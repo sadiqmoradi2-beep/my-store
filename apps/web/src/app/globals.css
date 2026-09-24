@@ -1,0 +1,179 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-vazirmatn), 'Segoe UI', system-ui, sans-serif;
+
+  /* سبز شال — رنگ اصلی برند */
+  --color-primary-50: #effaf6;
+  --color-primary-100: #d7f2e7;
+  --color-primary-200: #aee5d0;
+  --color-primary-300: #7bd1b3;
+  --color-primary-400: #47b693;
+  --color-primary-500: #259a79;
+  --color-primary-600: #177c62;
+  --color-primary-700: #136350;
+  --color-primary-800: #114f41;
+  --color-primary-900: #0f4137;
+
+  /* زعفرانی — رنگ تأکید */
+  --color-accent-100: #fdf0d7;
+  --color-accent-200: #fadfa8;
+  --color-accent-300: #f6c869;
+  --color-accent-400: #efab2e;
+  --color-accent-500: #de8f12;
+  --color-accent-600: #b96f0a;
+  --color-accent-700: #94540c;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+}
+
+:root {
+  --surface: #f7f6f2;
+  --surface-2: #ffffff;
+  --surface-3: #eef0ea;
+  --ink: #16241f;
+  --ink-muted: #47564f;
+  --ink-faint: #74827b;
+  --line: #dde2db;
+}
+
+.dark {
+  --surface: #0c1512;
+  --surface-2: #13201b;
+  --surface-3: #1a2a24;
+  --ink: #e8efe9;
+  --ink-muted: #a3b3aa;
+  --ink-faint: #6d7f76;
+  --line: #24352e;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 100dvh;
+}
+
+/* بافت نقطه‌ای ملایم پس‌زمینه */
+.bg-dotted {
+  background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+::selection {
+  background: var(--color-primary-200);
+  color: #0f4137;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ───────── شخصی‌سازی: رنگ پنل ───────── */
+.accent-blue {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+}
+
+.accent-violet {
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
+}
+
+.accent-rose {
+  --color-primary-50: #fff1f2;
+  --color-primary-100: #ffe4e6;
+  --color-primary-200: #fecdd3;
+  --color-primary-300: #fda4af;
+  --color-primary-400: #fb7185;
+  --color-primary-500: #f43f5e;
+  --color-primary-600: #e11d48;
+  --color-primary-700: #be123c;
+  --color-primary-800: #9f1239;
+  --color-primary-900: #881337;
+}
+
+.accent-amber {
+  --color-primary-50: #fffbeb;
+  --color-primary-100: #fef3c7;
+  --color-primary-200: #fde68a;
+  --color-primary-300: #fcd34d;
+  --color-primary-400: #fbbf24;
+  --color-primary-500: #f59e0b;
+  --color-primary-600: #d97706;
+  --color-primary-700: #b45309;
+  --color-primary-800: #92400e;
+  --color-primary-900: #78350f;
+}
+
+/* ───────── شخصی‌سازی: اندازه فونت و تراکم ───────── */
+html.font-scale-sm {
+  font-size: 87.5%;
+}
+html.font-scale-lg {
+  font-size: 112.5%;
+}
+html.density-compact {
+  --spacing: 0.2rem;
+}
+
+/*
+ * چاپ / PDF — پس‌زمینه سفید، بدون سایه، جدول‌ها بدون اسکرول.
+ * @page صریح لازم است — بدون آن، مرورگر حاشیه/اندازهٔ پیش‌فرض خودش را به‌کار می‌برد که همیشه
+ * روی کاغذ A4 وسط‌چین نیست (مثلاً در چاپ لیبل قیمت با چند لیبل در هر صفحه).
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  main {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  * {
+    box-shadow: none !important;
+  }
+}

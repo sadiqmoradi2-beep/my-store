@@ -1,0 +1,211 @@
+import { ROLES, RoleKey } from './roles';
+
+export const PERMISSIONS = {
+  TENANTS_READ: 'tenants.read',
+  TENANTS_UPDATE: 'tenants.update',
+  TENANTS_MANAGE_ALL: 'tenants.manage_all',
+
+  USERS_READ: 'users.read',
+  USERS_CREATE: 'users.create',
+  USERS_UPDATE: 'users.update',
+  USERS_DELETE: 'users.delete',
+
+  ROLES_READ: 'roles.read',
+  ROLES_MANAGE: 'roles.manage',
+
+  BRANCHES_READ: 'branches.read',
+  BRANCHES_CREATE: 'branches.create',
+  BRANCHES_UPDATE: 'branches.update',
+  BRANCHES_DELETE: 'branches.delete',
+
+  CATEGORIES_READ: 'categories.read',
+  CATEGORIES_CREATE: 'categories.create',
+  CATEGORIES_UPDATE: 'categories.update',
+  CATEGORIES_DELETE: 'categories.delete',
+
+  PRODUCTS_READ: 'products.read',
+  PRODUCTS_CREATE: 'products.create',
+  PRODUCTS_UPDATE: 'products.update',
+  PRODUCTS_DELETE: 'products.delete',
+  PRODUCTS_PRICE_HISTORY: 'products.price_history',
+
+  INVENTORY_READ: 'inventory.read',
+  INVENTORY_IN: 'inventory.in',
+  INVENTORY_OUT: 'inventory.out',
+  INVENTORY_ADJUST: 'inventory.adjust',
+  INVENTORY_TRANSFER: 'inventory.transfer',
+
+  ORDERS_READ: 'orders.read',
+  ORDERS_CREATE: 'orders.create',
+  ORDERS_APPROVE: 'orders.approve',
+  ORDERS_TRANSITION: 'orders.transition',
+  ORDERS_CANCEL: 'orders.cancel',
+
+  DASHBOARD_VIEW: 'dashboard.view',
+
+  CARTS_MANAGE: 'carts.manage',
+
+  PAYMENTS_READ: 'payments.read',
+  PAYMENTS_CREATE: 'payments.create',
+
+  CASH_READ: 'cash.read',
+  CASH_MANAGE: 'cash.manage',
+  CASH_TRANSACT: 'cash.transact',
+
+  POS_USE: 'pos.use',
+
+  SELLERS_READ: 'sellers.read',
+  SELLERS_MANAGE: 'sellers.manage',
+
+  EMPLOYEES_READ: 'employees.read',
+  EMPLOYEES_MANAGE: 'employees.manage',
+
+  SEASONS_READ: 'work_season.read',
+  SEASONS_MANAGE: 'work_season.manage',
+
+  DEBTS_READ: 'debts.read',
+  DEBTS_MANAGE: 'debts.manage',
+
+  RETURNS_READ: 'returns.read',
+  RETURNS_CREATE: 'returns.create',
+
+  SUPPLIERS_READ: 'suppliers.read',
+  SUPPLIERS_MANAGE: 'suppliers.manage',
+
+  PURCHASES_READ: 'purchases.read',
+  PURCHASES_CREATE: 'purchases.create',
+
+  REPORTS_VIEW: 'reports.view',
+
+  PARTNERS_READ: 'partners.read',
+  PARTNERS_MANAGE: 'partners.manage',
+
+  ACTIVITY_READ: 'activity_log.read',
+
+  BACKUPS_MANAGE: 'backups.manage',
+
+  MODULES_MANAGE: 'modules.manage',
+
+  SUBSCRIPTION_MANAGE: 'subscription.manage',
+  /** Approve/reject a plan-change request requiring approval — platform admin only (SUPER_ADMIN) */
+  SUBSCRIPTION_APPROVE: 'subscription.approve',
+  /** Manage global plan settings (enable/disable, approval requirement, yearly price) — platform admin only */
+  PLANS_MANAGE: 'subscription.plans_manage',
+
+  /** Review/manage feedback submitted by stores about the platform — platform admin only */
+  FEEDBACK_MANAGE: 'feedback.manage',
+} as const;
+
+export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const PERMISSION_MODULES: Record<PermissionKey, string> = Object.fromEntries(
+  Object.values(PERMISSIONS).map((key) => [key, key.split('.')[0]]),
+) as Record<PermissionKey, string>;
+
+const ALL = Object.values(PERMISSIONS);
+const READ_ONLY_CORE: PermissionKey[] = [
+  PERMISSIONS.DASHBOARD_VIEW,
+  PERMISSIONS.CATEGORIES_READ,
+  PERMISSIONS.PRODUCTS_READ,
+  PERMISSIONS.ORDERS_READ,
+];
+
+export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
+  [ROLES.SUPER_ADMIN]: ALL,
+  [ROLES.ADMIN]: ALL.filter(
+    (p) =>
+      p !== PERMISSIONS.TENANTS_MANAGE_ALL &&
+      p !== PERMISSIONS.SUBSCRIPTION_APPROVE &&
+      p !== PERMISSIONS.PLANS_MANAGE &&
+      p !== PERMISSIONS.FEEDBACK_MANAGE,
+  ),
+  [ROLES.BRANCH_MANAGER]: [
+    ...READ_ONLY_CORE,
+    PERMISSIONS.USERS_READ,
+    PERMISSIONS.BRANCHES_READ,
+    PERMISSIONS.CATEGORIES_CREATE,
+    PERMISSIONS.CATEGORIES_UPDATE,
+    PERMISSIONS.PRODUCTS_CREATE,
+    PERMISSIONS.PRODUCTS_UPDATE,
+    PERMISSIONS.PRODUCTS_PRICE_HISTORY,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.INVENTORY_IN,
+    PERMISSIONS.INVENTORY_OUT,
+    PERMISSIONS.INVENTORY_ADJUST,
+    PERMISSIONS.INVENTORY_TRANSFER,
+    PERMISSIONS.ORDERS_CREATE,
+    PERMISSIONS.ORDERS_APPROVE,
+    PERMISSIONS.ORDERS_TRANSITION,
+    PERMISSIONS.ORDERS_CANCEL,
+    PERMISSIONS.CARTS_MANAGE,
+    PERMISSIONS.PAYMENTS_READ,
+    PERMISSIONS.PAYMENTS_CREATE,
+    PERMISSIONS.CASH_READ,
+    PERMISSIONS.CASH_MANAGE,
+    PERMISSIONS.CASH_TRANSACT,
+    PERMISSIONS.POS_USE,
+    PERMISSIONS.SELLERS_READ,
+    PERMISSIONS.EMPLOYEES_READ,
+    PERMISSIONS.SEASONS_READ,
+    PERMISSIONS.DEBTS_READ,
+    PERMISSIONS.DEBTS_MANAGE,
+    PERMISSIONS.RETURNS_READ,
+    PERMISSIONS.RETURNS_CREATE,
+    PERMISSIONS.SUPPLIERS_READ,
+    PERMISSIONS.SUPPLIERS_MANAGE,
+    PERMISSIONS.PURCHASES_READ,
+    PERMISSIONS.PURCHASES_CREATE,
+    PERMISSIONS.REPORTS_VIEW,
+  ],
+  [ROLES.SALES_MANAGER]: [
+    PERMISSIONS.REPORTS_VIEW,
+    ...READ_ONLY_CORE,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.ORDERS_CREATE,
+    PERMISSIONS.ORDERS_APPROVE,
+    PERMISSIONS.ORDERS_TRANSITION,
+    PERMISSIONS.ORDERS_CANCEL,
+    PERMISSIONS.CARTS_MANAGE,
+    PERMISSIONS.PAYMENTS_READ,
+    PERMISSIONS.PAYMENTS_CREATE,
+    PERMISSIONS.SELLERS_READ,
+    PERMISSIONS.RETURNS_READ,
+    PERMISSIONS.RETURNS_CREATE,
+    PERMISSIONS.DEBTS_READ,
+  ],
+  [ROLES.SELLER]: [
+    ...READ_ONLY_CORE,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.ORDERS_CREATE,
+    PERMISSIONS.CARTS_MANAGE,
+    PERMISSIONS.POS_USE,
+    PERMISSIONS.PAYMENTS_CREATE,
+    PERMISSIONS.CASH_READ,
+  ],
+  [ROLES.EMPLOYEE]: READ_ONLY_CORE,
+  [ROLES.WAREHOUSE_STAFF]: [
+    PERMISSIONS.PRODUCTS_READ,
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.INVENTORY_IN,
+    PERMISSIONS.INVENTORY_OUT,
+    PERMISSIONS.INVENTORY_ADJUST,
+    PERMISSIONS.INVENTORY_TRANSFER,
+    PERMISSIONS.ORDERS_READ,
+    PERMISSIONS.ORDERS_TRANSITION,
+    PERMISSIONS.RETURNS_READ,
+    PERMISSIONS.PURCHASES_READ,
+  ],
+  [ROLES.CASHIER]: [
+    PERMISSIONS.PRODUCTS_READ,
+    PERMISSIONS.ORDERS_READ,
+    PERMISSIONS.ORDERS_CREATE,
+    PERMISSIONS.CARTS_MANAGE,
+    PERMISSIONS.PAYMENTS_CREATE,
+    PERMISSIONS.CASH_READ,
+    PERMISSIONS.CASH_TRANSACT,
+    PERMISSIONS.POS_USE,
+    PERMISSIONS.RETURNS_READ,
+    PERMISSIONS.RETURNS_CREATE,
+    PERMISSIONS.DEBTS_READ,
+  ],
+};

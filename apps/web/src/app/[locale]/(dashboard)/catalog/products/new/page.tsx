@@ -1,0 +1,37 @@
+'use client';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api-client';
+import { ProductForm, ProductFormValues } from '@/components/products/product-form';
+import { BackLink, Card } from '@/components/ui';
+
+export default function NewProductPage() {
+  const t = useTranslations('products');
+  const locale = useLocale();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (values: ProductFormValues) => api.post('/products', values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      router.push(`/${locale}/catalog/products`);
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <BackLink href={`/${locale}/catalog/products`} label={t('backToList')} />
+      <h1 className="text-xl font-black text-ink">{t('new')}</h1>
+      <Card className="p-5">
+        <ProductForm
+          onSubmit={(v) => mutation.mutate(v)}
+          submitting={mutation.isPending}
+          error={mutation.error}
+        />
+      </Card>
+    </div>
+  );
+}
