@@ -1,0 +1,24 @@
+# Render Blueprint — API only. The web app is hosted on Vercel; Postgres on Neon; Redis is a Render Key Value.
+services:
+  - type: web
+    name: my-store-api
+    runtime: node
+    region: ohio
+    plan: free
+    buildCommand: npm install --include=dev && npm run build -w packages/shared && npx prisma generate --schema apps/api/prisma/schema.prisma && npm run build -w apps/api
+    startCommand: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && node apps/api/dist/src/main.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true

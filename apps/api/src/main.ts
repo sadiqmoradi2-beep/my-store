@@ -10,6 +10,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.useStaticAssets(resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
+  // Behind a hosting proxy (Render/Vercel): use the real client IP for rate limiting
+  app.set('trust proxy', true);
   app.setGlobalPrefix('api/v1');
   app.use(cookieParser());
   app.enableCors({
