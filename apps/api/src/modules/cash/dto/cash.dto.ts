@@ -1,65 +1,9 @@
 import { Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsEnum,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 /** Sanity cap on a register transaction/balance — guards against a typo (extra digit) */
 const MAX_CASH_AMOUNT = 10_000_000_000;
-import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-
-export class CreateCashRegisterDto {
-  @IsString()
-  branchId: string;
-
-  @IsString()
-  @MinLength(2)
-  @MaxLength(80)
-  name: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(MAX_CASH_AMOUNT)
-  openingBalance?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  isDefault?: boolean;
-
-  /** This register = the branch's net sale profit register — receives the full profit share of each sale */
-  @IsOptional()
-  @IsBoolean()
-  isNetProfitBox?: boolean;
-}
-
-export class UpdateCashRegisterDto {
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(80)
-  name?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  isDefault?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isNetProfitBox?: boolean;
-}
 
 /** Manual entry of income/expense/withdrawal — SALE and REFUND are only recorded by the system */
 export class CreateCashTransactionDto {
@@ -91,4 +35,20 @@ export class CashTransactionListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   referenceType?: string;
+}
+
+export class IncomeSummaryQueryDto {
+  /** Range start — defaults to the first day of the current month */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Range end (whole day included) — defaults to now */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

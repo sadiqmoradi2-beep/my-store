@@ -30,11 +30,24 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
-enum OrderStatus {
-  PENDING
-  APPROVED
-  DELIVERED
-  CANCELLED
+enum PaymentMethod {
+  CASH
+  CARD
+  EBT
+  ZELLE
+  LOAN
+  DEFICIT
+}
+
+enum IncomePart {
+  CASH
+  EBT
+  ZELLE
+}
+
+enum DebtKind {
+  LOAN
+  DEFICIT
 }
 
 enum StockMovementType {
@@ -56,20 +69,6 @@ enum PriceType {
 
 enum Currency {
   USDT
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-}
-
-enum OrderPaymentStatus {
-  UNPAID
-  PARTIAL
-  PAID
-  REFUNDED
 }
 
 enum CashTransactionType {
@@ -112,7 +111,7 @@ model Tenant {
   roles         Role[]
   categories    Category[]
   products      Product[]
-  orders        Order[]
+  sales         Sale[]
   cashRegisters CashRegister[]
   subscriptionHistory SubscriptionHistory[]
   platformFeedback    PlatformFeedback[]
@@ -247,11 +246,8 @@ model User {
 
   priceChanges               PriceHistory[]
   stockMovements             StockMovement[]
-  createdOrders              Order[]                @relation("OrderCreatedBy")
-  approvedOrders             Order[]                @relation("OrderApprovedBy")
-  orderStatusChanges         OrderStatusHistory[]
-  payments                   Payment[]
   cashTransactions           CashTransaction[]
+  salesCreated               Sale[]                 @relation("SaleCreatedBy")
   sellerProfile              SellerProfile?
   salaryPaymentsMade         SalaryPayment[]        @relation("SalaryPaymentPerformedBy")
   sellerSalaryPaymentsMade   SellerSalaryPayment[]  @relation("SellerSalaryPaymentPerformedBy")
@@ -288,8 +284,8 @@ model Branch {
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   warehouses    Warehouse[]
   users         User[]
-  orders        Order[]
   carts         Cart[]
+  sales         Sale[]
   cashRegisters CashRegister[]
 
   @@unique([tenantId, code])
@@ -372,8 +368,8 @@ model Product {
   priceHistory   PriceHistory[]
   stocks         Stock[]
   stockMovements StockMovement[]
-  orderItems     OrderItem[]
   cartItems      CartItem[]
+  saleItems      SaleItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -480,88 +476,50 @@ model CartItem {
   @@unique([cartId, productId])
 }
 
-model Order {
-  id              String             @id @default(cuid())
-  tenantId        String
-  branchId        String
-  orderNumber     Int
-  status          OrderStatus        @default(PENDING)
-  subtotal        Decimal            @db.Decimal(18, 2)
-  total           Decimal            @db.Decimal(18, 2)
-  currency        Currency           @default(USDT)
-  paymentStatus   OrderPaymentStatus @default(UNPAID)
-  paidTotal       Decimal            @default(0) @db.Decimal(18, 2)
-  notes           String?
-  createdById     String
-  approvedById    String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+// ──────────────── Sales (POS) ────────────────
 
-  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch        Branch               @relation(fields: [branchId], references: [id])
-  createdBy     User                 @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  approvedBy    User?                @relation("OrderApprovedBy", fields: [approvedById], references: [id])
-  items         OrderItem[]
-  statusHistory OrderStatusHistory[]
-  payments      Payment[]
+model Sale {
+  id            String        @id @default(cuid())
+  tenantId      String
+  branchId      String
+  saleNumber    Int
+  total         Decimal       @db.Decimal(18, 2)
+  cost          Decimal       @default(0) @db.Decimal(18, 2) // purchase-price snapshot of all items — profit = total - cost
+  paymentMethod PaymentMethod
+  registerId    String? // the Income register that received the money — empty for Loan / Deficit
+  debtId        String? // the receivable created by a Loan / Deficit sale
+  notes         String?
+  createdById   String
+  createdAt     DateTime      @default(now())
 
-  @@unique([tenantId, orderNumber])
-  @@index([tenantId, status])
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch    Branch        @relation(fields: [branchId], references: [id])
+  createdBy User          @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  items     SaleItem[]
+
+  @@unique([tenantId, saleNumber])
   @@index([tenantId, createdAt])
+  @@index([tenantId, paymentMethod, createdAt])
 }
 
-model OrderItem {
+model SaleItem {
   id          String  @id @default(cuid())
-  orderId     String
+  saleId      String
   productId   String
   productName String // snapshot
   quantity    Int
   unitPrice   Decimal @db.Decimal(18, 2)
-  unitCost    Decimal @db.Decimal(18, 2) // purchase-price snapshot — for profit and purchasing power
+  unitCost    Decimal @db.Decimal(18, 2) // purchase-price snapshot
   total       Decimal @db.Decimal(18, 2)
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
-  @@index([orderId])
+  @@index([saleId])
   @@index([productId])
 }
 
-model OrderStatusHistory {
-  id          String       @id @default(cuid())
-  orderId     String
-  fromStatus  OrderStatus?
-  toStatus    OrderStatus
-  changedById String
-  note        String?
-  createdAt   DateTime     @default(now())
-
-  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  changedBy User  @relation(fields: [changedById], references: [id])
-
-  @@index([orderId])
-}
-
-// ──────────────── Payments / Cash ────────────────
-
-model Payment {
-  id           String        @id @default(cuid())
-  tenantId     String
-  orderId      String
-  status       PaymentStatus @default(PAID)
-  amount       Decimal       @db.Decimal(18, 2)
-  registerId   String?
-  receivedById String
-  note         String?
-  createdAt    DateTime      @default(now())
-
-  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  register   CashRegister? @relation(fields: [registerId], references: [id])
-  receivedBy User          @relation(fields: [receivedById], references: [id])
-
-  @@index([tenantId, createdAt])
-  @@index([orderId])
-}
+// ──────────────── Income (cash parts) ────────────────
 
 model CashRegister {
   id                   String   @id @default(cuid())
@@ -570,7 +528,7 @@ model CashRegister {
   name                 String
   isDefault            Boolean  @default(false)
   isActive             Boolean  @default(true)
-  isNetProfitBox       Boolean  @default(false)
+  part                 IncomePart @default(CASH)
   openingBalance       Decimal  @default(0) @db.Decimal(18, 2)
   balance              Decimal  @default(0) @db.Decimal(18, 2)
   createdAt            DateTime @default(now())
@@ -579,10 +537,10 @@ model CashRegister {
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch       Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
   transactions CashTransaction[]
-  payments     Payment[]
 
   @@index([tenantId])
   @@index([branchId])
+  @@index([tenantId, part])
 }
 
 model CashTransaction {
@@ -676,15 +634,15 @@ model CommissionEntry {
   id              String   @id @default(cuid())
   tenantId        String
   sellerProfileId String
-  orderId         String
-  orderNumber     Int
+  saleId          String
+  saleNumber      Int
   amount          Decimal  @db.Decimal(18, 2)
   percent         Decimal  @db.Decimal(5, 2)
   createdAt       DateTime @default(now())
 
   sellerProfile SellerProfile @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
 
-  @@unique([sellerProfileId, orderId])
+  @@unique([sellerProfileId, saleId])
   @@index([tenantId, createdAt])
 }
 
@@ -875,6 +833,7 @@ model Debt {
   tenantId       String
   direction      DebtDirection
   status         DebtStatus    @default(OPEN)
+  kind           DebtKind      @default(DEFICIT)
   partyName      String // snapshot of the counterparty's name
   supplierId     String?
   employeeId     String?
@@ -947,7 +906,7 @@ model ActivityLog {
   userId     String?
   method     String
   path       String
-  action     String // e.g. "orders.create"
+  action     String // e.g. "sales.create"
   entityId   String?
   statusCode Int
   ip         String?
@@ -960,7 +919,7 @@ model Notification {
   id        String    @id @default(cuid())
   tenantId  String
   userId    String
-  type      String // ORDER_CREATED | LOW_STOCK | DEBT_DUE | SYSTEM
+  type      String // LOW_STOCK | PRODUCT_EXPIRING | DEBT_DUE | SYSTEM | SUBSCRIPTION_EXPIRING
   title     String
   body      String?
   refType   String?
@@ -1034,14 +993,14 @@ enum GatewayIntentStatus {
 }
 
 /**
- * Online payment intent — abstract and independent of order/subscription (free-form referenceId/meta)
+ * Online payment intent — abstract and independent of the subscription (free-form referenceId/meta)
  * so it can later be replaced with a real gateway (webhook) without changing consumers.
  */
 model GatewayIntent {
   id            String              @id @default(cuid())
   tenantId      String
   purpose       GatewayPurpose
-  referenceId   String? // e.g. orderId for ORDER_PAYMENT
+  referenceId   String? // e.g. the subscription id
   provider      String? // VISA_CARD | OTHER_ONLINE | AUTOMATIC ...
   amount        Decimal             @db.Decimal(18, 2)
   currency      Currency            @default(USDT)

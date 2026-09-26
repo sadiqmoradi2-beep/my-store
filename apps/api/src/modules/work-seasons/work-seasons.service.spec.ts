@@ -100,7 +100,7 @@ describe('WorkSeasonsService.close', () => {
         findFirst: jest.fn().mockResolvedValue({ ...openSeason }),
         update: jest.fn().mockImplementation(({ data }) => ({ id: 'season1', ...data })),
       },
-      order: { findMany: jest.fn().mockResolvedValue([]) },
+      sale: { findMany: jest.fn().mockResolvedValue([]) },
       cashTransaction: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }) },
       capitalEntry: { groupBy: jest.fn().mockResolvedValue([]) },
     };
@@ -115,13 +115,13 @@ describe('WorkSeasonsService.close', () => {
     await expect(service.close('t1', 'season1')).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
-    expect(prisma.order.findMany).not.toHaveBeenCalled();
+    expect(prisma.sale.findMany).not.toHaveBeenCalled();
   });
 
   it('محاسبه گزارش پایان دوره: فروش، بهای تمام‌شده، سود و سرمایه', async () => {
-    prisma.order.findMany.mockResolvedValue([
-      { total: D(500), items: [{ quantity: 2, unitCost: D(100) }] },
-      { total: D(300), items: [{ quantity: 1, unitCost: D(150) }] },
+    prisma.sale.findMany.mockResolvedValue([
+      { total: D(500), cost: D(200) },
+      { total: D(300), cost: D(150) },
     ]);
     prisma.cashTransaction.aggregate.mockResolvedValue({ _sum: { amount: D(120) } });
     prisma.capitalEntry.groupBy.mockResolvedValue([
@@ -138,7 +138,7 @@ describe('WorkSeasonsService.close', () => {
       salesTotal: '800',
       salesCost: '350',
       profit: '450',
-      ordersCount: 2,
+      salesCount: 2,
       expensesTotal: '120',
       capitalIn: '1000',
       capitalOut: '200',

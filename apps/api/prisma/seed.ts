@@ -2,7 +2,7 @@
  * Seed — base system data + demo store.
  * Run: npm run prisma:seed -w apps/api   (idempotent)
  */
-import { PrismaClient, Prisma, OrderStatus } from '@prisma/client';
+import { PrismaClient, Prisma, IncomePart, PaymentMethod } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   MODULE_REGISTRY,
@@ -241,33 +241,54 @@ async function seedDemoTenant() {
     });
   }
 
-  await prisma.cashRegister.createMany({
-    data: [
-      { tenantId: tid, branchId: mainBranch.id, name: 'Main Register', isDefault: true, openingBalance: D(10000), balance: D(10000) },
-      { tenantId: tid, branchId: branch2.id, name: 'Karte Naw Register', isDefault: true, openingBalance: D(5000), balance: D(5000) },
-    ],
-  });
+  // Income parts: every branch has a Cash, EBT and Zelle register
+  const registerDefs: { branchId: string; part: IncomePart; name: string; opening: number }[] = [
+    { branchId: mainBranch.id, part: 'CASH', name: 'Cash', opening: 10000 },
+    { branchId: mainBranch.id, part: 'EBT', name: 'EBT', opening: 2000 },
+    { branchId: mainBranch.id, part: 'ZELLE', name: 'Zelle', opening: 3000 },
+    { branchId: branch2.id, part: 'CASH', name: 'Cash', opening: 5000 },
+    { branchId: branch2.id, part: 'EBT', name: 'EBT', opening: 0 },
+    { branchId: branch2.id, part: 'ZELLE', name: 'Zelle', opening: 0 },
+  ];
+  const registerByPart = new Map<IncomePart, { id: string; balance: Prisma.Decimal }>();
+  for (const def of registerDefs) {
+    const register = await prisma.cashRegister.create({
+      data: {
+        tenantId: tid,
+        branchId: def.branchId,
+        part: def.part,
+        name: def.name,
+        isDefault: true,
+        openingBalance: D(def.opening),
+        balance: D(def.opening),
+      },
+    });
+    if (def.branchId === mainBranch.id) registerByPart.set(def.part, { id: register.id, balance: D(def.opening) });
+  }
 
-  // Orders in various statuses; some today and some earlier in the month
+  // Sales with different payment methods; some today and some earlier in the month
   const now = new Date();
   const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000);
-  const orderDefs: {
-    status: OrderStatus; createdAt: Date;
+  const partOf: Record<PaymentMethod, IncomePart | null> = {
+    CASH: 'CASH', CARD: 'ZELLE', EBT: 'EBT', ZELLE: 'ZELLE', LOAN: null, DEFICIT: null,
+  };
+  const saleDefs: {
+    method: PaymentMethod; createdAt: Date; party?: string;
     items: { productIndex: number; qty: number }[];
   }[] = [
-    { status: 'PENDING', createdAt: now, items: [{ productIndex: 0, qty: 2 }, { productIndex: 6, qty: 10 }] },
-    { status: 'PENDING', createdAt: now, items: [{ productIndex: 7, qty: 12 }] },
-    { status: 'APPROVED', createdAt: now, items: [{ productIndex: 1, qty: 1 }, { productIndex: 4, qty: 2 }] },
-    { status: 'APPROVED', createdAt: daysAgo(1), items: [{ productIndex: 2, qty: 3 }] },
-    { status: 'APPROVED', createdAt: daysAgo(2), items: [{ productIndex: 8, qty: 24 }] },
-    { status: 'DELIVERED', createdAt: daysAgo(3), items: [{ productIndex: 0, qty: 1 }, { productIndex: 3, qty: 5 }] },
-    { status: 'DELIVERED', createdAt: daysAgo(5), items: [{ productIndex: 9, qty: 1 }] },
-    { status: 'CANCELLED', createdAt: daysAgo(4), items: [{ productIndex: 5, qty: 2 }] },
+    { method: 'CASH', createdAt: now, items: [{ productIndex: 0, qty: 2 }, { productIndex: 6, qty: 10 }] },
+    { method: 'EBT', createdAt: now, items: [{ productIndex: 7, qty: 12 }] },
+    { method: 'ZELLE', createdAt: now, items: [{ productIndex: 1, qty: 1 }, { productIndex: 4, qty: 2 }] },
+    { method: 'CARD', createdAt: daysAgo(1), items: [{ productIndex: 2, qty: 3 }] },
+    { method: 'CASH', createdAt: daysAgo(2), items: [{ productIndex: 8, qty: 24 }] },
+    { method: 'LOAN', createdAt: daysAgo(3), party: 'Najibullah Rahimi', items: [{ productIndex: 0, qty: 1 }, { productIndex: 3, qty: 5 }] },
+    { method: 'DEFICIT', createdAt: daysAgo(5), party: 'Fatima Ahmadi', items: [{ productIndex: 9, qty: 1 }] },
+    { method: 'CASH', createdAt: daysAgo(4), items: [{ productIndex: 5, qty: 2 }] },
   ];
 
-  let orderNumber = 0;
-  for (const def of orderDefs) {
-    orderNumber += 1;
+  let saleNumber = 0;
+  for (const def of saleDefs) {
+    saleNumber += 1;
     const items = def.items.map(({ productIndex, qty }) => {
       const p = products[productIndex];
       return {
@@ -279,58 +300,82 @@ async function seedDemoTenant() {
         total: D(p.sale * qty),
       };
     });
-    const subtotal = items.reduce((sum, i) => sum.add(i.total), D(0));
-    const wasApproved = ['APPROVED', 'DELIVERED'].includes(def.status);
+    const total = items.reduce((sum, i) => sum.add(i.total), D(0));
+    const cost = items.reduce((sum, i) => sum.add(i.unitCost.mul(i.quantity)), D(0));
+    const part = partOf[def.method];
+    const register = part ? registerByPart.get(part)! : null;
 
-    const order = await prisma.order.create({
+    const sale = await prisma.sale.create({
       data: {
         tenantId: tid,
         branchId: mainBranch.id,
-        orderNumber,
-        status: def.status,
-        subtotal,
-        total: subtotal,
+        saleNumber,
+        total,
+        cost,
+        paymentMethod: def.method,
+        registerId: register?.id ?? null,
         createdById: seller.id,
-        approvedById: wasApproved ? admin.id : null,
         createdAt: def.createdAt,
         items: { create: items },
       },
     });
-    await prisma.orderStatusHistory.create({
-      data: { orderId: order.id, toStatus: 'PENDING', changedById: seller.id, createdAt: def.createdAt },
-    });
-    if (def.status !== 'PENDING') {
-      await prisma.orderStatusHistory.create({
+
+    if (register) {
+      register.balance = register.balance.add(total);
+      await prisma.cashTransaction.create({
         data: {
-          orderId: order.id,
-          fromStatus: 'PENDING',
-          toStatus: def.status,
-          changedById: admin.id,
+          tenantId: tid,
+          registerId: register.id,
+          type: 'SALE',
+          amount: total,
+          balanceAfter: register.balance,
+          category: def.method,
+          note: `Sale #${saleNumber}`,
+          referenceType: 'sale',
+          referenceId: sale.id,
+          performedById: seller.id,
           createdAt: def.createdAt,
         },
       });
+      await prisma.cashRegister.update({ where: { id: register.id }, data: { balance: register.balance } });
+    } else {
+      const debt = await prisma.debt.create({
+        data: {
+          tenantId: tid,
+          direction: 'RECEIVABLE',
+          kind: def.method === 'LOAN' ? 'LOAN' : 'DEFICIT',
+          partyName: def.party!,
+          amount: total,
+          dueDate: new Date(now.getTime() + 14 * 86_400_000),
+          referenceType: 'sale',
+          referenceId: sale.id,
+          notes: `Sale #${saleNumber}`,
+          createdById: admin.id,
+          createdAt: def.createdAt,
+        },
+      });
+      await prisma.sale.update({ where: { id: sale.id }, data: { debtId: debt.id } });
     }
-    // Stock effect of approved orders
-    if (wasApproved) {
-      for (const item of items) {
-        await prisma.stock.update({
-          where: { productId_warehouseId: { productId: item.productId, warehouseId: mainWarehouse.id } },
-          data: { quantity: { decrement: item.quantity } },
-        });
-        await prisma.stockMovement.create({
-          data: {
-            tenantId: tid,
-            productId: item.productId,
-            warehouseId: mainWarehouse.id,
-            type: 'SALE_OUT',
-            quantity: item.quantity,
-            referenceType: 'order',
-            referenceId: order.id,
-            performedById: admin.id,
-            createdAt: def.createdAt,
-          },
-        });
-      }
+
+    // Stock effect of the sale
+    for (const item of items) {
+      await prisma.stock.update({
+        where: { productId_warehouseId: { productId: item.productId, warehouseId: mainWarehouse.id } },
+        data: { quantity: { decrement: item.quantity } },
+      });
+      await prisma.stockMovement.create({
+        data: {
+          tenantId: tid,
+          productId: item.productId,
+          warehouseId: mainWarehouse.id,
+          type: 'SALE_OUT',
+          quantity: item.quantity,
+          referenceType: 'sale',
+          referenceId: sale.id,
+          performedById: seller.id,
+          createdAt: def.createdAt,
+        },
+      });
     }
   }
 

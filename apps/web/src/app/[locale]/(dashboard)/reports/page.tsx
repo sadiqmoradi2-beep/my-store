@@ -91,8 +91,8 @@ export default function ReportsPage() {
     ? [
         { label: t('salesTotal'), value: formatMoney(totals.salesTotal, locale), money: true, accent: true },
         { label: t('profit'), value: formatMoney(totals.profit, locale), money: true },
-        { label: t('ordersCount'), value: formatNumber(totals.ordersCount, locale), money: false },
-        { label: t('averageOrder'), value: formatMoney(totals.averageOrder, locale), money: true },
+        { label: t('salesCount'), value: formatNumber(totals.salesCount, locale), money: false },
+        { label: t('averageSale'), value: formatMoney(totals.averageSale, locale), money: true },
       ]
     : null;
 
@@ -201,7 +201,7 @@ export default function ReportsPage() {
               labels={{
                 revenue: t('revenue'),
                 profit: t('profit'),
-                orders: t('ordersCount'),
+                sales: t('salesCount'),
                 empty: tc('noData'),
               }}
             />
@@ -218,7 +218,7 @@ export default function ReportsPage() {
                         <th className="p-2 text-start font-medium">{t('revenue')}</th>
                         <th className="p-2 text-start font-medium">{t('cost')}</th>
                         <th className="p-2 text-start font-medium">{t('profit')}</th>
-                        <th className="p-2 text-start font-medium">{t('ordersCount')}</th>
+                        <th className="p-2 text-start font-medium">{t('salesCount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -228,7 +228,7 @@ export default function ReportsPage() {
                           <td className="p-2 text-ink">{formatMoney(point.total, locale)}</td>
                           <td className="p-2 text-ink-muted">{formatMoney(point.cost, locale)}</td>
                           <td className="p-2 text-ink">{formatMoney(point.profit, locale)}</td>
-                          <td className="p-2 text-ink-muted">{formatNumber(point.orders, locale)}</td>
+                          <td className="p-2 text-ink-muted">{formatNumber(point.sales, locale)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -277,7 +277,7 @@ export default function ReportsPage() {
                 rows={(branchReport.data ?? []).map((row) => ({
                   key: row.branchId,
                   name: row.name,
-                  hint: t('ordersHint', { count: formatNumber(row.ordersCount, locale) }),
+                  hint: t('salesHint', { count: formatNumber(row.salesCount, locale) }),
                   value: Number(row.total),
                   display: formatMoney(row.total, locale),
                 }))}
@@ -357,7 +357,7 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-line text-xs text-ink-muted">
                     <th className="p-2 text-start font-medium">{t('seller')}</th>
-                    <th className="p-2 text-start font-medium">{t('ordersCount')}</th>
+                    <th className="p-2 text-start font-medium">{t('salesCount')}</th>
                     <th className="p-2 text-start font-medium">{t('itemsSold')}</th>
                     <th className="p-2 text-start font-medium">{t('salesTotal')}</th>
                     <th className="p-2 text-start font-medium">{t('profit')}</th>
@@ -367,7 +367,7 @@ export default function ReportsPage() {
                   {sellerReport.data?.map((row) => (
                     <tr key={row.sellerId} className="border-b border-line/60 last:border-0">
                       <td className="p-2 font-semibold text-ink">{row.name}</td>
-                      <td className="p-2 text-ink-muted">{formatNumber(row.ordersCount, locale)}</td>
+                      <td className="p-2 text-ink-muted">{formatNumber(row.salesCount, locale)}</td>
                       <td className="p-2 text-ink-muted">{formatNumber(row.itemsSold, locale)}</td>
                       <td className="p-2 text-ink">{formatMoney(row.total, locale)}</td>
                       <td className="p-2 font-bold text-ink">{formatMoney(row.profit, locale)}</td>

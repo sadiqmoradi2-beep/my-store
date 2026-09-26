@@ -6,24 +6,19 @@ import { DashboardRepository } from './dashboard.repository';
 import { DashboardService } from './dashboard.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
+const sums = (total: number | null, cost: number | null, count = 0) => ({
+  _sum: { total: total == null ? null : D(total), cost: cost == null ? null : D(cost) },
+  _count: { _all: count },
+});
 
 describe('DashboardService.summary', () => {
   let service: DashboardService;
-  let repo: {
-    sumSales: jest.Mock;
-    revenueItems: jest.Mock;
-    countOrdersToday: jest.Mock;
-    ordersByStatus: jest.Mock;
-    topProducts: jest.Mock;
-  };
+  let repo: { sumSales: jest.Mock; topProducts: jest.Mock };
   let inventoryService: { lowStocks: jest.Mock };
 
   beforeEach(async () => {
     repo = {
-      sumSales: jest.fn().mockResolvedValue({ _sum: { total: D(1000) } }),
-      revenueItems: jest.fn().mockResolvedValue([]),
-      countOrdersToday: jest.fn().mockResolvedValue(5),
-      ordersByStatus: jest.fn().mockResolvedValue([]),
+      sumSales: jest.fn().mockResolvedValue(sums(1000, 700, 5)),
       topProducts: jest.fn().mockResolvedValue([]),
     };
     inventoryService = { lowStocks: jest.fn().mockResolvedValue([]) };
@@ -42,57 +37,43 @@ describe('DashboardService.summary', () => {
     service = moduleRef.get(DashboardService);
   });
 
-  it('سود روز/ماه را از اقلام سفارش محاسبه می‌کند', async () => {
-    repo.revenueItems
-      .mockResolvedValueOnce([
-        { unitPrice: D(100), unitCost: D(60), quantity: 2 },
-        { unitPrice: D(50), unitCost: D(30), quantity: 1 },
-      ])
-      .mockResolvedValueOnce([{ unitPrice: D(200), unitCost: D(150), quantity: 3 }]);
-
+  it('today/month profit = sales total minus the cost of the items sold', async () => {
+    repo.sumSales.mockResolvedValueOnce(sums(300, 200, 2)).mockResolvedValueOnce(sums(1000, 640, 9));
     const result = await service.summary('t1');
-
-    // روز: (100-60)*2 + (50-30)*1 = 80 + 20 = 100
+    expect(result.todaySales.toString()).toBe('300');
     expect(result.todayProfit.toString()).toBe('100');
-    // ماه: (200-150)*3 = 150
-    expect(result.monthProfit.toString()).toBe('150');
+    expect(result.monthSales.toString()).toBe('1000');
+    expect(result.monthProfit.toString()).toBe('360');
+    expect(result.todaySalesCount).toBe(2);
   });
 
-  it('sum خالی از aggregate → Decimal(0) به‌جای null', async () => {
-    repo.sumSales.mockResolvedValue({ _sum: { total: null } });
+  it('empty aggregate → Decimal(0) instead of null', async () => {
+    repo.sumSales.mockResolvedValue(sums(null, null, 0));
     const result = await service.summary('t1');
     expect(result.todaySales).toBeInstanceOf(Prisma.Decimal);
     expect(result.todaySales.toString()).toBe('0');
     expect(result.monthSales.toString()).toBe('0');
-  });
-
-  it('بدون اقلام سفارش → سود صفر (بدون خطا)', async () => {
-    const result = await service.summary('t1');
     expect(result.todayProfit.toString()).toBe('0');
-    expect(result.monthProfit.toString()).toBe('0');
   });
 
-  it('ordersByStatus همه وضعیت‌ها را با پیش‌فرض صفر برمی‌گرداند', async () => {
-    repo.ordersByStatus.mockResolvedValue([{ status: 'DELIVERED', _count: { _all: 7 } }]);
-    const result = await service.summary('t1');
-    expect(result.ordersByStatus.DELIVERED).toBe(7);
-    expect(result.ordersByStatus.PENDING).toBe(0);
-    expect(result.ordersByStatus.CANCELLED).toBe(0);
-  });
-
-  it('topProducts با _sum خالی → quantity/total صفر', async () => {
+  it('topProducts with an empty _sum → quantity/total zero', async () => {
     repo.topProducts.mockResolvedValue([
-      { productId: 'p1', productName: 'محصول ۱', _sum: { quantity: null, total: null } },
+      { productId: 'p1', productName: 'Product 1', _sum: { quantity: null, total: null } },
     ]);
     const result = await service.summary('t1');
     expect(result.topProducts[0].quantity).toBe(0);
     expect(result.topProducts[0].total.toString()).toBe('0');
   });
 
-  it('branchId را به تمام متدهای repo پاس می‌دهد', async () => {
+  it('passes branchId to the repository', async () => {
     await service.summary('t1', 'b1');
     expect(repo.sumSales).toHaveBeenCalledWith('t1', expect.any(Date), 'b1');
-    expect(repo.countOrdersToday).toHaveBeenCalledWith('t1', expect.any(Date), 'b1');
-    expect(repo.ordersByStatus).toHaveBeenCalledWith('t1', 'b1');
+    expect(repo.topProducts).toHaveBeenCalledWith('t1', expect.any(Date), 'b1');
+  });
+
+  it('low stock count comes from the inventory service', async () => {
+    inventoryService.lowStocks.mockResolvedValue([{}, {}, {}]);
+    const result = await service.summary('t1');
+    expect(result.lowStockCount).toBe(3);
   });
 });

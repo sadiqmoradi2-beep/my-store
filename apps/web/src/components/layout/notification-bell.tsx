@@ -22,10 +22,10 @@ function notificationTarget(locale: Locale, refType: string | null, refId: strin
   switch (refType) {
     case 'product':
       return `/${locale}/catalog/products/${refId}/edit`;
-    case 'order':
-      return `/${locale}/orders`;
+    case 'sale':
+      return `/${locale}/income`;
     case 'debt':
-      return `/${locale}/finance/debts`;
+      return `/${locale}/loans`;
     case 'subscription':
       return `/${locale}/settings/subscription`;
     default:

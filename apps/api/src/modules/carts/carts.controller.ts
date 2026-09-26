@@ -6,7 +6,6 @@ import { RequirePermissions } from '../../common/decorators/require-permissions.
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import {
   AddCartItemDto,
-  CheckoutCartDto,
   CreateCartDto,
   UpdateCartItemDto,
 } from './dto/cart.dto';
@@ -58,16 +57,5 @@ export class CartsController {
     @Param('productId') productId: string,
   ) {
     return this.cartsService.removeItem(tenantId, id, productId);
-  }
-
-  @Post(':id/checkout')
-  @RequirePermissions(PERMISSIONS.CARTS_MANAGE, PERMISSIONS.ORDERS_CREATE)
-  checkout(
-    @TenantId() tenantId: string,
-    @CurrentUser() user: RequestUser,
-    @Param('id') id: string,
-    @Body() dto: CheckoutCartDto,
-  ) {
-    return this.cartsService.checkout(tenantId, user.userId, id, dto);
   }
 }

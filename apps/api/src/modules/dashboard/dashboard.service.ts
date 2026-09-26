@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { kabulDayStartUtc, kabulGregorianMonthStartUtc, ORDER_STATUSES } from '@my-store/shared';
+import { kabulDayStartUtc, kabulGregorianMonthStartUtc } from '@my-store/shared';
 import { CacheService } from '../../redis/cache.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { DashboardRepository } from './dashboard.repository';
@@ -24,33 +24,22 @@ export class DashboardService {
     const dayStart = kabulDayStartUtc();
     const monthStart = kabulGregorianMonthStartUtc();
 
-    const [todaySales, monthSales, todayItems, monthItems, todayOrders, byStatus, lowStocks, top] =
-      await Promise.all([
-        this.repo.sumSales(tenantId, dayStart, branchId),
-        this.repo.sumSales(tenantId, monthStart, branchId),
-        this.repo.revenueItems(tenantId, dayStart, branchId),
-        this.repo.revenueItems(tenantId, monthStart, branchId),
-        this.repo.countOrdersToday(tenantId, dayStart, branchId),
-        this.repo.ordersByStatus(tenantId, branchId),
-        this.inventoryService.lowStocks(tenantId),
-        this.repo.topProducts(tenantId, monthStart, branchId),
-      ]);
-
-    const ordersByStatus = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<
-      string,
-      number
-    >;
-    for (const row of byStatus) {
-      ordersByStatus[row.status] = row._count._all;
-    }
+    const [today, month, lowStocks, top] = await Promise.all([
+      this.repo.sumSales(tenantId, dayStart, branchId),
+      this.repo.sumSales(tenantId, monthStart, branchId),
+      this.inventoryService.lowStocks(tenantId),
+      this.repo.topProducts(tenantId, monthStart, branchId),
+    ]);
+    const zero = new Prisma.Decimal(0);
+    const totalOf = (r: typeof today) => r._sum.total ?? zero;
+    const profitOf = (r: typeof today) => totalOf(r).sub(r._sum.cost ?? zero);
 
     return {
-      todaySales: todaySales._sum.total ?? new Prisma.Decimal(0),
-      monthSales: monthSales._sum.total ?? new Prisma.Decimal(0),
-      todayProfit: profitOf(todayItems),
-      monthProfit: profitOf(monthItems),
-      todayOrders,
-      ordersByStatus,
+      todaySales: totalOf(today),
+      monthSales: totalOf(month),
+      todayProfit: profitOf(today),
+      monthProfit: profitOf(month),
+      todaySalesCount: today._count._all,
       lowStockCount: lowStocks.length,
       topProducts: top.map((row) => ({
         productId: row.productId,
@@ -60,13 +49,4 @@ export class DashboardService {
       })),
     };
   }
-}
-
-function profitOf(
-  items: { unitPrice: Prisma.Decimal; unitCost: Prisma.Decimal; quantity: number }[],
-) {
-  return items.reduce(
-    (sum, i) => sum.add(i.unitPrice.sub(i.unitCost).mul(i.quantity)),
-    new Prisma.Decimal(0),
-  );
 }

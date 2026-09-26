@@ -11,7 +11,7 @@ describe('ExportsService', () => {
   let prisma: {
     product: { findMany: jest.Mock };
     stock: { groupBy: jest.Mock; findMany: jest.Mock };
-    order: { findMany: jest.Mock };
+    sale: { findMany: jest.Mock };
   };
   let reportsService: { sales: jest.Mock };
 
@@ -19,12 +19,12 @@ describe('ExportsService', () => {
     prisma = {
       product: { findMany: jest.fn().mockResolvedValue([]) },
       stock: { groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]) },
-      order: { findMany: jest.fn().mockResolvedValue([]) },
+      sale: { findMany: jest.fn().mockResolvedValue([]) },
     };
     reportsService = {
       sales: jest.fn().mockResolvedValue({
         points: [],
-        totals: { ordersCount: 0, salesTotal: D(0), salesCost: D(0), profit: D(0) },
+        totals: { salesCount: 0, salesTotal: D(0), salesCost: D(0), profit: D(0) },
       }),
     };
 
@@ -75,10 +75,10 @@ describe('ExportsService', () => {
     });
   });
 
-  describe('orders', () => {
+  describe('sales', () => {
     it('an explicit date range and branchId are applied to where', async () => {
-      await service.orders('t1', { from: '2026-01-01', to: '2026-01-31', branchId: 'b1' });
-      const args = prisma.order.findMany.mock.calls[0][0];
+      await service.sales('t1', { from: '2026-01-01', to: '2026-01-31', branchId: 'b1' });
+      const args = prisma.sale.findMany.mock.calls[0][0];
       expect(args.where.tenantId).toBe('t1');
       expect(args.where.branchId).toBe('b1');
       expect(args.where.createdAt.gte.toISOString().slice(0, 10)).toBe('2026-01-01');
@@ -86,8 +86,8 @@ describe('ExportsService', () => {
     });
 
     it('no input range → defaults to 30 days and no branch filter', async () => {
-      await service.orders('t1', {});
-      const args = prisma.order.findMany.mock.calls[0][0];
+      await service.sales('t1', {});
+      const args = prisma.sale.findMany.mock.calls[0][0];
       expect(args.where.branchId).toBeUndefined();
       const diffDays =
         (args.where.createdAt.lte.getTime() - args.where.createdAt.gte.getTime()) / 86_400_000;
@@ -98,15 +98,15 @@ describe('ExportsService', () => {
   describe('salesReport', () => {
     it('calls reportsService.sales with tenantId and query and appends a grand-total row', async () => {
       reportsService.sales.mockResolvedValue({
-        points: [{ bucket: new Date('2026-01-05'), orders: 2, total: D(500), cost: D(200), profit: D(300) }],
-        totals: { ordersCount: 2, salesTotal: D(500), salesCost: D(200), profit: D(300) },
+        points: [{ bucket: new Date('2026-01-05'), sales: 2, total: D(500), cost: D(200), profit: D(300) }],
+        totals: { salesCount: 2, salesTotal: D(500), salesCost: D(200), profit: D(300) },
       });
       const query = { from: '2026-01-01', to: '2026-01-31' };
       const sheet = await service.salesReport('t1', query);
       expect(reportsService.sales).toHaveBeenCalledWith('t1', query);
       expect(sheet.rows).toHaveLength(2);
       expect(sheet.rows[1]).toEqual(
-        expect.objectContaining({ bucket: 'Total', orders: 2, total: 500, cost: 200, profit: 300 }),
+        expect.objectContaining({ bucket: 'Total', sales: 2, total: 500, cost: 200, profit: 300 }),
       );
     });
 
@@ -114,7 +114,7 @@ describe('ExportsService', () => {
       const sheet = await service.salesReport('t1', {});
       expect(sheet.rows).toHaveLength(1);
       expect(sheet.rows[0]).toEqual(
-        expect.objectContaining({ bucket: 'Total', orders: 0, total: 0, cost: 0, profit: 0 }),
+        expect.objectContaining({ bucket: 'Total', sales: 0, total: 0, cost: 0, profit: 0 }),
       );
     });
   });

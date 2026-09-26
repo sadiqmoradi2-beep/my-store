@@ -129,7 +129,7 @@ export default function AlertsPage() {
                         <td className="p-3 font-bold text-ink">
                           {party ? (
                             <Link
-                              href={`/${locale}/finance/debts/supplier/${party}`}
+                              href={`/${locale}/loans/supplier/${party}`}
                               className="text-primary-700 hover:underline dark:text-primary-300"
                             >
                               {debt.partyName}

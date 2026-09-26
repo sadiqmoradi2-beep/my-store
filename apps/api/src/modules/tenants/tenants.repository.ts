@@ -52,15 +52,15 @@ export class TenantsRepository {
     });
   }
 
-  /** Lightweight usage-behavior signals — just the admin's last login and total order count, no heavy analysis */
+  /** Lightweight usage-behavior signals — just the admin's last login and total sale count, no heavy analysis */
   async behaviorSignals(tenantId: string) {
-    const [lastAdminLogin, totalOrders] = await Promise.all([
+    const [lastAdminLogin, totalSales] = await Promise.all([
       this.prisma.user.aggregate({
         where: { tenantId, role: { key: 'ADMIN' } },
         _max: { lastLoginAt: true },
       }),
-      this.prisma.order.count({ where: { tenantId } }),
+      this.prisma.sale.count({ where: { tenantId } }),
     ]);
-    return { lastAdminLoginAt: lastAdminLogin._max.lastLoginAt, totalOrders };
+    return { lastAdminLoginAt: lastAdminLogin._max.lastLoginAt, totalSales };
   }
 }

@@ -12,7 +12,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Stock',
   'StockMovement',
   'Cart',
-  'Order',
+  'Sale',
 ]);
 
 const WHERE_CHECKED_OPS = new Set([

@@ -41,7 +41,7 @@ export function DebtLedgerView({
     <div className="space-y-4">
       {showHeader && (
         <>
-          <BackLink href={`/${locale}/finance/debts`} label={t('title')} />
+          <BackLink href={`/${locale}/loans`} label={t('title')} />
           <h1 className="text-xl font-black text-ink">{data.party.name}</h1>
         </>
       )}

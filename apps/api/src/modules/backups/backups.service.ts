@@ -152,7 +152,7 @@ export class BackupsService {
   /**
    * Wipe the store's data — either everything (only business/transactional data; the account
    * structure — roles, users, branches, warehouses, registers — stays intact) or a specific
-   * scope (e.g. just orders, or just cash history). A safety backup is taken automatically first.
+   * scope (e.g. just sales, or just income history). A safety backup is taken automatically first.
    */
   async wipeData(tenantId: string, currentUserId: string, scope?: ResetScope) {
     await this.create(tenantId, 'MANUAL', currentUserId, `Automatic backup before data reset (${scope ?? 'ALL'})`);

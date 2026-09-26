@@ -2,7 +2,6 @@ export * from './constants/roles';
 export * from './constants/permissions';
 export * from './constants/modules';
 export * from './constants/plans';
-export * from './constants/order-status';
 export * from './constants/sales';
 export * from './constants/phase3';
 export * from './constants/phase4';

@@ -39,7 +39,7 @@ describe('ReportsService', () => {
   let service: ReportsService;
   let prisma: {
     $queryRaw: jest.Mock;
-    orderItem: { groupBy: jest.Mock };
+    saleItem: { groupBy: jest.Mock };
     product: { findMany: jest.Mock };
     branch: { findMany: jest.Mock };
     user: { findMany: jest.Mock };
@@ -48,7 +48,7 @@ describe('ReportsService', () => {
   beforeEach(async () => {
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([]),
-      orderItem: { groupBy: jest.fn().mockResolvedValue([]) },
+      saleItem: { groupBy: jest.fn().mockResolvedValue([]) },
       product: { findMany: jest.fn().mockResolvedValue([]) },
       branch: { findMany: jest.fn().mockResolvedValue([]) },
       user: { findMany: jest.fn().mockResolvedValue([]) },
@@ -74,19 +74,19 @@ describe('ReportsService', () => {
       expect(result.totals.salesTotal.toString()).toBe('0');
       expect(result.totals.salesCost.toString()).toBe('0');
       expect(result.totals.profit.toString()).toBe('0');
-      expect(result.totals.ordersCount).toBe(0);
-      expect(result.totals.averageOrder.toString()).toBe('0');
-      expect(Number.isNaN(result.totals.averageOrder.toNumber())).toBe(false);
+      expect(result.totals.salesCount).toBe(0);
+      expect(result.totals.averageSale.toString()).toBe('0');
+      expect(Number.isNaN(result.totals.averageSale.toNumber())).toBe(false);
     });
 
     it('با نتیجه → سود و جمع صحیح محاسبه می‌شود', async () => {
       prisma.$queryRaw.mockResolvedValue([
-        { bucket: new Date('2026-01-05'), total: D(500), cost: D(200), orders: 3 },
+        { bucket: new Date('2026-01-05'), total: D(500), cost: D(200), sales: 3 },
       ]);
       const result = await service.sales('t1', {});
       expect(result.totals.salesTotal.toString()).toBe('500');
       expect(result.totals.profit.toString()).toBe('300');
-      expect(result.totals.averageOrder.toString()).toBe('166.67');
+      expect(result.totals.averageSale.toString()).toBe('166.67');
     });
   });
 
@@ -98,7 +98,7 @@ describe('ReportsService', () => {
     });
 
     it('_sum خالی → quantity/revenue صفر', async () => {
-      prisma.orderItem.groupBy
+      prisma.saleItem.groupBy
         .mockResolvedValueOnce([{ productId: 'p1', _sum: { quantity: null, total: null } }])
         .mockResolvedValueOnce([]);
       prisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'محصول ۱' }]);
@@ -118,8 +118,8 @@ describe('ReportsService', () => {
 
     it('با نتیجه → سود هر شعبه = فروش منهای هزینه', async () => {
       prisma.$queryRaw.mockResolvedValue([
-        { branchId: 'b1', total: D(1000), cost: D(400), orders: 5 },
-        { branchId: 'b2', total: D(300), cost: D(300), orders: 2 },
+        { branchId: 'b1', total: D(1000), cost: D(400), sales: 5 },
+        { branchId: 'b2', total: D(300), cost: D(300), sales: 2 },
       ]);
       prisma.branch.findMany.mockResolvedValue([
         { id: 'b1', name: 'شعبه مرکزی' },
@@ -127,7 +127,7 @@ describe('ReportsService', () => {
       ]);
       const result = await service.branches('t1', {});
       expect(result[0]).toEqual(
-        expect.objectContaining({ branchId: 'b1', name: 'شعبه مرکزی', ordersCount: 5 }),
+        expect.objectContaining({ branchId: 'b1', name: 'شعبه مرکزی', salesCount: 5 }),
       );
       expect(result[0].profit.toString()).toBe('600');
       expect(result[1].profit.toString()).toBe('0');
@@ -142,7 +142,7 @@ describe('ReportsService', () => {
 
     it('با نتیجه → سود و تعداد اجناس فروخته‌شده هر فروشنده', async () => {
       prisma.$queryRaw.mockResolvedValue([
-        { sellerId: 'u1', total: D(1000), cost: D(400), quantity: 12, orders: 5 },
+        { sellerId: 'u1', total: D(1000), cost: D(400), quantity: 12, sales: 5 },
       ]);
       prisma.user.findMany.mockResolvedValue([{ id: 'u1', fullName: 'فروشنده یک' }]);
       const result = await service.sellers('t1', {});
@@ -150,7 +150,7 @@ describe('ReportsService', () => {
         expect.objectContaining({
           sellerId: 'u1',
           name: 'فروشنده یک',
-          ordersCount: 5,
+          salesCount: 5,
           itemsSold: 12,
         }),
       );

@@ -14,7 +14,7 @@ const HEIGHT = 280;
 interface SalesChartProps {
   points: SalesReportPoint[];
   locale: Locale;
-  labels: { revenue: string; profit: string; orders: string; empty: string };
+  labels: { revenue: string; profit: string; sales: string; empty: string };
 }
 
 export function SalesChart({ points, locale, labels }: SalesChartProps) {
@@ -230,7 +230,7 @@ export function SalesChart({ points, locale, labels }: SalesChartProps) {
               </p>
             ))}
             <p className="mt-0.5 text-[11px] text-ink-muted">
-              {labels.orders}: {formatNumber(hoveredPoint.orders, locale)}
+              {labels.sales}: {formatNumber(hoveredPoint.sales, locale)}
             </p>
           </div>
         )}

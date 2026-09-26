@@ -1,7 +1,6 @@
 /** Phase 4 constants — reports, notifications, activity log */
 
 export const NOTIFICATION_TYPES = [
-  'ORDER_CREATED',
   'LOW_STOCK',
   'PRODUCT_EXPIRING',
   'DEBT_DUE',
@@ -11,7 +10,6 @@ export const NOTIFICATION_TYPES = [
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const NOTIFICATION_TYPE_NAMES: Record<NotificationType, string> = {
-  ORDER_CREATED: 'New order',
   LOW_STOCK: 'Low stock',
   PRODUCT_EXPIRING: 'Expiring product',
   DEBT_DUE: 'Debt due',
@@ -27,7 +25,7 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export const EXPORT_RESOURCES = [
   'products',
-  'orders',
+  'sales',
   'stock',
   'cash',
   'debts',

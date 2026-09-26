@@ -12,14 +12,14 @@ interface RawSalesPoint {
   bucket: Date;
   total: Prisma.Decimal;
   cost: Prisma.Decimal;
-  orders: number;
+  sales: number;
 }
 
 interface RawBranchRow {
   branchId: string;
   total: Prisma.Decimal;
   cost: Prisma.Decimal;
-  orders: number;
+  sales: number;
 }
 
 interface RawSellerRow {
@@ -27,7 +27,7 @@ interface RawSellerRow {
   total: Prisma.Decimal;
   cost: Prisma.Decimal;
   quantity: number;
-  orders: number;
+  sales: number;
 }
 
 @Injectable()
@@ -41,7 +41,7 @@ export class ReportsService {
     return `report:${report}:${tenantId}:${JSON.stringify(query)}`;
   }
 
-  /** Time series of sales/profit for delivered orders + range total */
+  /** Time series of sales/profit + range total */
   sales(tenantId: string, query: SalesReportQueryDto) {
     return this.cache.wrap(this.cacheKey('sales', tenantId, query), REPORT_TTL_SECONDS, () =>
       this.computeSales(tenantId, query),
@@ -52,26 +52,21 @@ export class ReportsService {
     const { from, to } = rangeOf(query);
     const trunc = query.granularity === 'month' ? 'month' : 'day';
     const branchFilter = query.branchId
-      ? Prisma.sql`AND o."branchId" = ${query.branchId}`
+      ? Prisma.sql`AND s."branchId" = ${query.branchId}`
       : Prisma.empty;
 
     // The day/month boundary is computed based on Kabul time: createdAt is shifted forward so
     // date_trunc aligns with Kabul midnight, then the result is shifted back by the same amount
     // (consistent with endOfKabulDay)
     const rows = await this.prisma.$queryRaw<RawSalesPoint[]>`
-      SELECT date_trunc(${trunc}, o."createdAt" + (${KABUL_UTC_OFFSET_MINUTES} * interval '1 minute'))
+      SELECT date_trunc(${trunc}, s."createdAt" + (${KABUL_UTC_OFFSET_MINUTES} * interval '1 minute'))
                - (${KABUL_UTC_OFFSET_MINUTES} * interval '1 minute') AS bucket,
-             COALESCE(SUM(o.total), 0)           AS total,
-             COALESCE(SUM(c.cost), 0)            AS cost,
-             COUNT(*)::int                       AS orders
-      FROM "Order" o
-      JOIN LATERAL (
-        SELECT COALESCE(SUM(oi."unitCost" * oi.quantity), 0) AS cost
-        FROM "OrderItem" oi WHERE oi."orderId" = o.id
-      ) c ON true
-      WHERE o."tenantId" = ${tenantId}
-        AND o.status = 'DELIVERED'
-        AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
+             COALESCE(SUM(s.total), 0)           AS total,
+             COALESCE(SUM(s.cost), 0)            AS cost,
+             COUNT(*)::int                       AS sales
+      FROM "Sale" s
+      WHERE s."tenantId" = ${tenantId}
+        AND s."createdAt" >= ${from} AND s."createdAt" <= ${to}
         ${branchFilter}
       GROUP BY bucket
       ORDER BY bucket`;
@@ -82,19 +77,19 @@ export class ReportsService {
       total: row.total,
       cost: row.cost,
       profit: row.total.sub(row.cost),
-      orders: row.orders,
+      sales: row.sales,
     }));
     const salesTotal = points.reduce((sum, p) => sum.add(p.total), zero);
     const salesCost = points.reduce((sum, p) => sum.add(p.cost), zero);
-    const ordersCount = points.reduce((sum, p) => sum + p.orders, 0);
+    const salesCount = points.reduce((sum, p) => sum + p.sales, 0);
     return {
       points,
       totals: {
         salesTotal,
         salesCost,
         profit: salesTotal.sub(salesCost),
-        ordersCount,
-        averageOrder: ordersCount > 0 ? salesTotal.div(ordersCount).toDecimalPlaces(2) : zero,
+        salesCount,
+        averageSale: salesCount > 0 ? salesTotal.div(salesCount).toDecimalPlaces(2) : zero,
       },
     };
   }
@@ -109,17 +104,17 @@ export class ReportsService {
   private async computeProducts(tenantId: string, query: ReportRangeQueryDto) {
     const { from, to } = rangeOf(query);
     const where = {
-      order: { tenantId, status: 'DELIVERED' as const, createdAt: { gte: from, lte: to } },
+      sale: { tenantId, createdAt: { gte: from, lte: to } },
     };
     const [top, low] = await Promise.all([
-      this.prisma.orderItem.groupBy({
+      this.prisma.saleItem.groupBy({
         by: ['productId'],
         where,
         _sum: { quantity: true, total: true },
         orderBy: { _sum: { total: 'desc' } },
         take: 10,
       }),
-      this.prisma.orderItem.groupBy({
+      this.prisma.saleItem.groupBy({
         by: ['productId'],
         where,
         _sum: { quantity: true, total: true },
@@ -180,19 +175,14 @@ export class ReportsService {
   private async computeBranches(tenantId: string, query: ReportRangeQueryDto) {
     const { from, to } = rangeOf(query);
     const rows = await this.prisma.$queryRaw<RawBranchRow[]>`
-      SELECT o."branchId"                        AS "branchId",
-             COALESCE(SUM(o.total), 0)           AS total,
-             COALESCE(SUM(c.cost), 0)            AS cost,
-             COUNT(*)::int                       AS orders
-      FROM "Order" o
-      JOIN LATERAL (
-        SELECT COALESCE(SUM(oi."unitCost" * oi.quantity), 0) AS cost
-        FROM "OrderItem" oi WHERE oi."orderId" = o.id
-      ) c ON true
-      WHERE o."tenantId" = ${tenantId}
-        AND o.status = 'DELIVERED'
-        AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
-      GROUP BY o."branchId"
+      SELECT s."branchId"                        AS "branchId",
+             COALESCE(SUM(s.total), 0)           AS total,
+             COALESCE(SUM(s.cost), 0)            AS cost,
+             COUNT(*)::int                       AS sales
+      FROM "Sale" s
+      WHERE s."tenantId" = ${tenantId}
+        AND s."createdAt" >= ${from} AND s."createdAt" <= ${to}
+      GROUP BY s."branchId"
       ORDER BY total DESC`;
     const names = new Map(
       (
@@ -205,7 +195,7 @@ export class ReportsService {
     return rows.map((row) => ({
       branchId: row.branchId,
       name: names.get(row.branchId) ?? '—',
-      ordersCount: row.orders,
+      salesCount: row.sales,
       total: row.total,
       cost: row.cost,
       profit: row.total.sub(row.cost),
@@ -222,21 +212,19 @@ export class ReportsService {
   private async computeSellers(tenantId: string, query: ReportRangeQueryDto) {
     const { from, to } = rangeOf(query);
     const rows = await this.prisma.$queryRaw<RawSellerRow[]>`
-      SELECT o."createdById"                       AS "sellerId",
-             COALESCE(SUM(o.total), 0)              AS total,
-             COALESCE(SUM(c.cost), 0)               AS cost,
+      SELECT s."createdById"                       AS "sellerId",
+             COALESCE(SUM(s.total), 0)              AS total,
+             COALESCE(SUM(s.cost), 0)               AS cost,
              COALESCE(SUM(c.quantity), 0)::int       AS quantity,
-             COUNT(*)::int                          AS orders
-      FROM "Order" o
+             COUNT(*)::int                          AS sales
+      FROM "Sale" s
       JOIN LATERAL (
-        SELECT COALESCE(SUM(oi."unitCost" * oi.quantity), 0) AS cost,
-               COALESCE(SUM(oi.quantity), 0)                 AS quantity
-        FROM "OrderItem" oi WHERE oi."orderId" = o.id
+        SELECT COALESCE(SUM(si.quantity), 0) AS quantity
+        FROM "SaleItem" si WHERE si."saleId" = s.id
       ) c ON true
-      WHERE o."tenantId" = ${tenantId}
-        AND o.status = 'DELIVERED'
-        AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
-      GROUP BY o."createdById"
+      WHERE s."tenantId" = ${tenantId}
+        AND s."createdAt" >= ${from} AND s."createdAt" <= ${to}
+      GROUP BY s."createdById"
       ORDER BY total DESC`;
     const names = new Map(
       (
@@ -249,7 +237,7 @@ export class ReportsService {
     return rows.map((row) => ({
       sellerId: row.sellerId,
       name: names.get(row.sellerId) ?? '—',
-      ordersCount: row.orders,
+      salesCount: row.sales,
       itemsSold: row.quantity,
       total: row.total,
       cost: row.cost,

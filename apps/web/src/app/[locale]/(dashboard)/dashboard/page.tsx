@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Banknote, ShoppingBag, TrendingUp } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import type { DashboardSummaryDto, Locale, OrderStatus, SalesReportDto } from '@my-store/shared';
+import type { DashboardSummaryDto, Locale, SalesReportDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatMoney, formatNumber } from '@/lib/format';
-import { Badge, Card, ErrorText, Spinner, cn } from '@/components/ui';
+import { Card, ErrorText, Spinner, cn } from '@/components/ui';
 import { SalesChart } from '@/components/reports/sales-chart';
 import { BarList } from '@/components/reports/bar-list';
 
@@ -15,7 +15,6 @@ const DAY_MS = 86_400_000;
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
-  const tOrders = useTranslations('orders');
   const tReports = useTranslations('reports');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
@@ -50,7 +49,7 @@ export default function DashboardPage() {
     { label: t('monthSales'), value: formatMoney(data.monthSales, locale), icon: Banknote },
     { label: t('todayProfit'), value: formatMoney(data.todayProfit, locale), icon: TrendingUp },
     { label: t('monthProfit'), value: formatMoney(data.monthProfit, locale), icon: TrendingUp, accent: true },
-    { label: t('todayOrders'), value: formatNumber(data.todayOrders, locale), icon: ShoppingBag },
+    { label: t('todaySalesCount'), value: formatNumber(data.todaySalesCount, locale), icon: ShoppingBag },
   ];
 
   return (
@@ -108,30 +107,14 @@ export default function DashboardPage() {
             labels={{
               revenue: tReports('revenue'),
               profit: tReports('profit'),
-              orders: tReports('ordersCount'),
+              sales: tReports('salesCount'),
               empty: tc('noData'),
             }}
           />
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <h2 className="mb-4 text-sm font-bold text-ink">{t('ordersByStatus')}</h2>
-          <div className="flex flex-wrap gap-2">
-            {(Object.entries(data.ordersByStatus) as [OrderStatus, number][]).map(([status, count]) => (
-              <Link
-                key={status}
-                href={`/${locale}/orders?status=${status}`}
-                className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 transition-colors hover:border-primary-400"
-              >
-                <Badge tone={status}>{tOrders(`statuses.${status}`)}</Badge>
-                <span className="text-sm font-bold text-ink">{formatNumber(count, locale)}</span>
-              </Link>
-            ))}
-          </div>
-        </Card>
-
+      <div className="grid gap-4">
         <Card className="p-5">
           <h2 className="mb-4 text-sm font-bold text-ink">{t('topProducts')}</h2>
           {data.topProducts.length === 0 ? (

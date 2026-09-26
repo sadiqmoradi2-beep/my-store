@@ -45,15 +45,15 @@ describe('DebtsService.pay', () => {
   });
 
   it('payment greater than the remaining balance → 422 and nothing is recorded', async () => {
-    await expect(service.pay('t1', 'u1', 'debt1', { amount: 400 })).rejects.toBeInstanceOf(
+    await expect(service.pay('t1', 'u1', 'debt1', { amount: 400, registerId: 'reg1' })).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
     expect(tx.debtPayment.create).not.toHaveBeenCalled();
   });
 
-  it('partial payment without a register → no register effect and PARTIAL status', async () => {
-    await service.pay('t1', 'u1', 'debt1', { amount: 100 });
-    expect(tx.cashTransaction.create).not.toHaveBeenCalled();
+  it('partial payment → recorded in the chosen Income part and PARTIAL status', async () => {
+    await service.pay('t1', 'u1', 'debt1', { amount: 100, registerId: 'reg1' });
+    expect(tx.cashTransaction.create).toHaveBeenCalledTimes(1);
     const data = tx.debt.update.mock.calls[0][0].data;
     expect(data.paidAmount.toString()).toBe('300');
     expect(data.status).toBe('PARTIAL');
@@ -77,7 +77,7 @@ describe('DebtsService.pay', () => {
   it('record not found → 404', async () => {
     prisma.debt.findFirst.mockResolvedValue(null);
     await expect(
-      service.pay('t1', 'u1', 'missing', { amount: 100 }),
+      service.pay('t1', 'u1', 'missing', { amount: 100, registerId: 'reg1' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
@@ -229,5 +229,72 @@ describe('createDebt', () => {
         createdById: 'u1',
       }),
     });
+  });
+});
+
+describe('DebtsService.create — Loan & Deficit', () => {
+  let service: DebtsService;
+  let prisma: Record<string, any>;
+  let tx: Record<string, any>;
+
+  beforeEach(async () => {
+    tx = {
+      debt: { create: jest.fn().mockImplementation(({ data }) => ({ id: 'debt1', ...data })) },
+      cashRegister: {
+        findFirst: jest.fn().mockResolvedValue({ balance: D(100), isActive: true }),
+        update: jest.fn(),
+      },
+      cashTransaction: { create: jest.fn() },
+    };
+    prisma = {
+      debt: { create: jest.fn().mockImplementation(({ data }) => ({ id: 'debt1', ...data })) },
+      $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [DebtsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    service = moduleRef.get(DebtsService);
+  });
+
+  it('kind defaults: a payable is a Deficit, a receivable is a Loan', async () => {
+    await service.create('t1', 'u1', { direction: 'PAYABLE', partyName: 'Supplier', amount: 50 });
+    expect(prisma.debt.create.mock.calls[0][0].data.kind).toBe('DEFICIT');
+    await service.create('t1', 'u1', { direction: 'RECEIVABLE', partyName: 'Client', amount: 50 });
+    expect(prisma.debt.create.mock.calls[1][0].data.kind).toBe('LOAN');
+  });
+
+  it('a Loan we borrowed and receive now → INCOME in the chosen Income part', async () => {
+    await service.create('t1', 'u1', {
+      direction: 'PAYABLE',
+      kind: 'LOAN',
+      partyName: 'Bank',
+      amount: 500,
+      receivedRegisterId: 'reg-zelle',
+    });
+    const cash = tx.cashTransaction.create.mock.calls[0][0].data;
+    expect(cash.type).toBe('INCOME');
+    expect(cash.registerId).toBe('reg-zelle');
+    expect(cash.category).toBe('Loan received');
+    expect(cash.amount.toString()).toBe('500');
+    expect(cash.referenceType).toBe('debt');
+  });
+
+  it('a Loan without a receiving register → no money movement', async () => {
+    await service.create('t1', 'u1', { direction: 'PAYABLE', kind: 'LOAN', partyName: 'Bank', amount: 500 });
+    expect(tx.cashTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('a Deficit cannot be received into an Income part → 400', async () => {
+    await expect(
+      service.create('t1', 'u1', {
+        direction: 'PAYABLE',
+        kind: 'DEFICIT',
+        partyName: 'Supplier',
+        amount: 500,
+        receivedRegisterId: 'reg-cash',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.cashTransaction.create).not.toHaveBeenCalled();
   });
 });

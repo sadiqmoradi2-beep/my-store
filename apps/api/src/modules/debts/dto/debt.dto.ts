@@ -13,8 +13,10 @@ import {
   CURRENCIES,
   Currency,
   DEBT_DIRECTIONS,
+  DEBT_KINDS,
   DEBT_STATUSES,
   DebtDirection,
+  DebtKind,
   DebtStatus,
 } from '@my-store/shared';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
@@ -22,6 +24,16 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 export class CreateDebtDto {
   @IsEnum(DEBT_DIRECTIONS)
   direction: DebtDirection;
+
+  /** Loan = money we borrowed; Deficit = money we owe (default) */
+  @IsOptional()
+  @IsEnum(DEBT_KINDS)
+  kind?: DebtKind;
+
+  /** Loan only: the Income register that received the borrowed money right now — it counts as money in */
+  @IsOptional()
+  @IsString()
+  receivedRegisterId?: string;
 
   /** Free-form counterparty — filled in automatically if a supplier/employee is selected */
   @IsOptional()
@@ -61,10 +73,9 @@ export class PayDebtDto {
   @Min(0.01)
   amount: number;
 
-  /** Register — empty = no register effect */
-  @IsOptional()
+  /** The Income register the money is paid from (payable) or received into (receivable) */
   @IsString()
-  registerId?: string;
+  registerId: string;
 
   /** Cheque / payment-proof image or PDF URL — mainly used for supplier payments */
   @IsOptional()
@@ -84,6 +95,10 @@ export class DebtListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(DEBT_STATUSES)
   status?: DebtStatus;
+
+  @IsOptional()
+  @IsEnum(DEBT_KINDS)
+  kind?: DebtKind;
 
   /** Only open/partial documents that are past their due date */
   @IsOptional()

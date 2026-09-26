@@ -1,15 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@my-store/shared';
 import { CurrentUser, RequestUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
-import {
-  CashTransactionListQueryDto,
-  CreateCashRegisterDto,
-  CreateCashTransactionDto,
-  UpdateCashRegisterDto,
-} from './dto/cash.dto';
+import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 import { CashService } from './cash.service';
 import { RequireModule } from '../../common/decorators/require-module.decorator';
 
@@ -26,16 +21,11 @@ export class CashController {
     return this.cashService.listRegisters(tenantId, branchId);
   }
 
-  @Post()
-  @RequirePermissions(PERMISSIONS.CASH_MANAGE)
-  create(@TenantId() tenantId: string, @Body() dto: CreateCashRegisterDto) {
-    return this.cashService.createRegister(tenantId, dto);
-  }
-
-  @Patch(':id')
-  @RequirePermissions(PERMISSIONS.CASH_MANAGE)
-  update(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: UpdateCashRegisterDto) {
-    return this.cashService.updateRegister(tenantId, id, dto);
+  /** Income overview: Cash / EBT / Zelle parts + totals */
+  @Get('income-summary')
+  @RequirePermissions(PERMISSIONS.CASH_READ)
+  incomeSummary(@TenantId() tenantId: string, @Query() query: IncomeSummaryQueryDto) {
+    return this.cashService.incomeSummary(tenantId, query);
   }
 
   @Get(':id/transactions')

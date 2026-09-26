@@ -29,8 +29,8 @@ function buildPayload(overrides: {
     createdAt: '2026-07-20T00:00:00.000Z',
     tenant: { name: 'فروشگاه ۱', slug: 'shop-1' },
     data: {
-      order: [{ id: 'o1', tenantId: 't1' }],
-      orderItem: [{ id: 'oi1', orderId: 'o1' }],
+      sale: [{ id: 'o1', tenantId: 't1' }],
+      saleItem: [{ id: 'oi1', saleId: 'o1' }],
       user: [],
       ...overrides.data,
     },
@@ -162,12 +162,12 @@ describe('BackupsService', () => {
       expect(txOptsCaptured).toEqual({ timeout: 300_000 });
     });
 
-    it('ترتیب صحیح: فرزند (orderItem) قبل از والد (order) حذف؛ والد قبل از فرزند درج می‌شود', async () => {
+    it('ترتیب صحیح: فرزند (saleItem) قبل از والد (sale) حذف؛ والد قبل از فرزند درج می‌شود', async () => {
       await service.restore('t1', 'bk1', 'me1');
-      const deleteOrder = callOrder.indexOf('delete:order');
-      const deleteOrderItem = callOrder.indexOf('delete:orderItem');
-      const createOrder = callOrder.indexOf('create:order');
-      const createOrderItem = callOrder.indexOf('create:orderItem');
+      const deleteOrder = callOrder.indexOf('delete:sale');
+      const deleteOrderItem = callOrder.indexOf('delete:saleItem');
+      const createOrder = callOrder.indexOf('create:sale');
+      const createOrderItem = callOrder.indexOf('create:saleItem');
       expect(deleteOrderItem).toBeGreaterThanOrEqual(0);
       expect(deleteOrderItem).toBeLessThan(deleteOrder);
       expect(createOrder).toBeGreaterThanOrEqual(0);
@@ -225,8 +225,8 @@ describe('BackupsService', () => {
 
     it('دادهٔ کسب‌وکاری حذف می‌شود ولی ساختار حساب دست‌نخورده می‌ماند', async () => {
       await service.wipeData('t1', 'u1');
-      expect(callOrder).toContain('delete:order');
-      expect(callOrder).toContain('delete:orderItem');
+      expect(callOrder).toContain('delete:sale');
+      expect(callOrder).toContain('delete:saleItem');
       expect(callOrder).toContain('delete:supplier');
       expect(callOrder).not.toContain('delete:user');
       expect(callOrder).not.toContain('delete:role');
@@ -235,7 +235,7 @@ describe('BackupsService', () => {
       expect(callOrder).not.toContain('delete:cashRegister');
       expect(callOrder).not.toContain('delete:employee');
       expect(callOrder).not.toContain('delete:category');
-      expect(callOrder).not.toContain('create:order'); // فقط حذف — بدون درج دوباره
+      expect(callOrder).not.toContain('create:sale'); // فقط حذف — بدون درج دوباره
     });
 
     it('در یک تراکنش با timeout مناسب اجرا می‌شود', async () => {
@@ -264,7 +264,7 @@ describe('BackupsService', () => {
         update: jest.fn(),
       };
       await service.wipeData('t1', 'u1', 'CASH');
-      expect(callOrder).toEqual(['delete:payment', 'delete:cashTransaction', 'delete:gatewayIntent']);
+      expect(callOrder).toEqual(['delete:cashTransaction', 'delete:gatewayIntent']);
       expect(txCache.cashRegister.update).toHaveBeenCalledWith({
         where: { id: 'reg1' },
         data: { balance: 100 },

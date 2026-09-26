@@ -46,7 +46,7 @@ export class PaymentGatewayService {
   }
 }
 
-/** Verify that an intent for a given amount is actually PAID — before finalizing an order/subscription */
+/** Verify that an intent for a given amount is actually PAID — before finalizing a subscription */
 export async function assertPaid(
   prisma: PrismaService,
   tenantId: string,
@@ -59,6 +59,6 @@ export async function assertPaid(
     throw new BadRequestException('The online payment has not been confirmed yet');
   }
   if (!intent.amount.equals(expectedAmount)) {
-    throw new BadRequestException('The online payment amount does not match the order amount');
+    throw new BadRequestException('The online payment amount does not match the plan price');
   }
 }

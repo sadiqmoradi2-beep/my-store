@@ -14,6 +14,14 @@ export const ATTENDANCE_STATUS_NAMES: Record<AttendanceStatus, string> = {
 };
 
 export const DEBT_STATUSES = ['OPEN', 'PARTIAL', 'SETTLED'] as const;
+export const DEBT_KINDS = ['LOAN', 'DEFICIT'] as const;
+export type DebtKind = (typeof DEBT_KINDS)[number];
+
+export const DEBT_KIND_NAMES: Record<DebtKind, string> = {
+  LOAN: 'Loan',
+  DEFICIT: 'Deficit',
+};
+
 export type DebtStatus = (typeof DEBT_STATUSES)[number];
 
 export const SEASON_STATUSES = ['OPEN', 'CLOSED'] as const;

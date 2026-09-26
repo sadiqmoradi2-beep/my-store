@@ -5,10 +5,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { OrdersService } from '../orders/orders.service';
 import {
   AddCartItemDto,
-  CheckoutCartDto,
   CreateCartDto,
 } from './dto/cart.dto';
 
@@ -16,7 +14,6 @@ import {
 export class CartsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ordersService: OrdersService,
   ) {}
 
   async create(tenantId: string, dto: CreateCartDto) {
@@ -101,23 +98,6 @@ export class CartsService {
     await this.findCart(tenantId, id);
     await this.prisma.cartItem.deleteMany({ where: { cartId: id, productId } });
     return this.get(tenantId, id);
-  }
-
-  /** Convert the cart to an order (the order transaction rechecks all rules) and delete the cart */
-  async checkout(tenantId: string, userId: string, id: string, dto: CheckoutCartDto) {
-    const cart = await this.findCart(tenantId, id);
-    if (cart.items.length === 0) throw new UnprocessableEntityException('Cart is empty');
-    const order = await this.ordersService.create(tenantId, userId, {
-      branchId: cart.branchId,
-      notes: dto.notes,
-      items: cart.items.map((i) => ({
-        productId: i.productId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice.toNumber(),
-      })),
-    });
-    await this.prisma.cart.delete({ where: { id } });
-    return order;
   }
 
   private async findCart(tenantId: string, id: string) {

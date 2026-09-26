@@ -124,10 +124,10 @@ export class WorkSeasonsService {
 
   private async buildReport(tenantId: string, seasonId: string, from: Date, to: Date) {
     const range = { gte: from, lte: to };
-    const [orders, expenses, capital] = await Promise.all([
-      this.prisma.order.findMany({
-        where: { tenantId, status: 'DELIVERED', createdAt: range },
-        select: { total: true, items: { select: { quantity: true, unitCost: true } } },
+    const [sales, expenses, capital] = await Promise.all([
+      this.prisma.sale.findMany({
+        where: { tenantId, createdAt: range },
+        select: { total: true, cost: true },
       }),
       this.prisma.cashTransaction.aggregate({
         where: { tenantId, type: 'EXPENSE', createdAt: range },
@@ -140,19 +140,15 @@ export class WorkSeasonsService {
       }),
     ]);
     const zero = new Prisma.Decimal(0);
-    const salesTotal = orders.reduce((sum, o) => sum.add(o.total), zero);
-    const salesCost = orders.reduce(
-      (sum, o) =>
-        sum.add(o.items.reduce((s, i) => s.add(i.unitCost.mul(i.quantity)), zero)),
-      zero,
-    );
+    const salesTotal = sales.reduce((sum, o) => sum.add(o.total), zero);
+    const salesCost = sales.reduce((sum, o) => sum.add(o.cost), zero);
     const capitalOf = (type: 'DEPOSIT' | 'WITHDRAWAL') =>
       capital.find((c) => c.type === type)?._sum.amount ?? zero;
     return {
       salesTotal: salesTotal.toString(),
       salesCost: salesCost.toString(),
       profit: salesTotal.sub(salesCost).toString(),
-      ordersCount: orders.length,
+      salesCount: sales.length,
       expensesTotal: (expenses._sum.amount ?? zero).toString(),
       capitalIn: capitalOf('DEPOSIT').toString(),
       capitalOut: capitalOf('WITHDRAWAL').toString(),

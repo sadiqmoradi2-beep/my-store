@@ -33,7 +33,7 @@ describe('SellersService', () => {
         update: jest.fn().mockImplementation(({ data }) => ({ id: 'sp1', ...data })),
         findMany: jest.fn().mockResolvedValue([]),
       },
-      order: { groupBy: jest.fn().mockResolvedValue([]) },
+      sale: { groupBy: jest.fn().mockResolvedValue([]) },
       commissionEntry: { groupBy: jest.fn().mockResolvedValue([]) },
     };
 
@@ -124,29 +124,29 @@ describe('SellersService', () => {
   });
 
   describe('list', () => {
-    it('seller with no orders/commission → defaults to zero', async () => {
+    it('seller with no sales/commission → defaults to zero', async () => {
       prisma.sellerProfile.findMany.mockResolvedValue([
         { id: 'sp1', userId: 'u1', user: { fullName: 'Ali', email: 'a@x.com' } },
       ]);
       const result = await service.list('t1');
-      expect(result[0].ordersCount).toBe(0);
+      expect(result[0].salesCount).toBe(0);
       expect(result[0].salesTotal.toString()).toBe('0');
       expect(result[0].commissionTotal.toString()).toBe('0');
       expect(result[0].fullName).toBe('Ali');
     });
 
-    it('order and commission stats are mapped to the corresponding seller', async () => {
+    it('sale and commission stats are mapped to the corresponding seller', async () => {
       prisma.sellerProfile.findMany.mockResolvedValue([
         { id: 'sp1', userId: 'u1', user: { fullName: 'Ali', email: 'a@x.com' } },
       ]);
-      prisma.order.groupBy.mockResolvedValue([
+      prisma.sale.groupBy.mockResolvedValue([
         { createdById: 'u1', _count: { _all: 4 }, _sum: { total: D(4000) } },
       ]);
       prisma.commissionEntry.groupBy.mockResolvedValue([
         { sellerProfileId: 'sp1', _sum: { amount: D(200) } },
       ]);
       const result = await service.list('t1');
-      expect(result[0].ordersCount).toBe(4);
+      expect(result[0].salesCount).toBe(4);
       expect(result[0].salesTotal.toString()).toBe('4000');
       expect(result[0].commissionTotal.toString()).toBe('200');
     });
@@ -199,7 +199,7 @@ describe('SellersService.paySalary', () => {
 });
 
 describe('recordCommission', () => {
-  const order = { id: 'o1', orderNumber: 12, total: D(1000), createdById: 'u1' };
+  const order = { id: 'o1', saleNumber: 12, total: D(1000), createdById: 'u1' };
 
   function buildTx(profile: unknown, existing: unknown = null) {
     return {
@@ -245,8 +245,8 @@ describe('recordCommission', () => {
     // 1000 * 5% = 50
     const data = tx.commissionEntry.create.mock.calls[0][0].data;
     expect(data.amount.toString()).toBe('50');
-    expect(data.orderId).toBe('o1');
-    expect(data.orderNumber).toBe(12);
+    expect(data.saleId).toBe('o1');
+    expect(data.saleNumber).toBe(12);
     expect(data.percent.toString()).toBe('5');
     expect(result).toEqual(expect.objectContaining({ id: 'ce1' }));
   });

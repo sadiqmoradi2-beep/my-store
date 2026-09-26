@@ -3,7 +3,7 @@
 export const RESET_SCOPES = [
   'ALL',
   'PRODUCTS',
-  'ORDERS',
+  'SALES',
   'CASH',
   'SUPPLIERS',
   'DEBTS',
@@ -18,7 +18,7 @@ export type ResetScope = (typeof RESET_SCOPES)[number];
 export const RESET_SCOPE_NAMES: Record<ResetScope, string> = {
   ALL: 'Everything (full reset)',
   PRODUCTS: 'Products & catalog',
-  ORDERS: 'Orders & carts',
+  SALES: 'Sales & carts',
   CASH: 'Income & cash transactions',
   SUPPLIERS: 'Suppliers & purchases',
   DEBTS: 'Debts & credits',
@@ -30,11 +30,11 @@ export const RESET_SCOPE_NAMES: Record<ResetScope, string> = {
 };
 
 export const RESET_SCOPE_DESCRIPTIONS: Record<ResetScope, string> = {
-  ALL: 'Deletes all business data (products, orders, suppliers, financials, history) — your account, users, branches, registers and settings stay intact.',
+  ALL: 'Deletes all business data (products, sales, suppliers, financials, history) — your account, users, branches, registers and settings stay intact.',
   PRODUCTS:
-    'Deletes your entire product catalog. Because orders and carts reference products, this also deletes all orders, carts and purchase returns — there is no way to remove products while keeping order history that references them.',
-  ORDERS: 'Deletes all orders, order items, statuses, payments and carts. Products are kept.',
-  CASH: 'Deletes all cash transactions, payments and payment-gateway intents. Cash register balances reset to their opening balance.',
+    'Deletes your entire product catalog. Because sales and carts reference products, this also deletes all sales, carts and purchase returns — there is no way to remove products while keeping sale history that references them.',
+  SALES: 'Deletes all sales and carts. Products are kept.',
+  CASH: 'Deletes all Income transactions (cash, EBT, Zelle) and payment-gateway intents. Cash register balances reset to their opening balance.',
   SUPPLIERS: 'Deletes all suppliers and purchase records.',
   DEBTS: 'Deletes all debt/credit records and their payments.',
   EMPLOYEES_HISTORY: 'Deletes attendance, shift and salary payment history — employee accounts themselves are kept.',
@@ -48,10 +48,8 @@ export const RESET_SCOPE_DESCRIPTIONS: Record<ResetScope, string> = {
 export const RESET_SCOPE_MODEL_KEYS: Record<Exclude<ResetScope, 'ALL'>, string[]> = {
   PRODUCTS: [
     'purchaseReturn',
-    'orderItem',
-    'orderStatusHistory',
-    'payment',
-    'order',
+    'saleItem',
+    'sale',
     'cartItem',
     'cart',
     'wishlistItem',
@@ -61,8 +59,8 @@ export const RESET_SCOPE_MODEL_KEYS: Record<Exclude<ResetScope, 'ALL'>, string[]
     'productImage',
     'product',
   ],
-  ORDERS: ['orderItem', 'orderStatusHistory', 'payment', 'order', 'cartItem', 'cart'],
-  CASH: ['payment', 'cashTransaction', 'gatewayIntent'],
+  SALES: ['saleItem', 'sale', 'cartItem', 'cart'],
+  CASH: ['cashTransaction', 'gatewayIntent'],
   SUPPLIERS: ['purchaseReturn', 'purchaseItem', 'purchase', 'supplier'],
   DEBTS: ['debtPayment', 'debt'],
   EMPLOYEES_HISTORY: ['employeeAttendance', 'employeeShift', 'salaryPayment'],

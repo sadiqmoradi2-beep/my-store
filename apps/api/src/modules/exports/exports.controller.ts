@@ -20,10 +20,10 @@ export class ExportsController {
     await this.send(res, await this.exportsService.products(tenantId), query);
   }
 
-  @Get('orders')
-  @RequirePermissions(PERMISSIONS.ORDERS_READ)
-  async orders(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.orders(tenantId, query), query);
+  @Get('sales')
+  @RequirePermissions(PERMISSIONS.SALES_READ)
+  async sales(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
+    await this.send(res, await this.exportsService.sales(tenantId, query), query);
   }
 
   @Get('stock')

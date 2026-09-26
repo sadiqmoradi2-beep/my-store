@@ -1,14 +1,32 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Minus, Pencil, Plus, ScanBarcode, Search, Trash2, X } from 'lucide-react';
+import { Banknote, CreditCard, HandCoins, Landmark, Minus, Pencil, Plus, ReceiptText, ScanBarcode, Search, Trash2, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useRef, useState } from 'react';
-import type { BranchDto, CartDto, Locale, PosSaleResultDto, ProductDto } from '@my-store/shared';
+import {
+  isUnpaidMethod,
+  PAYMENT_METHODS,
+  type BranchDto,
+  type CartDto,
+  type Locale,
+  type PaymentMethod,
+  type PosSaleResultDto,
+  type ProductDto,
+} from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { Button, Card, ErrorText, Field, Input, Modal, Select, Spinner, cn, inputClass } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
+
+const METHOD_ICONS: Record<PaymentMethod, typeof Banknote> = {
+  CASH: Banknote,
+  CARD: CreditCard,
+  EBT: ReceiptText,
+  ZELLE: Landmark,
+  LOAN: HandCoins,
+  DEFICIT: HandCoins,
+};
 
 export default function PosPage() {
   const t = useTranslations('pos');
@@ -20,6 +38,9 @@ export default function PosPage() {
   const [branchId, setBranchId] = useState(user?.branchId ?? '');
   const [cartId, setCartId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState('');
+  const [method, setMethod] = useState<PaymentMethod>('CASH');
+  const [partyName, setPartyName] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [result, setResult] = useState<PosSaleResultDto | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +55,8 @@ export default function PosPage() {
     queryFn: () => api.get<CartDto>(`/carts/${cartId}`),
     enabled: !!cartId,
   });
+
+  const unpaid = isUnpaidMethod(method);
 
   const invalidateCart = () => queryClient.invalidateQueries({ queryKey: ['pos-cart'] });
 
@@ -56,15 +79,22 @@ export default function PosPage() {
     mutationFn: () =>
       api.post<PosSaleResultDto>('/pos/sale', {
         cartId,
-        cashReceived: cashReceived !== '' ? Number(cashReceived) : undefined,
+        paymentMethod: method,
+        ...(method === 'CASH' && cashReceived !== '' && { cashReceived: Number(cashReceived) }),
+        ...(unpaid && { partyName: partyName.trim(), dueDate: dueDate || undefined }),
       }),
     onSuccess: (sale) => {
       setResult(sale);
       setCartId(null);
       setCashReceived('');
+      setMethod('CASH');
+      setPartyName('');
+      setDueDate('');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stocks'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['income-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['cash-registers'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
@@ -75,6 +105,8 @@ export default function PosPage() {
     onSuccess: () => {
       setCartId(null);
       setCashReceived('');
+      setPartyName('');
+      setDueDate('');
     },
   });
 
@@ -135,21 +167,63 @@ export default function PosPage() {
               </div>
 
               <div className="mt-4 space-y-3 border-t border-line pt-4">
-                <Field label={t('cashReceived')} hint={t('cashReceivedHint')}>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    dir="ltr"
-                    value={cashReceived}
-                    onChange={(e) => setCashReceived(e.target.value)}
-                  />
+                <Field label={t('paymentMethod')}>
+                  <div className="grid grid-cols-3 gap-2">
+                    {PAYMENT_METHODS.map((m) => {
+                      const Icon = METHOD_ICONS[m];
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setMethod(m)}
+                          aria-pressed={method === m}
+                          title={t(`methodHints.${m}`)}
+                          className={cn(
+                            'flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs font-semibold transition-colors duration-200',
+                            method === m
+                              ? 'border-primary-600 bg-primary-700 text-white dark:bg-primary-600'
+                              : 'border-line bg-surface-2 text-ink-muted hover:border-primary-300 hover:text-ink',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" aria-hidden />
+                          {t(`methods.${m}`)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-xs text-ink-faint">{t(`methodHints.${method}`)}</p>
                 </Field>
-                {cashReceived !== '' && Number(cashReceived) >= Number(cart.total) && (
-                  <p className="text-sm font-bold text-primary-700 dark:text-primary-300">
-                    {t('change')}: {formatMoney(Number(cashReceived) - Number(cart.total), locale)}{' '}
-                    {tc('currency')}
-                  </p>
+
+                {method === 'CASH' && (
+                  <>
+                    <Field label={t('cashReceived')} hint={t('cashReceivedHint')}>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        dir="ltr"
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                      />
+                    </Field>
+                    {cashReceived !== '' && Number(cashReceived) >= Number(cart.total) && (
+                      <p className="text-sm font-bold text-primary-700 dark:text-primary-300">
+                        {t('change')}: {formatMoney(Number(cashReceived) - Number(cart.total), locale)}{' '}
+                        {tc('currency')}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {unpaid && (
+                  <>
+                    <Field label={t('partyName')} hint={t('partyHint')}>
+                      <Input required value={partyName} onChange={(e) => setPartyName(e.target.value)} />
+                    </Field>
+                    <Field label={t('dueDate')}>
+                      <Input type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                    </Field>
+                  </>
                 )}
                 <ErrorText error={saleMutation.error} />
                 <ErrorText error={clearCart.error} />
@@ -157,6 +231,7 @@ export default function PosPage() {
                   <Button
                     className="flex-1"
                     loading={saleMutation.isPending}
+                    disabled={unpaid && !partyName.trim()}
                     onClick={() => saleMutation.mutate()}
                   >
                     {t('completeSale')}
@@ -480,13 +555,17 @@ function SaleResultModal({ result, onClose }: { result: PosSaleResultDto; onClos
     <Modal open title={t('saleComplete')} onClose={onClose}>
       <div className="space-y-3 text-sm">
         <SummaryRow
-          label={t('orderNumber')}
-          value={`#${formatNumber(result.order.orderNumber, locale)}`}
+          label={t('saleNumber')}
+          value={`#${formatNumber(result.sale.saleNumber, locale)}`}
         />
+        <SummaryRow label={t('paymentMethod')} value={t(`methods.${result.sale.paymentMethod}`)} />
         <SummaryRow
           label={t('total')}
-          value={`${formatMoney(result.order.total, locale)} ${tc('currency')}`}
+          value={`${formatMoney(result.sale.total, locale)} ${tc('currency')}`}
         />
+        {result.sale.debtId && (
+          <p className="rounded-lg bg-surface-3 p-3 text-xs text-ink-muted">{t('unpaidNote')}</p>
+        )}
         {Number(result.change) > 0 && (
           <div className="flex items-center justify-between rounded-lg bg-accent-100 p-3 text-base font-black text-accent-700 dark:bg-accent-700/20 dark:text-accent-300">
             <span>{t('change')}</span>

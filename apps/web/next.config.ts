@@ -12,6 +12,15 @@ const apiInternalUrl = process.env.API_INTERNAL_URL?.replace(/\/$/, '');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async redirects() {
+    // Old Cash / Debts / Orders routes
+    return [
+      { source: '/:locale/finance', destination: '/:locale/income', permanent: false },
+      { source: '/:locale/finance/cash', destination: '/:locale/income', permanent: false },
+      { source: '/:locale/finance/debts/:path*', destination: '/:locale/loans/:path*', permanent: false },
+      { source: '/:locale/orders', destination: '/:locale/income', permanent: false },
+    ];
+  },
   async rewrites() {
     if (!apiInternalUrl) return [];
     return [

@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Currency, DebtDirection, Prisma } from '@prisma/client';
+import { Currency, DebtDirection, DebtKind, Prisma } from '@prisma/client';
 import { debtStatusFor } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
@@ -23,6 +23,7 @@ export class DebtsService {
       ...(query.search && {
         partyName: { contains: query.search, mode: 'insensitive' as const },
       }),
+      ...(query.kind && { kind: query.kind }),
       ...(query.overdue && {
         status: { not: 'SETTLED' },
         dueDate: { lt: new Date() },
@@ -142,23 +143,45 @@ export class DebtsService {
     }
     // An employee isn't locked to either direction: they can owe the store (advance/loan), or the store can owe them (unpaid salary)
     const partyName = await this.resolvePartyName(tenantId, dto);
-    return this.prisma.debt.create({
-      data: {
+    const kind = dto.kind ?? (dto.direction === 'RECEIVABLE' ? 'LOAN' : 'DEFICIT');
+    if (dto.receivedRegisterId && !(kind === 'LOAN' && dto.direction === 'PAYABLE')) {
+      throw new BadRequestException('Only a Loan we borrowed can be received into an Income part');
+    }
+    const data = {
+      tenantId,
+      direction: dto.direction,
+      kind,
+      partyName,
+      supplierId: dto.supplierId,
+      employeeId: dto.employeeId,
+      amount: new Prisma.Decimal(dto.amount),
+      currency: dto.currency ?? 'USDT',
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+      notes: dto.notes,
+      createdById: userId,
+    };
+    if (!dto.receivedRegisterId) return this.prisma.debt.create({ data });
+
+    // Borrowed money that arrives now is income in the chosen part (Cash / EBT / Zelle)
+    const receivedRegisterId = dto.receivedRegisterId;
+    return this.prisma.$transaction(async (tx) => {
+      const debt = await tx.debt.create({ data });
+      await recordCashTransaction(tx, {
         tenantId,
-        direction: dto.direction,
-        partyName,
-        supplierId: dto.supplierId,
-        employeeId: dto.employeeId,
+        userId,
+        registerId: receivedRegisterId,
+        type: 'INCOME',
         amount: new Prisma.Decimal(dto.amount),
-        currency: dto.currency ?? 'USDT',
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-        notes: dto.notes,
-        createdById: userId,
-      },
+        category: 'Loan received',
+        note: partyName,
+        referenceType: 'debt',
+        referenceId: debt.id,
+      });
+      return debt;
     });
   }
 
-  /** Payment/collection: RECEIVABLE → money into the register; PAYABLE → money out */
+  /** Payment/collection: RECEIVABLE → money into an Income part; PAYABLE → money out of it */
   async pay(tenantId: string, userId: string, id: string, dto: PayDebtDto) {
     const debt = await this.get(tenantId, id);
     const amount = new Prisma.Decimal(dto.amount);
@@ -181,19 +204,17 @@ export class DebtsService {
           performedById: userId,
         },
       });
-      if (dto.registerId) {
-        await recordCashTransaction(tx, {
-          tenantId,
-          userId,
-          registerId: dto.registerId,
-          type: debt.direction === 'RECEIVABLE' ? 'INCOME' : 'EXPENSE',
-          amount,
-          category: debt.direction === 'RECEIVABLE' ? 'Receivable collection' : 'Payable settlement',
-          note: debt.partyName,
-          referenceType: 'debt',
-          referenceId: id,
-        });
-      }
+      await recordCashTransaction(tx, {
+        tenantId,
+        userId,
+        registerId: dto.registerId,
+        type: debt.direction === 'RECEIVABLE' ? 'INCOME' : 'EXPENSE',
+        amount,
+        category: `${debt.kind === 'LOAN' ? 'Loan' : 'Deficit'} ${debt.direction === 'RECEIVABLE' ? 'received' : 'paid'}`,
+        note: debt.partyName,
+        referenceType: 'debt',
+        referenceId: id,
+      });
       const paidAmount = debt.paidAmount.add(amount);
       await tx.debt.update({
         where: { id },
@@ -239,6 +260,8 @@ export class DebtsService {
 interface DebtInput {
   tenantId: string;
   direction: DebtDirection;
+  kind?: DebtKind;
+  dueDate?: Date;
   partyName: string;
   supplierId?: string;
   employeeId?: string;
@@ -256,6 +279,8 @@ export function createDebt(tx: Prisma.TransactionClient, input: DebtInput) {
     data: {
       tenantId: input.tenantId,
       direction: input.direction,
+      kind: input.kind ?? (input.direction === 'RECEIVABLE' ? 'LOAN' : 'DEFICIT'),
+      dueDate: input.dueDate,
       partyName: input.partyName,
       supplierId: input.supplierId,
       employeeId: input.employeeId,

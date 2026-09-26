@@ -21,19 +21,18 @@ const BCRYPT_ROUNDS = 10;
 export class SellersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Sellers + performance (delivered sales and commission) */
+  /** Sellers + performance (sales and commission) */
   async list(tenantId: string) {
     const profiles = await this.prisma.sellerProfile.findMany({
       where: { tenantId },
       include: { user: { select: { fullName: true, email: true } } },
       orderBy: { createdAt: 'asc' },
     });
-    const [orderStats, commissionStats] = await Promise.all([
-      this.prisma.order.groupBy({
+    const [saleStats, commissionStats] = await Promise.all([
+      this.prisma.sale.groupBy({
         by: ['createdById'],
         where: {
           tenantId,
-          status: 'DELIVERED',
           createdById: { in: profiles.map((p) => p.userId) },
         },
         _count: { _all: true },
@@ -45,14 +44,14 @@ export class SellersService {
         _sum: { amount: true },
       }),
     ]);
-    const orderByUser = new Map(orderStats.map((s) => [s.createdById, s]));
+    const saleByUser = new Map(saleStats.map((s) => [s.createdById, s]));
     const commissionByProfile = new Map(commissionStats.map((s) => [s.sellerProfileId, s]));
     return profiles.map(({ user, ...profile }) => ({
       ...profile,
       fullName: user.fullName,
       email: user.email,
-      ordersCount: orderByUser.get(profile.userId)?._count._all ?? 0,
-      salesTotal: orderByUser.get(profile.userId)?._sum.total ?? new Prisma.Decimal(0),
+      salesCount: saleByUser.get(profile.userId)?._count._all ?? 0,
+      salesTotal: saleByUser.get(profile.userId)?._sum.total ?? new Prisma.Decimal(0),
       commissionTotal:
         commissionByProfile.get(profile.id)?._sum.amount ?? new Prisma.Decimal(0),
     }));
@@ -210,36 +209,36 @@ export class SellersService {
   }
 }
 
-interface CommissionOrder {
+interface CommissionSale {
   id: string;
-  orderNumber: number;
+  saleNumber: number;
   total: Prisma.Decimal;
   createdById: string;
 }
 
-/** Record seller commission upon order delivery — if the order creator has an active profile */
+/** Record seller commission for a sale — if the seller has an active commission profile */
 export async function recordCommission(
   tx: Prisma.TransactionClient,
   tenantId: string,
-  order: CommissionOrder,
+  sale: CommissionSale,
 ) {
   const profile = await tx.sellerProfile.findFirst({
-    where: { tenantId, userId: order.createdById, isActive: true },
+    where: { tenantId, userId: sale.createdById, isActive: true },
     select: { id: true, payType: true, commissionPercent: true },
   });
   if (!profile || profile.payType === 'FIXED_SALARY' || profile.commissionPercent.lte(0)) return null;
   const existing = await tx.commissionEntry.findUnique({
-    where: { sellerProfileId_orderId: { sellerProfileId: profile.id, orderId: order.id } },
+    where: { sellerProfileId_saleId: { sellerProfileId: profile.id, saleId: sale.id } },
   });
   if (existing) return existing;
-  const amount = computeCommission(order.total.toNumber(), profile.commissionPercent.toNumber());
+  const amount = computeCommission(sale.total.toNumber(), profile.commissionPercent.toNumber());
   if (amount <= 0) return null;
   return tx.commissionEntry.create({
     data: {
       tenantId,
       sellerProfileId: profile.id,
-      orderId: order.id,
-      orderNumber: order.orderNumber,
+      saleId: sale.id,
+      saleNumber: sale.saleNumber,
       amount: new Prisma.Decimal(amount),
       percent: profile.commissionPercent,
     },

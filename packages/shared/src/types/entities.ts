@@ -1,14 +1,10 @@
-import { OrderStatus } from '../constants/order-status';
-import {
-  CashTransactionType,
-  OrderPaymentStatus,
-  PaymentStatus,
-} from '../constants/sales';
+import { CashTransactionType, IncomePart, PaymentMethod } from '../constants/sales';
 import {
   AttendanceStatus,
   CapitalEntryType,
   Currency,
   DebtDirection,
+  DebtKind,
   DebtStatus,
   SalaryPaymentStatus,
   SeasonStatus,
@@ -17,7 +13,7 @@ import {
 import { PartnerEntryType } from '../constants/partners';
 import { CalendarType, Locale } from './auth';
 
-export type { Currency };
+export type { Currency, IncomePart, PaymentMethod };
 export type StockMovementType =
   | 'PURCHASE_IN'
   | 'SALE_OUT'
@@ -139,32 +135,34 @@ export interface StockMovementDto {
   createdAt: string;
 }
 
-export interface OrderItemDto {
+// ─────────────────────── Phase 2 ───────────────────────
+
+export interface SaleItemDto {
   id: string;
   productId: string;
   productName: string;
   quantity: number;
   unitPrice: string;
+  unitCost: string;
   total: string;
 }
 
-export interface OrderDto {
+export interface SaleDto {
   id: string;
-  orderNumber: number;
+  saleNumber: number;
   branchId: string;
   branchName?: string;
-  status: OrderStatus;
-  subtotal: string;
   total: string;
-  currency: Currency;
-  paymentStatus: OrderPaymentStatus;
-  paidTotal: string;
+  cost: string;
+  profit: string;
+  paymentMethod: PaymentMethod;
+  registerId: string | null;
+  debtId: string | null;
   notes: string | null;
-  items: OrderItemDto[];
+  createdByName?: string;
+  items: SaleItemDto[];
   createdAt: string;
 }
-
-// ─────────────────────── Phase 2 ───────────────────────
 
 export interface CartItemDto {
   id: string;
@@ -184,17 +182,6 @@ export interface CartDto {
   subtotal: string;
   cost: string;
   total: string;
-}
-
-export interface PaymentDto {
-  id: string;
-  orderId: string;
-  status: PaymentStatus;
-  amount: string;
-  registerId: string | null;
-  receivedByName?: string;
-  note: string | null;
-  createdAt: string;
 }
 
 export type GatewayPurpose = 'SUBSCRIPTION';
@@ -220,9 +207,9 @@ export interface CashRegisterDto {
   branchId: string;
   branchName?: string;
   name: string;
+  part: IncomePart;
   isDefault: boolean;
   isActive: boolean;
-  isNetProfitBox: boolean;
   openingBalance: string;
   balance: string;
 }
@@ -243,9 +230,39 @@ export interface CashTransactionDto {
 
 
 export interface PosSaleResultDto {
-  order: OrderDto;
-  payment: PaymentDto | null;
+  sale: SaleDto;
   change: string;
+}
+
+export interface IncomePartSummaryDto {
+  part: IncomePart;
+  name: string;
+  /** Current money held in this part (all its registers) */
+  balance: string;
+  /** Money that came into this part during the range (sales, loans received, debts collected, other income) */
+  income: string;
+  /** Money that went out of this part during the range (expenses, salaries, withdrawals, debts paid) */
+  expenses: string;
+  /** Profit of the sales paid into this part during the range */
+  profit: string;
+  salesCount: number;
+}
+
+export interface IncomeSummaryDto {
+  from: string;
+  to: string;
+  parts: IncomePartSummaryDto[];
+  /** Sales recorded as Loan / Deficit — not paid yet */
+  unpaid: { total: string; profit: string; salesCount: number };
+  totals: {
+    /** Sum of the income of Cash, EBT and Zelle */
+    totalIncome: string;
+    totalBalance: string;
+    /** Every sale of the range, paid or not */
+    totalSales: string;
+    totalProfit: string;
+    salesCount: number;
+  };
 }
 
 // ─────────────────────── Phase 3 ───────────────────────
@@ -260,7 +277,7 @@ export interface SellerDto {
   fixedSalaryAmount: string | null;
   isActive: boolean;
   notes: string | null;
-  ordersCount?: number;
+  salesCount?: number;
   salesTotal?: string;
   commissionTotal?: string;
   createdAt: string;
@@ -268,8 +285,8 @@ export interface SellerDto {
 
 export interface CommissionEntryDto {
   id: string;
-  orderId: string;
-  orderNumber?: number;
+  saleId: string;
+  saleNumber?: number;
   amount: string;
   percent: string;
   createdAt: string;
@@ -357,7 +374,7 @@ export interface SeasonReport {
   salesTotal: string;
   salesCost: string;
   profit: string;
-  ordersCount: number;
+  salesCount: number;
   expensesTotal: string;
   capitalIn: string;
   capitalOut: string;
@@ -414,6 +431,7 @@ export interface DebtDto {
   id: string;
   direction: DebtDirection;
   status: DebtStatus;
+  kind: DebtKind;
   partyName: string;
   supplierId: string | null;
   employeeId: string | null;
@@ -452,7 +470,7 @@ export interface SalesReportPoint {
   total: string;
   cost: string;
   profit: string;
-  orders: number;
+  sales: number;
 }
 
 export interface SalesReportDto {
@@ -461,8 +479,8 @@ export interface SalesReportDto {
     salesTotal: string;
     salesCost: string;
     profit: string;
-    ordersCount: number;
-    averageOrder: string;
+    salesCount: number;
+    averageSale: string;
   };
 }
 
@@ -483,7 +501,7 @@ export interface CashReportRow {
 export interface BranchReportRow {
   branchId: string;
   name: string;
-  ordersCount: number;
+  salesCount: number;
   total: string;
   cost: string;
   profit: string;
@@ -492,7 +510,7 @@ export interface BranchReportRow {
 export interface SellerReportRow {
   sellerId: string;
   name: string;
-  ordersCount: number;
+  salesCount: number;
   itemsSold: number;
   total: string;
   cost: string;
@@ -613,7 +631,7 @@ export interface TenantDetailDto {
   } | null;
   usage: { branches: number; users: number; products: number };
   history: SubscriptionHistoryDto[];
-  behavior: { lastAdminLoginAt: string | null; totalOrders: number };
+  behavior: { lastAdminLoginAt: string | null; totalSales: number };
 }
 
 /** Store owner's suggestion/complaint about the platform — submitted from the store panel, reviewed in the platform admin panel */
@@ -647,8 +665,7 @@ export interface DashboardSummaryDto {
   monthSales: string;
   todayProfit: string;
   monthProfit: string;
-  todayOrders: number;
-  ordersByStatus: Record<OrderStatus, number>;
+  todaySalesCount: number;
   lowStockCount: number;
   topProducts: { productId: string; name: string; quantity: number; total: string }[];
 }

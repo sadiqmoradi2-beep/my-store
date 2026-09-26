@@ -175,7 +175,7 @@ function ClosedSeason({ season }: { season: WorkSeasonDto }) {
         <div className="mt-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-3 lg:grid-cols-6">
           <Stat label={t('report.salesTotal')} value={formatMoney(report.salesTotal, locale)} suffix={tc('currency')} />
           <Stat label={t('report.profit')} value={formatMoney(report.profit, locale)} suffix={tc('currency')} />
-          <Stat label={t('report.ordersCount')} value={formatNumber(report.ordersCount, locale)} />
+          <Stat label={t('report.salesCount')} value={formatNumber(report.salesCount ?? 0, locale)} />
           <Stat label={t('report.expensesTotal')} value={formatMoney(report.expensesTotal, locale)} suffix={tc('currency')} />
           <Stat label={t('capitalIn')} value={formatMoney(report.capitalIn, locale)} suffix={tc('currency')} />
           <Stat label={t('capitalOut')} value={formatMoney(report.capitalOut, locale)} suffix={tc('currency')} />

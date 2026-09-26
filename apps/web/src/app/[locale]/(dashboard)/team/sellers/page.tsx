@@ -43,7 +43,7 @@ export default function SellersPage() {
               <tr className="border-b border-line text-xs text-ink-muted">
                 <th className="p-3 text-start font-medium">{t('seller')}</th>
                 <th className="p-3 text-start font-medium">{t('payType')}</th>
-                <th className="p-3 text-start font-medium">{t('ordersCount')}</th>
+                <th className="p-3 text-start font-medium">{t('salesCount')}</th>
                 <th className="p-3 text-start font-medium">{t('salesTotal')}</th>
                 <th className="p-3 text-start font-medium">{t('commissionTotal')}</th>
                 <th className="p-3 text-start font-medium">{tc('actions')}</th>
@@ -86,7 +86,7 @@ export default function SellersPage() {
                     )}
                   </td>
                   <td className="p-3 text-ink-muted">
-                    {formatNumber(seller.ordersCount ?? 0, locale)}
+                    {formatNumber(seller.salesCount ?? 0, locale)}
                   </td>
                   <td className="p-3 text-ink">
                     {formatMoney(seller.salesTotal ?? 0, locale)}{' '}

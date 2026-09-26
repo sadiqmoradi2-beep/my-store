@@ -34,7 +34,7 @@ describe('TenantsService', () => {
       countForAdmin: jest.fn().mockResolvedValue(0),
       findByIdForAdmin: jest.fn(),
       subscriptionHistory: jest.fn().mockResolvedValue([]),
-      behaviorSignals: jest.fn().mockResolvedValue({ lastAdminLoginAt: null, totalOrders: 0 }),
+      behaviorSignals: jest.fn().mockResolvedValue({ lastAdminLoginAt: null, totalSales: 0 }),
     };
     const passwordHash = await bcrypt.hash('correct-pass', 4);
     prisma = {
@@ -138,12 +138,12 @@ describe('TenantsService', () => {
         },
       });
       repo.subscriptionHistory.mockResolvedValue([{ id: 'h1', event: 'PLAN_CHANGED' }]);
-      repo.behaviorSignals.mockResolvedValue({ lastAdminLoginAt: null, totalOrders: 5 });
+      repo.behaviorSignals.mockResolvedValue({ lastAdminLoginAt: null, totalSales: 5 });
 
       const result = await service.detail('t1');
       expect(result.usage).toEqual({ branches: 1, users: 2, products: 3 });
       expect(result.history).toHaveLength(1);
-      expect(result.behavior.totalOrders).toBe(5);
+      expect(result.behavior.totalSales).toBe(5);
       expect(result.subscription?.plan.code).toBe('BUSINESS');
     });
   });

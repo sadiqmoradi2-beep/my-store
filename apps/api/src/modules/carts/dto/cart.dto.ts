@@ -30,9 +30,3 @@ export class UpdateCartItemDto {
   @Min(0)
   unitPrice?: number;
 }
-
-export class CheckoutCartDto {
-  @IsOptional()
-  @IsString()
-  notes?: string;
-}

@@ -144,8 +144,8 @@ export default function PlatformTenantDetailPage() {
                 </span>
               </p>
               <p>
-                <span className="text-ink-muted">{t('totalOrders')}: </span>
-                <span className="text-ink">{formatNumber(tenant.behavior.totalOrders, locale)}</span>
+                <span className="text-ink-muted">{t('totalSales')}: </span>
+                <span className="text-ink">{formatNumber(tenant.behavior.totalSales, locale)}</span>
               </p>
             </div>
           </Card>

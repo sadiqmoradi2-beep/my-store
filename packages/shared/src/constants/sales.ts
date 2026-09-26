@@ -1,10 +1,53 @@
-/** Shared sales constants and logic — Phase 2 (payment, cash register, purchasing power) */
+/** Shared sales constants — payment methods, income parts, cash transactions */
 
-export const PAYMENT_STATUSES = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'] as const;
-export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+/** How a sale is paid at the POS */
+export const PAYMENT_METHODS = ['CASH', 'CARD', 'EBT', 'ZELLE', 'LOAN', 'DEFICIT'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export const ORDER_PAYMENT_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'REFUNDED'] as const;
-export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUSES)[number];
+export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
+  CASH: 'Cash',
+  CARD: 'Card',
+  EBT: 'EBT',
+  ZELLE: 'Zelle',
+  LOAN: 'Loan',
+  DEFICIT: 'Deficit',
+};
+
+export const PAYMENT_METHOD_HINTS: Record<PaymentMethod, string> = {
+  CASH: 'Cash payment',
+  CARD: 'Debit / credit card payment',
+  EBT: 'Government assistance (Electronic Benefit Transfer)',
+  ZELLE: 'Bank transfer payment',
+  LOAN: 'Not paid now — recorded in Loan & Deficit',
+  DEFICIT: 'Not paid now — recorded in Loan & Deficit',
+};
+
+/** The three parts of Income — every payment received lands in one of them */
+export const INCOME_PARTS = ['CASH', 'EBT', 'ZELLE'] as const;
+export type IncomePart = (typeof INCOME_PARTS)[number];
+
+export const INCOME_PART_NAMES: Record<IncomePart, string> = {
+  CASH: 'Cash',
+  EBT: 'EBT',
+  ZELLE: 'Zelle',
+};
+
+/** Which Income part receives the money of each payment method (Card goes to the bank/Zelle part). LOAN and DEFICIT are unpaid — no money yet. */
+export const PAYMENT_METHOD_PART: Record<PaymentMethod, IncomePart | null> = {
+  CASH: 'CASH',
+  CARD: 'ZELLE',
+  EBT: 'EBT',
+  ZELLE: 'ZELLE',
+  LOAN: null,
+  DEFICIT: null,
+};
+
+/** Methods that leave the sale unpaid — the amount becomes a receivable in Loan & Deficit */
+export const UNPAID_PAYMENT_METHODS: PaymentMethod[] = ['LOAN', 'DEFICIT'];
+
+export function isUnpaidMethod(method: PaymentMethod): boolean {
+  return UNPAID_PAYMENT_METHODS.includes(method);
+}
 
 export const CASH_TRANSACTION_TYPES = ['SALE', 'INCOME', 'EXPENSE', 'REFUND', 'WITHDRAWAL'] as const;
 export type CashTransactionType = (typeof CASH_TRANSACTION_TYPES)[number];
@@ -26,13 +69,6 @@ export const CASH_TRANSACTION_TYPE_NAMES: Record<CashTransactionType, string> = 
   EXPENSE: 'Expense',
   REFUND: 'Refund',
   WITHDRAWAL: 'Withdrawal',
-};
-
-export const ORDER_PAYMENT_STATUS_NAMES: Record<OrderPaymentStatus, string> = {
-  UNPAID: 'Unpaid',
-  PARTIAL: 'Partial',
-  PAID: 'Paid',
-  REFUNDED: 'Refunded',
 };
 
 // ─────────────────── Online payment options ───────────────────

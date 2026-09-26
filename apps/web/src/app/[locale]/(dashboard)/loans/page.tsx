@@ -8,8 +8,11 @@ import { FormEvent, useState } from 'react';
 import {
   type CashRegisterDto,
   type Currency,
+  DEBT_KINDS,
+  INCOME_PART_NAMES,
   type DebtDirection,
   type DebtDto,
+  type DebtKind,
   type DebtStatus,
   type Locale,
   type SupplierDto,
@@ -25,12 +28,13 @@ const STATUS_TONES: Record<DebtStatus, string> = {
   SETTLED: 'DELIVERED',
 };
 
-export default function DebtsPage() {
+export default function LoansPage() {
   const t = useTranslations('debts');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
 
   const [direction, setDirection] = useState<DebtDirection | ''>('');
+  const [kind, setKind] = useState<DebtKind | ''>('');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [paying, setPaying] = useState<DebtDto | null>(null);
@@ -41,10 +45,10 @@ export default function DebtsPage() {
     queryFn: () => api.get<{ receivable: string; payable: string }>('/debts/summary'),
   });
   const { data, isPending, error } = useQuery({
-    queryKey: ['debts', direction, page],
+    queryKey: ['debts', direction, kind, page],
     queryFn: () =>
       api.getPaged<DebtDto[]>(
-        `/debts?page=${page}&limit=15${direction ? `&direction=${direction}` : ''}`,
+        `/debts?page=${page}&limit=15${direction ? `&direction=${direction}` : ''}${kind ? `&kind=${kind}` : ''}`,
       ),
   });
 
@@ -89,6 +93,24 @@ export default function DebtsPage() {
       )}
 
       <div className="flex flex-wrap gap-1.5">
+        {(['', ...DEBT_KINDS] as const).map((k) => (
+          <button
+            key={k || 'all-kinds'}
+            onClick={() => {
+              setKind(k);
+              setPage(1);
+            }}
+            className={cn(
+              'cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200',
+              kind === k
+                ? 'bg-accent-700 text-white dark:bg-accent-600'
+                : 'border border-line bg-surface-2 text-ink-muted hover:text-ink',
+            )}
+          >
+            {k === '' ? t('allKinds') : t(`kinds.${k}`)}
+          </button>
+        ))}
+        <span className="mx-1 self-center text-ink-faint">|</span>
         {(['', 'RECEIVABLE', 'PAYABLE'] as const).map((dir) => (
           <button
             key={dir || 'all'}
@@ -118,6 +140,7 @@ export default function DebtsPage() {
             <thead>
               <tr className="border-b border-line text-xs text-ink-muted">
                 <th className="p-3 text-start font-medium">{t('party')}</th>
+                <th className="p-3 text-start font-medium">{t('kind')}</th>
                 <th className="p-3 text-start font-medium">{t('direction')}</th>
                 <th className="p-3 text-start font-medium">{t('amount')}</th>
                 <th className="p-3 text-start font-medium">{t('remaining')}</th>
@@ -128,7 +151,7 @@ export default function DebtsPage() {
             <tbody>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-ink-faint">
+                  <td colSpan={7} className="p-8 text-center text-ink-faint">
                     {tc('noData')}
                   </td>
                 </tr>
@@ -143,7 +166,7 @@ export default function DebtsPage() {
                     <td className="p-3">
                       {debt.supplierId ? (
                         <Link
-                          href={`/${locale}/finance/debts/supplier/${debt.supplierId}`}
+                          href={`/${locale}/loans/supplier/${debt.supplierId}`}
                           className="font-bold text-primary-700 hover:underline dark:text-primary-300"
                         >
                           {debt.partyName}
@@ -152,6 +175,9 @@ export default function DebtsPage() {
                         <p className="font-bold text-ink">{debt.partyName}</p>
                       )}
                       {debt.notes && <p className="text-xs text-ink-faint">{debt.notes}</p>}
+                    </td>
+                    <td className="p-3">
+                      <Badge tone={debt.kind === 'LOAN' ? 'PENDING' : 'neutral'}>{t(`kinds.${debt.kind}`)}</Badge>
                     </td>
                     <td className="p-3">
                       <Badge tone={debt.direction === 'RECEIVABLE' ? 'APPROVED' : 'danger'}>
@@ -234,7 +260,9 @@ function DebtModal({ onClose }: { onClose: () => void }) {
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    direction: 'RECEIVABLE' as DebtDirection,
+    direction: 'PAYABLE' as DebtDirection,
+    kind: 'LOAN' as DebtKind,
+    receivedRegisterId: '',
     linkMode: 'text' as 'text' | 'link',
     partyName: '',
     partyId: '',
@@ -249,6 +277,8 @@ function DebtModal({ onClose }: { onClose: () => void }) {
     mutationFn: () =>
       api.post('/debts', {
         direction: form.direction,
+        kind: form.kind,
+        ...(form.receivedRegisterId && { receivedRegisterId: form.receivedRegisterId }),
         ...(form.linkMode === 'link' ? { supplierId: form.partyId } : { partyName: form.partyName }),
         amount: Number(form.amount),
         currency: form.currency,
@@ -258,8 +288,15 @@ function DebtModal({ onClose }: { onClose: () => void }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['debts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-registers'] });
+      queryClient.invalidateQueries({ queryKey: ['income-summary'] });
       onClose();
     },
+  });
+
+  const { data: registers } = useQuery({
+    queryKey: ['cash-registers'],
+    queryFn: () => api.get<CashRegisterDto[]>('/cash-registers'),
   });
 
   function submit(e: FormEvent) {
@@ -274,11 +311,29 @@ function DebtModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal open title={t('new')} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
+        <Field label={t('kind')} hint={t(`kindHints.${form.kind}`)}>
+          <Select
+            value={form.kind}
+            onChange={(e) => set({ kind: e.target.value as DebtKind, receivedRegisterId: '' })}
+          >
+            {DEBT_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {t(`kinds.${k}`)}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label={t('direction')}>
           <Select
             value={form.direction}
             onChange={(e) =>
-              set({ direction: e.target.value as DebtDirection, linkMode: 'text', partyId: '', partyName: '' })
+              set({
+                direction: e.target.value as DebtDirection,
+                receivedRegisterId: '',
+                linkMode: 'text',
+                partyId: '',
+                partyName: '',
+              })
             }
           >
             <option value="RECEIVABLE">{t('directions.RECEIVABLE')}</option>
@@ -316,6 +371,19 @@ function DebtModal({ onClose }: { onClose: () => void }) {
         ) : (
           <Field label={t('party')}>
             <Input required value={form.partyName} onChange={(e) => set({ partyName: e.target.value })} />
+          </Field>
+        )}
+
+        {form.kind === 'LOAN' && form.direction === 'PAYABLE' && (
+          <Field label={t('receivedInto')} hint={t('receivedIntoHint')}>
+            <Select value={form.receivedRegisterId} onChange={(e) => set({ receivedRegisterId: e.target.value })}>
+              <option value="">{t('notReceivedYet')}</option>
+              {registers?.map((register) => (
+                <option key={register.id} value={register.id}>
+                  {INCOME_PART_NAMES[register.part]} — {register.branchName}
+                </option>
+              ))}
+            </Select>
           </Field>
         )}
 
@@ -430,7 +498,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
   const queryClient = useQueryClient();
   const remaining = Number(debt.amount) - Number(debt.paidAmount);
   const [amount, setAmount] = useState(String(remaining));
-  const [registerId, setRegisterId] = useState('');
+  const [registerChoice, setRegisterChoice] = useState('');
   const [note, setNote] = useState('');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<unknown>(null);
@@ -440,6 +508,8 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
     queryKey: ['cash-registers'],
     queryFn: () => api.get<CashRegisterDto[]>('/cash-registers'),
   });
+
+  const registerId = registerChoice || registers?.find((r) => r.part === 'CASH')?.id || registers?.[0]?.id || '';
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -461,7 +531,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
       }
       return api.post(`/debts/${debt.id}/payments`, {
         amount: Number(amount),
-        registerId: registerId || undefined,
+        registerId,
         proofImageUrl,
         note: note || undefined,
       });
@@ -471,6 +541,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
       queryClient.invalidateQueries({ queryKey: ['debts-summary'] });
       queryClient.invalidateQueries({ queryKey: ['debt-ledger'] });
       queryClient.invalidateQueries({ queryKey: ['cash-registers'] });
+      queryClient.invalidateQueries({ queryKey: ['income-summary'] });
       onClose();
     },
   });
@@ -503,11 +574,10 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
           label={t('register')}
           hint={debt.direction === 'RECEIVABLE' ? t('registerHintIn') : t('registerHintOut')}
         >
-          <Select value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
-            <option value="">{t('noRegister')}</option>
+          <Select required value={registerId} onChange={(e) => setRegisterChoice(e.target.value)}>
             {registers?.map((register) => (
               <option key={register.id} value={register.id}>
-                {register.name} — {register.branchName}
+                {INCOME_PART_NAMES[register.part]} — {register.branchName}
               </option>
             ))}
           </Select>
@@ -526,7 +596,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
         <ErrorText error={uploadError} />
         <ErrorText error={mutation.error} />
         <div className="flex gap-2">
-          <Button type="submit" loading={mutation.isPending || uploading}>
+          <Button type="submit" loading={mutation.isPending || uploading} disabled={!registerId}>
             {tc('confirm')}
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>

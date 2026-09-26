@@ -3,7 +3,7 @@ import {
   CASH_TRANSACTION_TYPE_NAMES,
   DEBT_DIRECTION_NAMES,
   DEBT_STATUS_NAMES,
-  ORDER_STATUS_NAMES,
+  PAYMENT_METHOD_NAMES,
 } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ReportsService, rangeOf } from '../reports/reports.service';
@@ -61,39 +61,35 @@ export class ExportsService {
     };
   }
 
-  async orders(tenantId: string, query: ExportQueryDto): Promise<ExportSheet> {
+  async sales(tenantId: string, query: ExportQueryDto): Promise<ExportSheet> {
     const { from, to } = rangeOf(query);
-    const orders = await this.prisma.order.findMany({
+    const sales = await this.prisma.sale.findMany({
       where: {
         tenantId,
         createdAt: { gte: from, lte: to },
         ...(query.branchId && { branchId: query.branchId }),
       },
-      include: {
-        branch: { select: { name: true } },
-      },
+      include: { branch: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return {
-      name: 'orders',
-      title: 'Orders',
+      name: 'sales',
+      title: 'Sales',
       columns: [
-        { key: 'orderNumber', header: 'Number', width: 10 },
+        { key: 'saleNumber', header: 'Number', width: 10 },
         { key: 'createdAt', header: 'Date' },
         { key: 'branch', header: 'Branch', width: 18 },
-        { key: 'status', header: 'Status', width: 14 },
-        { key: 'subtotal', header: 'Items subtotal' },
-        { key: 'total', header: 'Final amount' },
-        { key: 'paidTotal', header: 'Paid' },
+        { key: 'method', header: 'Payment method', width: 16 },
+        { key: 'total', header: 'Total' },
+        { key: 'profit', header: 'Profit' },
       ],
-      rows: orders.map((o) => ({
-        orderNumber: o.orderNumber,
-        createdAt: o.createdAt,
-        branch: o.branch.name,
-        status: ORDER_STATUS_NAMES[o.status],
-        subtotal: o.subtotal.toNumber(),
-        total: o.total.toNumber(),
-        paidTotal: o.paidTotal.toNumber(),
+      rows: sales.map((s) => ({
+        saleNumber: s.saleNumber,
+        createdAt: s.createdAt,
+        branch: s.branch.name,
+        method: PAYMENT_METHOD_NAMES[s.paymentMethod],
+        total: s.total.toNumber(),
+        profit: s.total.sub(s.cost).toNumber(),
       })),
     };
   }
@@ -208,14 +204,14 @@ export class ExportsService {
     const monthly = query.granularity === 'month';
     const rows: Record<string, unknown>[] = report.points.map((p) => ({
       bucket: monthly ? jalali(p.bucket).slice(0, 7) : jalali(p.bucket).slice(0, 10),
-      orders: p.orders,
+      sales: p.sales,
       total: p.total.toNumber(),
       cost: p.cost.toNumber(),
       profit: p.profit.toNumber(),
     }));
     rows.push({
       bucket: 'Total',
-      orders: report.totals.ordersCount,
+      sales: report.totals.salesCount,
       total: report.totals.salesTotal.toNumber(),
       cost: report.totals.salesCost.toNumber(),
       profit: report.totals.profit.toNumber(),
@@ -225,7 +221,7 @@ export class ExportsService {
       title: 'Sales report',
       columns: [
         { key: 'bucket', header: 'Period', width: 14 },
-        { key: 'orders', header: 'Orders count', width: 12 },
+        { key: 'sales', header: 'Sales count', width: 12 },
         { key: 'total', header: 'Sales' },
         { key: 'cost', header: 'Cost' },
         { key: 'profit', header: 'Profit' },

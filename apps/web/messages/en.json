@@ -45,13 +45,9 @@
     "products": "Products",
     "categories": "Categories",
     "inventory": "Inventory",
-    "orders": "Orders",
     "pos": "My Store",
-    "finance": "Cash",
-    "cash": "Cash",
     "returns": "Return Purchase",
     "suppliers": "Suppliers",
-    "debts": "Debts",
     "team": "Team",
     "sellers": "Sellers",
     "employees": "Employees",
@@ -61,7 +57,9 @@
     "activityLog": "Activity log",
     "backups": "Backups",
     "settings": "Settings",
-    "feedback": "Feedback"
+    "feedback": "Feedback",
+    "income": "Income",
+    "loans": "Loan & Deficit"
   },
   "auth": {
     "loginTitle": "Sign in to MY STORE",
@@ -109,13 +107,12 @@
     "monthSales": "This month's sales",
     "todayProfit": "Today's profit",
     "monthProfit": "Month's profit",
-    "todayOrders": "Today's orders",
     "lowStock": "Low stock alert",
     "lowStockItems": "{count} items below minimum",
     "salesTrend": "Sales trend (last 7 days)",
-    "ordersByStatus": "Orders by status",
     "topProducts": "Top products this month",
-    "sold": "{count} pcs"
+    "sold": "{count} pcs",
+    "todaySalesCount": "Today's sales (count)"
   },
   "products": {
     "title": "Products",
@@ -227,39 +224,8 @@
     "warehousePhone": "Warehouse phone (optional)",
     "warehouseOwner": "Warehouse owner name (optional)"
   },
-  "orders": {
-    "title": "Orders",
-    "orderNumber": "No.",
-    "branch": "Branch",
-    "total": "Total",
-    "status": "Status",
-    "all": "All",
-    "items": "Items",
-    "history": "Status history",
-    "transitionConfirm": "Change order status to \"{status}\"?",
-    "statuses": {
-      "PENDING": "Pending",
-      "APPROVED": "Approved",
-      "DELIVERED": "Delivered",
-      "CANCELLED": "Cancelled"
-    },
-    "actions": {
-      "APPROVED": "Approve",
-      "DELIVERED": "Delivered",
-      "CANCELLED": "Cancel"
-    }
-  },
   "cash": {
-    "title": "Cash registers",
-    "newRegister": "New register",
-    "default": "Default",
-    "netProfitBox": "Net sales profit",
-    "makeNetProfitBox": "Set as net-profit register",
-    "netProfitBoxHint": "This register only records the full net profit of each sale — it can't also be the default sales register",
-    "branch": "Branch",
-    "selectBranch": "Select branch…",
-    "registerName": "Register name",
-    "openingBalance": "Opening balance",
+    "title": "Income",
     "transactionsOf": "Transactions of {name}",
     "newTransaction": "New transaction",
     "referenceFilters": {
@@ -303,7 +269,35 @@
       "taxes": "Taxes & fees",
       "partner": "Partner withdrawal",
       "owner": "Owner withdrawal"
-    }
+    },
+    "totalIncome": "Total income",
+    "totalIncomeHint": "Cash + EBT + Zelle money in",
+    "totalSales": "Total sales",
+    "totalProfit": "Total profit",
+    "totalBalance": "Money held now",
+    "totalBalanceHint": "Balance of Cash + EBT + Zelle",
+    "salesCount": "{count} sales",
+    "balance": "Balance",
+    "partIncome": "Income",
+    "partSpent": "Spent",
+    "profit": "Profit",
+    "parts": {
+      "CASH": "Cash",
+      "EBT": "EBT",
+      "ZELLE": "Zelle"
+    },
+    "ranges": {
+      "today": "Today",
+      "week": "Last 7 days",
+      "month": "This month",
+      "all": "All time"
+    },
+    "unpaidNote": "Not paid yet (Loan & Deficit): {total} from {count} sales — profit {profit}. It becomes income when it is paid back.",
+    "salesTitle": "Sales",
+    "allMethods": "All payment methods",
+    "saleNumber": "No.",
+    "method": "Payment method",
+    "total": "Total"
   },
   "pos": {
     "title": "My Store",
@@ -324,8 +318,29 @@
     "completeSale": "Complete sale",
     "clearConfirm": "Clear the cart?",
     "saleComplete": "Sale completed",
-    "orderNumber": "Order number",
-    "newSale": "New sale"
+    "newSale": "New sale",
+    "saleNumber": "Sale number",
+    "paymentMethod": "Payment method",
+    "methods": {
+      "CASH": "Cash",
+      "CARD": "Card",
+      "EBT": "EBT",
+      "ZELLE": "Zelle",
+      "LOAN": "Loan",
+      "DEFICIT": "Deficit"
+    },
+    "methodHints": {
+      "CASH": "Cash payment — the money goes to Income → Cash",
+      "CARD": "Debit / credit card payment — the money goes to Income → Zelle (bank)",
+      "EBT": "Government assistance (Electronic Benefit Transfer) — the money goes to Income → EBT",
+      "ZELLE": "Bank transfer payment — the money goes to Income → Zelle",
+      "LOAN": "Not paid now — recorded in Loan & Deficit as money owed to you",
+      "DEFICIT": "Not paid now — recorded in Loan & Deficit as money owed to you"
+    },
+    "partyName": "Who owes this amount?",
+    "partyHint": "Name of the person — required for Loan / Deficit",
+    "dueDate": "Expected back by",
+    "unpaidNote": "Recorded in Loan & Deficit — when it is paid back, the money enters Income."
   },
   "sellers": {
     "title": "Sellers",
@@ -347,7 +362,6 @@
     "close": "Close",
     "commissionPercent": "Commission %",
     "commissionHint": "Calculated when each of their orders is delivered",
-    "ordersCount": "Delivered orders",
     "salesTotal": "Sales total",
     "commissionTotal": "Commission total",
     "notes": "Notes",
@@ -361,7 +375,8 @@
     "register": "Register",
     "registerHint": "Deducted from the register as an expense",
     "noRegister": "No cash effect",
-    "note": "Note"
+    "note": "Note",
+    "salesCount": "Sales"
   },
   "employees": {
     "title": "Employees",
@@ -466,21 +481,21 @@
     "report": {
       "salesTotal": "Sales",
       "profit": "Profit",
-      "ordersCount": "Orders",
-      "expensesTotal": "Expenses"
+      "expensesTotal": "Expenses",
+      "salesCount": "Sales"
     }
   },
   "debts": {
-    "title": "Debts & credits",
-    "new": "New record",
+    "title": "Loan & Deficit",
+    "new": "New Loan / Deficit",
     "all": "All",
-    "receivableTotal": "Open receivables",
-    "payableTotal": "Open payables",
+    "receivableTotal": "Owed to us",
+    "payableTotal": "We owe",
     "party": "Party",
-    "direction": "Type",
+    "direction": "Direction",
     "directions": {
-      "RECEIVABLE": "Receivable",
-      "PAYABLE": "Payable"
+      "RECEIVABLE": "Owed to us",
+      "PAYABLE": "We owe"
     },
     "statuses": {
       "OPEN": "Open",
@@ -491,12 +506,11 @@
     "remaining": "Remaining",
     "dueDate": "Due date",
     "notes": "Notes",
-    "pay": "Pay / collect",
+    "pay": "Pay / receive",
     "remainingHint": "Remaining: {amount}",
-    "register": "Register",
-    "registerHintIn": "Enters the register as income",
-    "registerHintOut": "Deducted from the register as an expense",
-    "noRegister": "No cash effect",
+    "register": "Income part",
+    "registerHintIn": "The money enters this Income part",
+    "registerHintOut": "The money leaves this Income part",
     "proof": "Payment proof",
     "proofHint": "Optional — a photo or scan of the cheque or payment receipt (jpg/png/webp/pdf, up to 5MB)",
     "viewDownload": "View / download",
@@ -516,8 +530,21 @@
     "performedBy": "Recorded by",
     "payerReceiver": {
       "RECEIVABLE": "Payer: debtor — Receiver: shop",
-      "PAYABLE": "Payer: shop — Receiver: supplier"
-    }
+      "PAYABLE": "Payer: shop — Receiver: creditor"
+    },
+    "kind": "Type",
+    "kinds": {
+      "LOAN": "Loan",
+      "DEFICIT": "Deficit"
+    },
+    "kindHints": {
+      "LOAN": "Loan — money we borrowed. When it is received it counts as income; paying it back leaves Income.",
+      "DEFICIT": "Deficit — money we owe to a supplier or a person. Paying it leaves Income."
+    },
+    "allKinds": "All types",
+    "receivedInto": "Received into",
+    "receivedIntoHint": "Choose the Income part that received the borrowed money",
+    "notReceivedYet": "Not received yet"
   },
   "partners": {
     "title": "Partners",
@@ -646,8 +673,6 @@
     "title": "Reports",
     "salesTotal": "Total sales",
     "profit": "Profit",
-    "ordersCount": "Orders",
-    "averageOrder": "Average order",
     "lastDays": "Last {count} days",
     "fromDate": "From",
     "toDate": "To",
@@ -669,13 +694,15 @@
     },
     "soldCount": "{count} sold",
     "branchesTitle": "Sales by branch",
-    "ordersHint": "{count} orders",
     "purchaseTotal": "Total purchases",
     "cashTitle": "Cash flow",
     "txCount": "Count",
     "topSellersTitle": "Top seller",
     "seller": "Seller",
-    "itemsSold": "Items sold"
+    "itemsSold": "Items sold",
+    "salesCount": "Sales",
+    "averageSale": "Average sale",
+    "salesHint": "{count} sales"
   },
   "activityLog": {
     "title": "Activity log",
@@ -823,7 +850,6 @@
     "behaviorSection": "Usage behavior",
     "lastAdminLogin": "Last admin login",
     "neverLoggedIn": "Never logged in",
-    "totalOrders": "Total orders",
     "noPlan": "No subscription on record",
     "feedbackTitle": "Store feedback",
     "feedbackHint": "Suggestions, complaints, and requests stores have sent about the platform.",
@@ -832,7 +858,8 @@
     "allStatuses": "All statuses",
     "noFeedback": "No feedback found.",
     "saveNote": "Save",
-    "noteSaved": "Saved"
+    "noteSaved": "Saved",
+    "totalSales": "Total sales"
   },
   "settings": {
     "title": "Panel personalization",
