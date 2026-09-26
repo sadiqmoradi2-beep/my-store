@@ -6,7 +6,7 @@ services:
     region: ohio
     plan: free
     buildCommand: npm install --include=dev && npm run build -w packages/shared && npx prisma generate --schema apps/api/prisma/schema.prisma && npm run build -w apps/api
-    startCommand: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && node apps/api/dist/src/main.js
+    startCommand: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && npx tsx apps/api/prisma/seed.ts && node apps/api/dist/src/main.js
     envVars:
       - key: NODE_VERSION
         value: 20
