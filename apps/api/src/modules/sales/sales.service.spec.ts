@@ -3,14 +3,14 @@ import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { findIncomeRegister, recordCashTransaction } from '../cash/cash.service';
-import { createDebt } from '../debts/debts.service';
 import { applyMovement } from '../inventory/inventory.service';
 import { notifyLowStock } from '../notifications/notifications.service';
 import { recordCommission } from '../sellers/sellers.service';
+import { findActiveSessionIdForUser } from '../work-sessions/session-link';
 import { SalesService } from './sales.service';
 
 jest.mock('../cash/cash.service', () => ({ findIncomeRegister: jest.fn(), recordCashTransaction: jest.fn() }));
-jest.mock('../debts/debts.service', () => ({ createDebt: jest.fn() }));
+jest.mock('../work-sessions/session-link', () => ({ findActiveSessionIdForUser: jest.fn() }));
 jest.mock('../inventory/inventory.service', () => ({ applyMovement: jest.fn() }));
 jest.mock('../notifications/notifications.service', () => ({ notifyLowStock: jest.fn() }));
 jest.mock('../sellers/sellers.service', () => ({ recordCommission: jest.fn() }));
@@ -36,7 +36,7 @@ describe('SalesService.createFromCart', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     (findIncomeRegister as jest.Mock).mockResolvedValue({ id: 'reg-auto' });
-    (createDebt as jest.Mock).mockResolvedValue({ id: 'debt-1' });
+    (findActiveSessionIdForUser as jest.Mock).mockResolvedValue(null);
     tx = {
       sale: {
         findFirst: jest.fn().mockResolvedValue({ saleNumber: 6 }),
@@ -53,12 +53,13 @@ describe('SalesService.createFromCart', () => {
         })),
       },
       cashRegister: { findFirst: jest.fn().mockResolvedValue({ id: 'reg-chosen' }) },
+      warehouse: { findFirst: jest.fn().mockResolvedValue({ id: 'w1' }), create: jest.fn().mockResolvedValue({ id: 'w-new' }) },
       cart: { delete: jest.fn() },
     };
     prisma = {
       cart: { findFirst: jest.fn().mockResolvedValue({ ...cart }) },
       branch: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'b1', warehouses: [{ id: 'w1' }] }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'b1', name: 'Main' }),
       },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
     };
@@ -87,7 +88,6 @@ describe('SalesService.createFromCart', () => {
       expect.objectContaining({ registerId: 'reg-auto', type: 'SALE', category: 'Cash' }),
     );
     expect((recordCashTransaction as jest.Mock).mock.calls[0][1].amount.toString()).toBe('450');
-    expect(createDebt).not.toHaveBeenCalled();
     expect(recordCommission).toHaveBeenCalledWith(tx, 't1', expect.objectContaining({ saleNumber: 7, createdById: 'u1' }));
     expect(tx.cart.delete).toHaveBeenCalledWith({ where: { id: 'cart-1' } });
     expect(result.change.toString()).toBe('50');
@@ -112,29 +112,6 @@ describe('SalesService.createFromCart', () => {
   it('cash received less than the total → 422 and nothing is written', async () => {
     await expect(
       service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH', cashReceived: 400 }),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
-
-  it.each(['LOAN', 'DEFICIT'] as const)('%s sale → no money recorded, a receivable is created for the person', async (method) => {
-    await service.createFromCart('t1', 'u1', {
-      cartId: 'cart-1',
-      paymentMethod: method,
-      partyName: '  Najib ',
-      dueDate: '2026-12-01',
-    });
-    expect(recordCashTransaction).not.toHaveBeenCalled();
-    expect(createDebt).toHaveBeenCalledWith(
-      tx,
-      expect.objectContaining({ direction: 'RECEIVABLE', kind: method, partyName: 'Najib', referenceType: 'sale' }),
-    );
-    expect((createDebt as jest.Mock).mock.calls[0][1].amount.toString()).toBe('450');
-    expect(tx.sale.update).toHaveBeenCalledWith(expect.objectContaining({ data: { registerId: null, debtId: 'debt-1' } }));
-  });
-
-  it('Loan / Deficit without a person name → 422', async () => {
-    await expect(
-      service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'LOAN' }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -169,11 +146,25 @@ describe('SalesService.createFromCart', () => {
     );
   });
 
-  it('branch without a default warehouse → 422', async () => {
-    prisma.branch.findFirst.mockResolvedValue({ id: 'b1', warehouses: [] });
-    await expect(service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' })).rejects.toBeInstanceOf(
-      UnprocessableEntityException,
-    );
+  it('a branch without a warehouse gets a default one created (a full reset deletes them)', async () => {
+    tx.warehouse.findFirst.mockResolvedValue(null);
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' });
+    expect(tx.warehouse.create).toHaveBeenCalledWith({
+      data: { tenantId: 't1', branchId: 'b1', name: 'Main Warehouse', isDefault: true },
+    });
+    expect(applyMovement).toHaveBeenCalledWith(tx, expect.objectContaining({ warehouseId: 'w-new' }));
+  });
+
+  it('a sale by a seller with an active work session belongs to that session and its cash movement too', async () => {
+    (findActiveSessionIdForUser as jest.Mock).mockResolvedValue('ses-1');
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' });
+    expect(tx.sale.create.mock.calls[0][0].data.sessionId).toBe('ses-1');
+    expect(recordCashTransaction).toHaveBeenCalledWith(tx, expect.objectContaining({ sessionId: 'ses-1' }));
+  });
+
+  it('no active session → the sale belongs to none', async () => {
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' });
+    expect(tx.sale.create.mock.calls[0][0].data.sessionId).toBeNull();
   });
 
   it('a stock shortage rejects the whole sale (error from applyMovement propagates)', async () => {

@@ -43,7 +43,7 @@ describe('BackupsService', () => {
   let callOrder: string[];
   let txCache: Record<
     string,
-    { deleteMany: jest.Mock; createMany: jest.Mock; create: jest.Mock; findMany: jest.Mock; update: jest.Mock }
+    { deleteMany: jest.Mock; createMany: jest.Mock; create: jest.Mock; findMany: jest.Mock; update: jest.Mock; updateMany: jest.Mock }
   >;
   let txOptsCaptured: unknown;
 
@@ -61,6 +61,7 @@ describe('BackupsService', () => {
         create: jest.fn().mockResolvedValue({}),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       };
     }
     return txCache[key];
@@ -156,6 +157,41 @@ describe('BackupsService', () => {
       readFileMock.mockResolvedValue(JSON.stringify(buildPayload()));
     });
 
+    it('full wipe also deletes staff login users linked to sellers/employees (never the current user or admins)', async () => {
+      txCache.sellerProfile = {
+        deleteMany: jest.fn().mockImplementation(() => {
+          callOrder.push('delete:sellerProfile');
+          return Promise.resolve({ count: 1 });
+        }),
+        createMany: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([{ userId: 'su1' }, { userId: 'u1' }]),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      };
+      txCache.employee = {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([{ userId: 'eu1' }, { userId: 'su1' }]),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      };
+      await service.wipeData('t1', 'u1');
+      expect(txCache.user.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['su1', 'eu1'] }, tenantId: 't1', role: { key: { not: 'ADMIN' } } },
+      });
+    });
+
+    it('scope=TEAM → deletes the team, keeps login users', async () => {
+      await service.wipeData('t1', 'u1', 'TEAM');
+      expect(callOrder).toContain('delete:employee');
+      expect(callOrder).toContain('delete:sellerProfile');
+      expect(callOrder).toContain('delete:partner');
+      expect(callOrder).not.toContain('delete:user');
+      expect(callOrder).not.toContain('delete:sale');
+    });
+
     it('در یک تراکنش با timeout مناسب اجرا می‌شود', async () => {
       await service.restore('t1', 'bk1', 'me1');
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -230,11 +266,17 @@ describe('BackupsService', () => {
       expect(callOrder).toContain('delete:supplier');
       expect(callOrder).not.toContain('delete:user');
       expect(callOrder).not.toContain('delete:role');
-      expect(callOrder).not.toContain('delete:branch');
-      expect(callOrder).not.toContain('delete:warehouse');
-      expect(callOrder).not.toContain('delete:cashRegister');
-      expect(callOrder).not.toContain('delete:employee');
-      expect(callOrder).not.toContain('delete:category');
+      expect(callOrder).toContain('delete:warehouse'); // a full reset removes the warehouses too
+      // branches and their Cash / EBT / Zelle boxes go too — one fresh main branch is created
+      expect(callOrder).toContain('delete:branch');
+      expect(callOrder).toContain('delete:cashRegister');
+      expect(callOrder.indexOf('delete:cashRegister')).toBeLessThan(callOrder.indexOf('delete:branch'));
+      expect(txCache.branch.create).toHaveBeenCalledWith({
+        data: { tenantId: 't1', name: 'Main Branch', code: 'MAIN', isMain: true },
+      });
+      for (const key of ['employee', 'sellerProfile', 'partner', 'category', 'stock', 'workSession']) {
+        expect(callOrder).toContain(`delete:${key}`); // the team, categories and inventory go too
+      }
       expect(callOrder).not.toContain('create:sale'); // فقط حذف — بدون درج دوباره
     });
 
@@ -262,12 +304,13 @@ describe('BackupsService', () => {
         create: jest.fn(),
         findMany: jest.fn().mockResolvedValue([{ id: 'reg1', openingBalance: 100 }]),
         update: jest.fn(),
+        updateMany: jest.fn(),
       };
       await service.wipeData('t1', 'u1', 'CASH');
       expect(callOrder).toEqual(['delete:cashTransaction', 'delete:gatewayIntent']);
-      expect(txCache.cashRegister.update).toHaveBeenCalledWith({
-        where: { id: 'reg1' },
-        data: { balance: 100 },
+      expect(txCache.cashRegister.updateMany).toHaveBeenCalledWith({
+        where: { tenantId: 't1' },
+        data: { balance: 0, openingBalance: 0 },
       });
     });
   });

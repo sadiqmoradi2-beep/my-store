@@ -26,7 +26,7 @@ const MENU_KEYS = [
   'returns',
   'suppliers',
   'team',
-  'workSeasons',
+  'sessions',
   'reports',
   'activityLog',
   'backups',

@@ -6,6 +6,7 @@ import { EMPLOYEE_POSITION_ROLE } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
+import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import {
   AttendanceQueryDto,
@@ -158,6 +159,7 @@ export class EmployeesService {
           note: `Salary for ${employee.fullName} — ${dto.period}`,
           referenceType: 'salary',
           referenceId: payment.id,
+          sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
         });
       }
       return payment;

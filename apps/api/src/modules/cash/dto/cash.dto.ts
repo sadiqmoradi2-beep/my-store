@@ -24,6 +24,11 @@ export class CreateCashTransactionDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
+  @IsOptional()
+  @IsString()
+  sessionId?: string | null;
 }
 
 export class CashTransactionListQueryDto extends PaginationQueryDto {

@@ -78,6 +78,11 @@ export class CreateLedgerEntryDto {
   @IsOptional()
   @IsString()
   registerId?: string;
+
+  /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
+  @IsOptional()
+  @IsString()
+  sessionId?: string | null;
 }
 
 /** Preview/apply an even distribution of a total profit or loss figure across active partners, by sharePercent */

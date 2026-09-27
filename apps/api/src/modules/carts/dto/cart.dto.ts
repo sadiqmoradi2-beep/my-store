@@ -26,7 +26,7 @@ export class UpdateCartItemDto {
   /** Seller's price override for this item — final unit price (optional; empty = no price change) */
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)
   unitPrice?: number;
 }

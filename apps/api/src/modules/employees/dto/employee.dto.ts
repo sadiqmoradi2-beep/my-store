@@ -132,6 +132,11 @@ export class PaySalaryDto {
   @IsString()
   registerId?: string;
 
+  /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
+  @IsOptional()
+  @IsString()
+  sessionId?: string | null;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })

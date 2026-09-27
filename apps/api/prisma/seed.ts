@@ -269,11 +269,11 @@ async function seedDemoTenant() {
   // Sales with different payment methods; some today and some earlier in the month
   const now = new Date();
   const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000);
-  const partOf: Record<PaymentMethod, IncomePart | null> = {
-    CASH: 'CASH', CARD: 'ZELLE', EBT: 'EBT', ZELLE: 'ZELLE', LOAN: null, DEFICIT: null,
+  const partOf: Record<PaymentMethod, IncomePart> = {
+    CASH: 'CASH', CARD: 'ZELLE', EBT: 'EBT', ZELLE: 'ZELLE',
   };
   const saleDefs: {
-    method: PaymentMethod; createdAt: Date; party?: string;
+    method: PaymentMethod; createdAt: Date;
     items: { productIndex: number; qty: number }[];
   }[] = [
     { method: 'CASH', createdAt: now, items: [{ productIndex: 0, qty: 2 }, { productIndex: 6, qty: 10 }] },
@@ -281,10 +281,29 @@ async function seedDemoTenant() {
     { method: 'ZELLE', createdAt: now, items: [{ productIndex: 1, qty: 1 }, { productIndex: 4, qty: 2 }] },
     { method: 'CARD', createdAt: daysAgo(1), items: [{ productIndex: 2, qty: 3 }] },
     { method: 'CASH', createdAt: daysAgo(2), items: [{ productIndex: 8, qty: 24 }] },
-    { method: 'LOAN', createdAt: daysAgo(3), party: 'Najibullah Rahimi', items: [{ productIndex: 0, qty: 1 }, { productIndex: 3, qty: 5 }] },
-    { method: 'DEFICIT', createdAt: daysAgo(5), party: 'Fatima Ahmadi', items: [{ productIndex: 9, qty: 1 }] },
+    { method: 'EBT', createdAt: daysAgo(3), items: [{ productIndex: 0, qty: 1 }, { productIndex: 3, qty: 5 }] },
+    { method: 'CARD', createdAt: daysAgo(5), items: [{ productIndex: 9, qty: 1 }] },
     { method: 'CASH', createdAt: daysAgo(4), items: [{ productIndex: 5, qty: 2 }] },
   ];
+
+  // A demo work session for the seller: every demo sale belongs to it
+  const sellerProfile = await prisma.sellerProfile.create({
+    data: { tenantId: tid, userId: seller.id, payType: 'COMMISSION', commissionPercent: D(2) },
+  });
+  const demoSession = await prisma.workSession.create({
+    data: {
+      tenantId: tid,
+      code: `SES-${now.getUTCFullYear()}-0001`,
+      role: 'SELLER',
+      sellerProfileId: sellerProfile.id,
+      personName: seller.fullName,
+      startedAt: daysAgo(6),
+      openingCash: D(200),
+      harvestLimit: D(1500),
+      openingNotes: 'Demo session',
+      createdById: admin.id,
+    },
+  });
 
   let saleNumber = 0;
   for (const def of saleDefs) {
@@ -303,7 +322,7 @@ async function seedDemoTenant() {
     const total = items.reduce((sum, i) => sum.add(i.total), D(0));
     const cost = items.reduce((sum, i) => sum.add(i.unitCost.mul(i.quantity)), D(0));
     const part = partOf[def.method];
-    const register = part ? registerByPart.get(part)! : null;
+    const register = registerByPart.get(part)!;
 
     const sale = await prisma.sale.create({
       data: {
@@ -313,49 +332,32 @@ async function seedDemoTenant() {
         total,
         cost,
         paymentMethod: def.method,
-        registerId: register?.id ?? null,
+        registerId: register.id,
+        sessionId: demoSession.id,
         createdById: seller.id,
         createdAt: def.createdAt,
         items: { create: items },
       },
     });
 
-    if (register) {
-      register.balance = register.balance.add(total);
-      await prisma.cashTransaction.create({
-        data: {
-          tenantId: tid,
-          registerId: register.id,
-          type: 'SALE',
-          amount: total,
-          balanceAfter: register.balance,
-          category: def.method,
-          note: `Sale #${saleNumber}`,
-          referenceType: 'sale',
-          referenceId: sale.id,
-          performedById: seller.id,
-          createdAt: def.createdAt,
-        },
-      });
-      await prisma.cashRegister.update({ where: { id: register.id }, data: { balance: register.balance } });
-    } else {
-      const debt = await prisma.debt.create({
-        data: {
-          tenantId: tid,
-          direction: 'RECEIVABLE',
-          kind: def.method === 'LOAN' ? 'LOAN' : 'DEFICIT',
-          partyName: def.party!,
-          amount: total,
-          dueDate: new Date(now.getTime() + 14 * 86_400_000),
-          referenceType: 'sale',
-          referenceId: sale.id,
-          notes: `Sale #${saleNumber}`,
-          createdById: admin.id,
-          createdAt: def.createdAt,
-        },
-      });
-      await prisma.sale.update({ where: { id: sale.id }, data: { debtId: debt.id } });
-    }
+    register.balance = register.balance.add(total);
+    await prisma.cashTransaction.create({
+      data: {
+        tenantId: tid,
+        registerId: register.id,
+        type: 'SALE',
+        amount: total,
+        balanceAfter: register.balance,
+        category: def.method,
+        note: `Sale #${saleNumber}`,
+        referenceType: 'sale',
+        referenceId: sale.id,
+        sessionId: demoSession.id,
+        performedById: seller.id,
+        createdAt: def.createdAt,
+      },
+    });
+    await prisma.cashRegister.update({ where: { id: register.id }, data: { balance: register.balance } });
 
     // Stock effect of the sale
     for (const item of items) {
@@ -378,6 +380,22 @@ async function seedDemoTenant() {
       });
     }
   }
+
+  await prisma.cashHarvest.create({
+    data: {
+      tenantId: tid,
+      number: 1,
+      sessionId: demoSession.id,
+      amount: D(100),
+      method: 'CASH',
+      status: 'APPROVED',
+      note: 'Demo harvest',
+      harvestedAt: daysAgo(1),
+      requestedById: admin.id,
+      collectedById: admin.id,
+      decidedAt: daysAgo(1),
+    },
+  });
 
   console.log('Demo store created ✓');
 }

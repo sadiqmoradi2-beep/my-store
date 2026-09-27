@@ -35,14 +35,29 @@ enum PaymentMethod {
   CARD
   EBT
   ZELLE
-  LOAN
-  DEFICIT
 }
 
 enum IncomePart {
   CASH
   EBT
   ZELLE
+}
+
+enum SessionRole {
+  SELLER
+  EMPLOYEE
+  PARTNER
+}
+
+enum SessionStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum HarvestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum DebtKind {
@@ -248,13 +263,18 @@ model User {
   stockMovements             StockMovement[]
   cashTransactions           CashTransaction[]
   salesCreated               Sale[]                 @relation("SaleCreatedBy")
+  workSessionsCreated        WorkSession[]          @relation("WorkSessionCreatedBy")
+  workSessionsClosed         WorkSession[]          @relation("WorkSessionClosedBy")
+  harvestsRequested          CashHarvest[]          @relation("HarvestRequestedBy")
+  harvestsCollected          CashHarvest[]          @relation("HarvestCollectedBy")
+  sessionAdjustmentsMade     SessionAdjustment[]    @relation("SessionAdjustmentBy")
+  sessionAuditsMade          WorkSessionAudit[]     @relation("SessionAuditBy")
   sellerProfile              SellerProfile?
   salaryPaymentsMade         SalaryPayment[]        @relation("SalaryPaymentPerformedBy")
   sellerSalaryPaymentsMade   SellerSalaryPayment[]  @relation("SellerSalaryPaymentPerformedBy")
   employeeShiftsStarted      EmployeeShift[]        @relation("EmployeeShiftStartedBy")
   employeeShiftsEnded        EmployeeShift[]        @relation("EmployeeShiftEndedBy")
   employeeAttendanceRecorded EmployeeAttendance[]   @relation("EmployeeAttendanceRecordedBy")
-  capitalEntries             CapitalEntry[]         @relation("CapitalEntryPerformedBy")
   purchasesCreated           Purchase[]             @relation("PurchaseCreatedBy")
   debtsCreated               Debt[]                 @relation("DebtCreatedBy")
   debtPaymentsMade           DebtPayment[]          @relation("DebtPaymentPerformedBy")
@@ -468,7 +488,7 @@ model CartItem {
   cartId    String
   productId String
   quantity  Int
-  unitPrice Decimal @db.Decimal(18, 2)
+  unitPrice Decimal @db.Decimal(18, 4)
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
@@ -486,8 +506,8 @@ model Sale {
   total         Decimal       @db.Decimal(18, 2)
   cost          Decimal       @default(0) @db.Decimal(18, 2) // purchase-price snapshot of all items — profit = total - cost
   paymentMethod PaymentMethod
-  registerId    String? // the Income register that received the money — empty for Loan / Deficit
-  debtId        String? // the receivable created by a Loan / Deficit sale
+  registerId    String? // the Income register that received the money
+  sessionId     String? // the work session (cash box) this sale belongs to
   notes         String?
   createdById   String
   createdAt     DateTime      @default(now())
@@ -495,11 +515,13 @@ model Sale {
   tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch    Branch        @relation(fields: [branchId], references: [id])
   createdBy User          @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  session   WorkSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   items     SaleItem[]
 
   @@unique([tenantId, saleNumber])
   @@index([tenantId, createdAt])
   @@index([tenantId, paymentMethod, createdAt])
+  @@index([sessionId])
 }
 
 model SaleItem {
@@ -508,7 +530,7 @@ model SaleItem {
   productId   String
   productName String // snapshot
   quantity    Int
-  unitPrice   Decimal @db.Decimal(18, 2)
+  unitPrice   Decimal @db.Decimal(18, 4)
   unitCost    Decimal @db.Decimal(18, 2) // purchase-price snapshot
   total       Decimal @db.Decimal(18, 2)
 
@@ -554,14 +576,17 @@ model CashTransaction {
   note          String?
   referenceType String?
   referenceId   String?
+  sessionId     String? // the work session whose cash box paid / received this
   performedById String
   createdAt     DateTime            @default(now())
 
   register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
   performedBy User         @relation(fields: [performedById], references: [id])
+  session     WorkSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([registerId, createdAt])
+  @@index([sessionId])
 }
 
 // ─────────────── Phase 3 — HR / Debts / Returns / Suppliers ───────────────
@@ -575,16 +600,6 @@ enum DebtStatus {
   OPEN
   PARTIAL
   SETTLED
-}
-
-enum SeasonStatus {
-  OPEN
-  CLOSED
-}
-
-enum CapitalEntryType {
-  DEPOSIT
-  WITHDRAWAL
 }
 
 enum SellerPayType {
@@ -607,6 +622,7 @@ model SellerProfile {
   user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   commissions    CommissionEntry[]
   salaryPayments SellerSalaryPayment[]
+  workSessions   WorkSession[]
 
   @@index([tenantId])
 }
@@ -662,6 +678,7 @@ model Employee {
   updatedAt DateTime      @updatedAt
 
   salaryPayments SalaryPayment[]
+  workSessions   WorkSession[]
   shifts         EmployeeShift[]
   attendance     EmployeeAttendance[]
 
@@ -741,38 +758,102 @@ model SalaryPayment {
   @@index([employeeId])
 }
 
-model WorkSeason {
-  id             String       @id @default(cuid())
-  tenantId       String
-  name           String
-  status         SeasonStatus @default(OPEN)
-  startsAt       DateTime     @default(now())
-  endsAt         DateTime?
-  currency       Currency     @default(USDT)
-  openingCapital Decimal      @default(0) @db.Decimal(18, 2)
-  openingCash    Decimal      @default(0) @db.Decimal(18, 2) // cash on hand — separate from total capital
-  closingReport  Json?
-  createdAt      DateTime     @default(now())
+// ──────────────── Work sessions (cash box of a seller / employee / partner) ────────────────
 
-  entries CapitalEntry[]
+model WorkSession {
+  id                  String        @id @default(cuid())
+  tenantId            String
+  code                String // SES-2026-0001
+  role                SessionRole
+  sellerProfileId     String?
+  employeeId          String?
+  partnerId           String?
+  personName          String // snapshot
+  status              SessionStatus @default(ACTIVE)
+  startedAt           DateTime
+  openingCash         Decimal       @default(0) @db.Decimal(18, 2) // immutable after start — corrected only through an audited adjustment
+  harvestLimit        Decimal       @default(0) @db.Decimal(18, 2)
+  openingNotes        String?
+  closedAt            DateTime?
+  actualClosingCash   Decimal?      @db.Decimal(18, 2)
+  expectedClosingCash Decimal?      @db.Decimal(18, 2) // snapshot at closing
+  closingNotes        String?
+  createdById         String
+  closedById          String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
+  seller       SellerProfile?      @relation(fields: [sellerProfileId], references: [id])
+  employee     Employee?           @relation(fields: [employeeId], references: [id])
+  partner      Partner?            @relation(fields: [partnerId], references: [id])
+  createdBy    User                @relation("WorkSessionCreatedBy", fields: [createdById], references: [id])
+  closedBy     User?               @relation("WorkSessionClosedBy", fields: [closedById], references: [id])
+  harvests     CashHarvest[]
+  adjustments  SessionAdjustment[]
+  audits       WorkSessionAudit[]
+  transactions CashTransaction[]
+  sales        Sale[]
+
+  @@unique([tenantId, code])
   @@index([tenantId, status])
+  @@index([tenantId, startedAt])
 }
 
-model CapitalEntry {
-  id            String           @id @default(cuid())
+/// Cash collected from a session's cash box. The session total is always the SUM of these rows.
+model CashHarvest {
+  id            String        @id @default(cuid())
   tenantId      String
-  seasonId      String
-  type          CapitalEntryType
-  amount        Decimal          @db.Decimal(18, 2)
+  number        Int // HRV-0001
+  sessionId     String
+  amount        Decimal       @db.Decimal(18, 2)
+  method        IncomePart    @default(CASH)
+  status        HarvestStatus @default(APPROVED)
   note          String?
-  performedById String
-  createdAt     DateTime         @default(now())
+  harvestedAt   DateTime      @default(now())
+  requestedById String
+  collectedById String? // who collected / approved it
+  decidedAt     DateTime?
+  createdAt     DateTime      @default(now())
 
-  season      WorkSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  performedBy User       @relation("CapitalEntryPerformedBy", fields: [performedById], references: [id])
+  session     WorkSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  requestedBy User        @relation("HarvestRequestedBy", fields: [requestedById], references: [id])
+  collectedBy User?       @relation("HarvestCollectedBy", fields: [collectedById], references: [id])
 
-  @@index([tenantId, createdAt])
+  @@unique([tenantId, number])
+  @@index([sessionId, status])
+}
+
+/// A correction of the session's cash box — never a silent edit of a transaction
+model SessionAdjustment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sessionId   String
+  amount      Decimal  @db.Decimal(18, 2) // signed: + adds cash to the box, - removes it
+  reason      String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  session   WorkSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdBy User        @relation("SessionAdjustmentBy", fields: [createdById], references: [id])
+
+  @@index([sessionId])
+}
+
+model WorkSessionAudit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  sessionId String
+  action    String // session.created | session.updated | harvest.created | harvest.approved | ...
+  userId    String
+  oldValue  Json?
+  newValue  Json?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  session WorkSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation("SessionAuditBy", fields: [userId], references: [id])
+
+  @@index([sessionId, createdAt])
 }
 
 model Supplier {
@@ -1103,8 +1184,9 @@ model Partner {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  tenant  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  entries PartnerLedgerEntry[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entries      PartnerLedgerEntry[]
+  workSessions WorkSession[]
 
   @@index([tenantId])
 }

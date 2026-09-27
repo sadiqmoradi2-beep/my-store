@@ -168,6 +168,7 @@ describe('SellersService.paySalary', () => {
         update: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
       sellerProfile: {
@@ -179,14 +180,6 @@ describe('SellersService.paySalary', () => {
       providers: [SellersService, { provide: PrismaService, useValue: prisma }],
     }).compile();
     service = moduleRef.get(SellersService);
-  });
-
-  it('commission-based seller → fixed salary payment is not allowed', async () => {
-    prisma.sellerProfile.findFirst.mockResolvedValue({ id: 'sp1', payType: 'COMMISSION' });
-    await expect(
-      service.paySalary('t1', 'u1', 'sp1', { amount: 500, period: '1405-04' }),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('fixed-salary seller + register → payment row + EXPENSE cost', async () => {

@@ -18,6 +18,7 @@ describe('CashService', () => {
         findFirst: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
       branch: { findMany: jest.fn().mockResolvedValue([{ id: 'b1' }]) },
@@ -92,7 +93,6 @@ describe('CashService', () => {
         { paymentMethod: 'EBT', _sum: { total: D(80), cost: D(50) }, _count: { _all: 1 } },
         { paymentMethod: 'ZELLE', _sum: { total: D(70), cost: D(40) }, _count: { _all: 1 } },
         { paymentMethod: 'CARD', _sum: { total: D(50), cost: D(30) }, _count: { _all: 2 } },
-        { paymentMethod: 'LOAN', _sum: { total: D(200), cost: D(120) }, _count: { _all: 1 } },
       ]);
     });
 
@@ -111,13 +111,11 @@ describe('CashService', () => {
       expect(zelle.salesCount).toBe(3);
     });
 
-    it('Loan / Deficit sales are unpaid: in total sales and profit, not in any part', async () => {
+    it('total sales, profit and count cover every payment method', async () => {
       const result = await service.incomeSummary('t1', {});
-      expect(result.unpaid.total.toString()).toBe('200');
-      expect(result.unpaid.profit.toString()).toBe('80');
-      expect(result.totals.totalSales.toString()).toBe('800');
-      expect(result.totals.totalProfit.toString()).toBe('260'); // 800 - (300+50+40+30+120)
-      expect(result.totals.salesCount).toBe(9);
+      expect(result.totals.totalSales.toString()).toBe('600');
+      expect(result.totals.totalProfit.toString()).toBe('180'); // 600 - (300+50+40+30)
+      expect(result.totals.salesCount).toBe(8);
     });
 
     it('total income is the sum of the Cash, EBT and Zelle incomes', async () => {

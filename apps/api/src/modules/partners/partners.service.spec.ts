@@ -98,6 +98,7 @@ describe('PartnersService.addLedgerEntry', () => {
         update: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
       partner: { findFirst: jest.fn().mockResolvedValue({ id: 'p1', name: 'Partner 1' }) },

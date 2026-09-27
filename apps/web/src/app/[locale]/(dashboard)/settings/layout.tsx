@@ -7,10 +7,11 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
-const TAB_KEYS = ['account', 'personalization', 'modules', 'roles'] as const;
+const TAB_KEYS = ['account', 'personalization', 'branches', 'modules', 'roles'] as const;
 
 /** Unlike account/personalization, these tabs are gated by a specific permission */
 const TAB_PERMISSIONS: Partial<Record<(typeof TAB_KEYS)[number], string>> = {
+  branches: PERMISSIONS.BRANCHES_READ,
   modules: PERMISSIONS.MODULES_MANAGE,
   roles: PERMISSIONS.ROLES_READ,
 };

@@ -12,7 +12,7 @@ export class BranchesService {
     private readonly prisma: PrismaService,
   ) {}
 
-  list(tenantId: string) {
+  async list(tenantId: string) {
     return this.repo.findMany(tenantId);
   }
 
@@ -24,7 +24,11 @@ export class BranchesService {
 
   async create(tenantId: string, dto: CreateBranchDto) {
     await assertPlanLimit(this.prisma, tenantId, 'branches');
-    return this.repo.createWithDefaultWarehouse(tenantId, dto);
+    const duplicate = await this.prisma.branch.findFirst({ where: { tenantId, code: dto.code }, select: { id: true } });
+    if (duplicate) throw new BadRequestException('A branch with this code already exists (also counting deleted branches)');
+    // The first branch of a store becomes the main branch
+    const existing = await this.prisma.branch.findFirst({ where: { tenantId, isActive: true }, select: { id: true } });
+    return this.repo.createWithDefaultWarehouse(tenantId, { ...dto, isMain: !existing });
   }
 
   async update(tenantId: string, id: string, dto: UpdateBranchDto) {

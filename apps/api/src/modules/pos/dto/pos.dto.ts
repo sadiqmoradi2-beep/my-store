@@ -1,12 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { PAYMENT_METHODS, PaymentMethod } from '@my-store/shared';
 
 export class PosSaleDto {
   @IsString()
   cartId: string;
 
-  /** Cash / Card / EBT / Zelle are paid now; Loan / Deficit leave the amount unpaid */
+  /** Cash / Card / EBT / Zelle — Loan and Deficit are handled only in Loan & Deficit */
   @IsEnum(PAYMENT_METHODS)
   paymentMethod: PaymentMethod;
 
@@ -21,17 +21,6 @@ export class PosSaleDto {
   @IsOptional()
   @IsString()
   registerId?: string;
-
-  /** Loan / Deficit only: who owes the amount */
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  partyName?: string;
-
-  /** Loan / Deficit only: when the amount is expected back */
-  @IsOptional()
-  @IsDateString()
-  dueDate?: string;
 
   @IsOptional()
   @IsString()

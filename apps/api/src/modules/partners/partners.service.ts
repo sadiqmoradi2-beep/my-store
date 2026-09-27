@@ -4,6 +4,7 @@ import { PartnerEntryType } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
+import { resolveSessionId } from '../work-sessions/session-link';
 import {
   CreateLedgerEntryDto,
   CreatePartnerDto,
@@ -145,6 +146,7 @@ export class PartnersService {
           note: `Withdrawal by ${partner.name}`,
           referenceType: 'partner',
           referenceId: entry.id,
+          sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
         });
       }
       return entry;

@@ -98,6 +98,11 @@ export class PaySellerSalaryDto {
   @IsString()
   registerId?: string;
 
+  /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
+  @IsOptional()
+  @IsString()
+  sessionId?: string | null;
+
   /** Optional pay slip / receipt image or PDF */
   @IsOptional()
   @IsString()

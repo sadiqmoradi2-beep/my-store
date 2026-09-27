@@ -77,7 +77,7 @@ export function SalesList({ from, to }: { from: string; to: string }) {
                 <tr key={sale.id} className="border-b border-line/60 last:border-0">
                   <td className="p-3 font-bold text-ink">#{formatNumber(sale.saleNumber, locale)}</td>
                   <td className="p-3">
-                    <Badge tone={sale.debtId ? 'PENDING' : 'APPROVED'}>{tp(`methods.${sale.paymentMethod}`)}</Badge>
+                    <Badge tone="APPROVED">{tp(`methods.${sale.paymentMethod}`)}</Badge>
                   </td>
                   <td className="p-3 font-bold text-ink">{formatMoney(sale.total, locale)}</td>
                   <td className="p-3 text-ink-muted">{formatMoney(sale.profit, locale)}</td>

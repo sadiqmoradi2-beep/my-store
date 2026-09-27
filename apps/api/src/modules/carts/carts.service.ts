@@ -32,7 +32,7 @@ export class CartsService {
   async get(tenantId: string, id: string) {
     const cart = await this.findCart(tenantId, id);
     const subtotal = cart.items.reduce(
-      (sum, i) => sum.add(i.unitPrice.mul(i.quantity)),
+      (sum, i) => sum.add(i.unitPrice.mul(i.quantity).toDecimalPlaces(2)),
       new Prisma.Decimal(0),
     );
     const cost = cart.items.reduce(

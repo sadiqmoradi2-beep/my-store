@@ -21,7 +21,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
   { key: 'cash-register', name: 'Income', version: '1.0.0', isCore: true, dependsOn: ['branches'], minPlan: 'FREE' },
   { key: 'sellers', name: 'Sellers', version: '1.0.0', isCore: false, dependsOn: ['users'], minPlan: 'BUSINESS' },
   { key: 'employees', name: 'Employees', version: '1.0.0', isCore: false, dependsOn: ['users'], minPlan: 'BUSINESS' },
-  { key: 'work-season', name: 'Work Season', version: '1.0.0', isCore: false, dependsOn: ['users'], minPlan: 'ENTERPRISE' },
+  { key: 'work-sessions', name: 'Work Sessions', version: '1.0.0', isCore: false, dependsOn: ['cash-register'], minPlan: 'BUSINESS' },
   { key: 'debts', name: 'Loan & Deficit', version: '1.0.0', isCore: false, dependsOn: [], minPlan: 'BUSINESS' },
   { key: 'returns', name: 'Return Purchase', version: '1.0.0', isCore: false, dependsOn: ['suppliers', 'inventory'], minPlan: 'FREE' },
   { key: 'suppliers', name: 'Suppliers', version: '1.0.0', isCore: false, dependsOn: ['inventory'], minPlan: 'BUSINESS' },

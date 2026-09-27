@@ -5,6 +5,7 @@ import { Landmark, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
+  PERMISSIONS,
   type CashRegisterDto,
   type CashTransactionDto,
   type CashTransactionType,
@@ -16,7 +17,9 @@ import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Select, Spinner, cn } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
+import { useAuthStore } from '@/stores/auth-store';
 import { SalesList } from '@/components/income/sales-list';
+import { SessionReport } from '@/components/sessions/session-report';
 import { TransactionModal } from '@/components/income/transaction-modal';
 
 const TX_TONES: Record<CashTransactionType, string> = {
@@ -53,6 +56,8 @@ export default function IncomePage() {
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
 
+  const user = useAuthStore((s) => s.user);
+  const canSeeSessions = !!user?.permissions?.includes(PERMISSIONS.SESSIONS_READ);
   const [range, setRange] = useState<RangeKey>('month');
   const [selectedPart, setSelectedPart] = useState<IncomePart>('CASH');
   const [registerId, setRegisterId] = useState<string | null>(null);
@@ -181,15 +186,6 @@ export default function IncomePage() {
               })}
             </div>
 
-            {summary.unpaid.salesCount > 0 && (
-              <p className="rounded-lg bg-surface-3 p-3 text-sm text-ink-muted">
-                {t('unpaidNote', {
-                  total: formatMoney(summary.unpaid.total, locale),
-                  profit: formatMoney(summary.unpaid.profit, locale),
-                  count: formatNumber(summary.unpaid.salesCount, locale),
-                })}
-              </p>
-            )}
           </>
         )
       )}
@@ -204,6 +200,13 @@ export default function IncomePage() {
         </Select>
       )}
       {selected && <RegisterTransactions register={selected} onNewTx={() => setNewTx(true)} />}
+
+      {canSeeSessions && (
+        <section className="space-y-2">
+          <h2 className="text-base font-bold text-ink">{t('sessionsTitle')}</h2>
+          <SessionReport from={from} to={to} />
+        </section>
+      )}
 
       <SalesList from={from} to={to} />
 
@@ -268,13 +271,14 @@ function RegisterTransactions({
         <Spinner />
       ) : (
         <Card className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-line text-xs text-ink-muted">
                 <th className="p-3 text-start font-medium">{t('txType')}</th>
                 <th className="p-3 text-start font-medium">{t('amount')}</th>
                 <th className="p-3 text-start font-medium">{t('balanceAfter')}</th>
                 <th className="p-3 text-start font-medium">{t('note')}</th>
+                <th className="p-3 text-start font-medium">{t('paidByColumn')}</th>
                 <th className="p-3 text-start font-medium">{t('performedBy')}</th>
                 <th className="p-3 text-start font-medium">{t('date')}</th>
               </tr>
@@ -282,7 +286,7 @@ function RegisterTransactions({
             <tbody>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-ink-faint">
+                  <td colSpan={7} className="p-8 text-center text-ink-faint">
                     {tc('noData')}
                   </td>
                 </tr>
@@ -295,6 +299,13 @@ function RegisterTransactions({
                   <td className="p-3 font-bold text-ink">{formatMoney(tx.amount, locale)}</td>
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
                   <td className="p-3 text-ink-muted">{tx.category ?? tx.note ?? '—'}</td>
+                  <td className="p-3 text-ink-muted">
+                    {tx.sessionPerson ? (
+                      <span title={tx.sessionCode ?? ''}>{tx.sessionPerson}</span>
+                    ) : (
+                      <span className="text-ink-faint">{t('mainBox')}</span>
+                    )}
+                  </td>
                   <td className="p-3 text-ink-muted">{tx.performedByName}</td>
                   <td className="p-3 text-xs text-ink-faint">{formatDate(tx.createdAt, locale)}</td>
                 </tr>

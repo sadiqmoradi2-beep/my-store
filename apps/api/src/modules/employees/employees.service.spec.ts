@@ -23,6 +23,7 @@ describe('EmployeesService.paySalary', () => {
         update: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
       employee: { findFirst: jest.fn().mockResolvedValue({ ...employee }) },

@@ -11,19 +11,8 @@ import { BACKUP_MODELS, sortByParentFirst } from './backup-registry';
 const BACKUP_VERSION = 1;
 const CHUNK = 1000;
 
-/** Account structure — not deleted during a "full data wipe" (only business data is removed) */
-const WIPE_PRESERVED_KEYS = new Set([
-  'role',
-  'rolePermission',
-  'branch',
-  'user',
-  'warehouse',
-  'cashRegister',
-  'employee',
-  'sellerProfile',
-  'category',
-  'partner',
-]);
+/** Kept by a "full data wipe": roles and the logins of the owner / admins. Everything else goes. */
+const WIPE_PRESERVED_KEYS = new Set(['role', 'rolePermission', 'user']);
 
 interface BackupPayload {
   version: number;
@@ -150,8 +139,8 @@ export class BackupsService {
   }
 
   /**
-   * Wipe the store's data — either everything (only business/transactional data; the account
-   * structure — roles, users, branches, warehouses, registers — stays intact) or a specific
+   * Wipe the store's data — either everything (all business data, team, inventory, branches and their
+   * Cash / EBT / Zelle boxes; only roles and admin logins stay, and one fresh main branch is created) or a specific
    * scope (e.g. just sales, or just income history). A safety backup is taken automatically first.
    */
   async wipeData(tenantId: string, currentUserId: string, scope?: ResetScope) {
@@ -166,21 +155,42 @@ export class BackupsService {
 
     await this.prisma.$transaction(
       async (tx) => {
+        // Staff logins tied to sellers / employees go together with the team on a full wipe
+        let staffUserIds: string[] = [];
+        if (isFullWipe) {
+          const [sellerRows, employeeRows] = await Promise.all([
+            tx.sellerProfile.findMany({ where: { tenantId }, select: { userId: true } }),
+            tx.employee.findMany({ where: { tenantId, userId: { not: null } }, select: { userId: true } }),
+          ]);
+          staffUserIds = [...new Set([...sellerRows, ...employeeRows].map((r) => r.userId).filter((id): id is string => !!id))].filter(
+            (id) => id !== currentUserId,
+          );
+        }
+        if (isFullWipe) {
+          // Branches are deleted too — detach the remaining logins first
+          await tx.user.updateMany({ where: { tenantId }, data: { branchId: null } });
+        }
         for (const model of orderedModels) {
           await this.delegate(tx, model.key).deleteMany({ where: model.where(tenantId) });
         }
-        if (touchesCash) {
-          // Cash transaction history was wiped — reset register balances to their opening balance
-          const registers = await tx.cashRegister.findMany({
-            where: { tenantId },
-            select: { id: true, openingBalance: true },
+        if (staffUserIds.length > 0) {
+          await tx.user.deleteMany({
+            where: { id: { in: staffUserIds }, tenantId, role: { key: { not: 'ADMIN' } } },
           });
-          for (const register of registers) {
-            await tx.cashRegister.update({
-              where: { id: register.id },
-              data: { balance: register.openingBalance },
-            });
-          }
+        }
+        if (isFullWipe) {
+          // Start again with one brand-new main branch; its warehouse and Cash / EBT / Zelle boxes are created on first use
+          const branch = await tx.branch.create({
+            data: { tenantId, name: 'Main Branch', code: 'MAIN', isMain: true },
+          });
+          await tx.user.updateMany({ where: { tenantId }, data: { branchId: branch.id } });
+        }
+        if (touchesCash && !isFullWipe) {
+          // The Income history was wiped — Cash / EBT / Zelle start again from zero
+          await tx.cashRegister.updateMany({
+            where: { tenantId },
+            data: { balance: 0, openingBalance: 0 },
+          });
         }
       },
       { timeout: 300_000 },

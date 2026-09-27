@@ -12,6 +12,7 @@ import { computeCommission } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta, PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
+import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { CreateSellerDto, PaySellerSalaryDto, UpdateSellerDto } from './dto/seller.dto';
 
@@ -133,12 +134,9 @@ export class SellersService {
     });
   }
 
-  /** Pay fixed salary — only for sellers with payType=FIXED_SALARY */
+  /** Pay a seller — a fixed salary, or a commission payout for a commission seller */
   async paySalary(tenantId: string, userId: string, id: string, dto: PaySellerSalaryDto) {
-    const profile = await this.get(tenantId, id);
-    if (profile.payType !== 'FIXED_SALARY') {
-      throw new UnprocessableEntityException('This seller does not have a fixed salary — they are commission-based');
-    }
+    await this.get(tenantId, id);
     const amount = new Prisma.Decimal(dto.amount);
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.sellerSalaryPayment.create({
@@ -164,6 +162,7 @@ export class SellersService {
           note: `Seller salary — ${dto.period}`,
           referenceType: 'seller_salary',
           referenceId: payment.id,
+          sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
         });
       }
       return payment;

@@ -77,6 +77,11 @@ export class PayDebtDto {
   @IsString()
   registerId: string;
 
+  /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
+  @IsOptional()
+  @IsString()
+  sessionId?: string | null;
+
   /** Cheque / payment-proof image or PDF URL — mainly used for supplier payments */
   @IsOptional()
   @IsString()

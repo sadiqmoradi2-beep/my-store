@@ -1,16 +1,15 @@
 import { CashTransactionType, IncomePart, PaymentMethod } from '../constants/sales';
 import {
   AttendanceStatus,
-  CapitalEntryType,
   Currency,
   DebtDirection,
   DebtKind,
   DebtStatus,
   SalaryPaymentStatus,
-  SeasonStatus,
   SellerPayType,
 } from '../constants/phase3';
 import { PartnerEntryType } from '../constants/partners';
+import { HarvestStatus, SessionResult, SessionRole, SessionStatus } from '../constants/sessions';
 import { CalendarType, Locale } from './auth';
 
 export type { Currency, IncomePart, PaymentMethod };
@@ -157,7 +156,7 @@ export interface SaleDto {
   profit: string;
   paymentMethod: PaymentMethod;
   registerId: string | null;
-  debtId: string | null;
+  sessionId: string | null;
   notes: string | null;
   createdByName?: string;
   items: SaleItemDto[];
@@ -224,6 +223,10 @@ export interface CashTransactionDto {
   note: string | null;
   referenceType: string | null;
   referenceId: string | null;
+  sessionId?: string | null;
+  /** The work session (cash box) that paid / received it */
+  sessionCode?: string | null;
+  sessionPerson?: string | null;
   performedByName?: string;
   createdAt: string;
 }
@@ -252,8 +255,6 @@ export interface IncomeSummaryDto {
   from: string;
   to: string;
   parts: IncomePartSummaryDto[];
-  /** Sales recorded as Loan / Deficit — not paid yet */
-  unpaid: { total: string; profit: string; salesCount: number };
   totals: {
     /** Sum of the income of Cash, EBT and Zelle */
     totalIncome: string;
@@ -352,41 +353,6 @@ export interface EmployeeAttendanceDto {
   checkOut: string | null;
   note: string | null;
   recordedByName?: string;
-  createdAt: string;
-}
-
-export interface WorkSeasonDto {
-  id: string;
-  name: string;
-  status: SeasonStatus;
-  startsAt: string;
-  endsAt: string | null;
-  currency: Currency;
-  openingCapital: string;
-  openingCash: string;
-  closingReport: SeasonReport | null;
-  capitalIn?: string;
-  capitalOut?: string;
-  createdAt: string;
-}
-
-export interface SeasonReport {
-  salesTotal: string;
-  salesCost: string;
-  profit: string;
-  salesCount: number;
-  expensesTotal: string;
-  capitalIn: string;
-  capitalOut: string;
-}
-
-export interface CapitalEntryDto {
-  id: string;
-  seasonId: string;
-  type: CapitalEntryType;
-  amount: string;
-  note: string | null;
-  performedByName?: string;
   createdAt: string;
 }
 
@@ -746,4 +712,129 @@ export interface PurchaseReturnDto {
   note: string | null;
   createdByName: string;
   createdAt: string;
+}
+
+
+// ─────────────────────── Work Sessions ───────────────────────
+
+export interface WorkSessionFiguresDto {
+  /** All sales of the session, whatever the payment method */
+  salesTotal: string;
+  /** Sales paid in cash — the only sales that enter the physical cash box */
+  salesCash: string;
+  salesProfit: string;
+  salesCount: number;
+  /** Cash that came in besides sales (debts collected in cash, loans received…) */
+  otherCashReceived: string;
+  /** Expenses paid in cash from the box */
+  cashExpenses: string;
+  /** Expenses paid from any Income part */
+  totalExpenses: string;
+  /** Approved harvests of any method — counted against the harvest limit */
+  harvestedTotal: string;
+  /** Approved harvests that took cash out of the box */
+  harvestedCash: string;
+  pendingHarvests: number;
+  adjustments: string;
+  expectedCash: string;
+  remainingHarvestLimit: string;
+}
+
+export interface WorkSessionDto {
+  id: string;
+  code: string;
+  role: SessionRole;
+  personId: string;
+  personName: string;
+  status: SessionStatus;
+  startedAt: string;
+  closedAt: string | null;
+  openingCash: string;
+  harvestLimit: string;
+  openingNotes: string | null;
+  closingNotes: string | null;
+  actualClosingCash: string | null;
+  expectedClosingCash: string | null;
+  difference: string | null;
+  result: SessionResult | null;
+  createdByName?: string;
+  closedByName?: string | null;
+  durationMinutes: number;
+  figures: WorkSessionFiguresDto;
+}
+
+export interface HarvestDto {
+  id: string;
+  number: number;
+  sessionId: string;
+  amount: string;
+  method: IncomePart;
+  status: HarvestStatus;
+  note: string | null;
+  harvestedAt: string;
+  requestedByName?: string;
+  collectedByName?: string | null;
+  createdAt: string;
+}
+
+export interface SessionAdjustmentDto {
+  id: string;
+  amount: string;
+  reason: string;
+  createdByName?: string;
+  createdAt: string;
+}
+
+export type SessionTimelineKind = 'START' | 'SALE' | 'INCOME' | 'EXPENSE' | 'HARVEST' | 'ADJUSTMENT' | 'CLOSE';
+
+export interface SessionTimelineItemDto {
+  at: string;
+  kind: SessionTimelineKind;
+  label: string;
+  /** Amount of the event as shown (positive = money in, negative = money out) */
+  amount: string;
+  /** How much the event moved the physical cash box (0 for card / EBT / Zelle) */
+  cashEffect: string;
+  /** Expected cash in the box after the event */
+  balanceAfter: string | null;
+  note?: string | null;
+}
+
+export interface SessionAuditDto {
+  id: string;
+  action: string;
+  userName?: string;
+  oldValue: unknown;
+  newValue: unknown;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface SessionReportRow {
+  role: SessionRole;
+  personId: string;
+  personName: string;
+  sessions: number;
+  income: string;
+  expenses: string;
+  harvested: string;
+  /** Expected cash still in the boxes of the person's active sessions */
+  cashHeld: string;
+  /** Sum of the closing differences of the closed sessions */
+  difference: string;
+}
+
+export interface SessionReportDto {
+  from: string;
+  to: string;
+  rows: SessionReportRow[];
+  totals: {
+    activeCount: number;
+    closedCount: number;
+    cashHeld: string;
+    income: string;
+    expenses: string;
+    harvested: string;
+    difference: string;
+  };
 }

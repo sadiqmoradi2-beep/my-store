@@ -2,7 +2,6 @@
 
 import {
   AlertTriangle,
-  CalendarRange,
   ChartColumn,
   Contact,
   HandCoins,
@@ -12,6 +11,7 @@ import {
   MessageSquare,
   Package,
   ScanBarcode,
+  Timer,
   Settings,
   Store,
   Truck,
@@ -39,7 +39,7 @@ const NAV_ITEMS = [
   { key: 'returns', href: 'returns', icon: Undo2, module: 'returns' },
   { key: 'suppliers', href: 'suppliers', icon: Truck, module: 'suppliers' },
   { key: 'team', href: 'team', icon: Contact, modules: ['sellers', 'employees', 'partners'] },
-  { key: 'workSeasons', href: 'work-seasons', icon: CalendarRange, module: 'work-season' },
+  { key: 'sessions', href: 'sessions', icon: Timer, module: 'work-sessions' },
   { key: 'reports', href: 'reports', icon: ChartColumn, module: 'reports' },
   {
     key: 'activityLog',

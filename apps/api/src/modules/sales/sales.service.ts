@@ -4,14 +4,15 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { isUnpaidMethod, PAYMENT_METHOD_NAMES, PAYMENT_METHOD_PART } from '@my-store/shared';
+import { PAYMENT_METHOD_NAMES, PAYMENT_METHOD_PART } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { findIncomeRegister, recordCashTransaction } from '../cash/cash.service';
-import { createDebt } from '../debts/debts.service';
+import { findDefaultWarehouse } from '../branches/default-warehouse';
 import { applyMovement } from '../inventory/inventory.service';
 import { notifyLowStock } from '../notifications/notifications.service';
 import { recordCommission } from '../sellers/sellers.service';
+import { findActiveSessionIdForUser } from '../work-sessions/session-link';
 import { PosSaleDto } from '../pos/dto/pos.dto';
 import { SaleListQueryDto } from './dto/sale.dto';
 
@@ -67,8 +68,8 @@ export class SalesService {
 
   /**
    * POS checkout — one transaction: the cart becomes a sale, stock is deducted from the branch's default
-   * warehouse, and the money is recorded: a paid method lands in its Income part (Cash / EBT / Zelle);
-   * Loan and Deficit leave the amount unpaid as a receivable in Loan & Deficit.
+   * warehouse, and the money lands in its Income part (Cash / EBT / Zelle; Card goes to Zelle).
+   * A sale made by a seller who has an active work session belongs to that session.
    */
   async createFromCart(tenantId: string, userId: string, dto: PosSaleDto) {
     const cart = await this.prisma.cart.findFirst({
@@ -78,20 +79,11 @@ export class SalesService {
     if (!cart) throw new NotFoundException('Cart not found');
     if (cart.items.length === 0) throw new UnprocessableEntityException('Cart is empty');
 
-    const unpaid = isUnpaidMethod(dto.paymentMethod);
-    const partyName = dto.partyName?.trim();
-    if (unpaid && !partyName) {
-      throw new UnprocessableEntityException('Enter the name of the person who owes this amount');
-    }
-
     const branch = await this.prisma.branch.findFirst({
       where: { id: cart.branchId, tenantId, isActive: true },
-      include: { warehouses: { where: { isDefault: true, isActive: true }, take: 1 } },
+      select: { id: true, name: true },
     });
-    const warehouse = branch?.warehouses[0];
-    if (!branch || !warehouse) {
-      throw new UnprocessableEntityException('Default warehouse for the branch not found');
-    }
+    if (!branch) throw new NotFoundException('Branch not found');
 
     const items = cart.items.map((i) => ({
       productId: i.productId,
@@ -99,7 +91,7 @@ export class SalesService {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       unitCost: i.product.purchasePrice,
-      total: i.unitPrice.mul(i.quantity),
+      total: i.unitPrice.mul(i.quantity).toDecimalPlaces(2),
     }));
     const total = items.reduce((sum, i) => sum.add(i.total), D(0));
     const cost = items.reduce((sum, i) => sum.add(i.unitCost.mul(i.quantity)), D(0));
@@ -113,6 +105,8 @@ export class SalesService {
     }
 
     const sale = await this.prisma.$transaction(async (tx) => {
+      const warehouse = await findDefaultWarehouse(tx, tenantId, branch);
+      const sessionId = await findActiveSessionIdForUser(tx, tenantId, userId);
       const last = await tx.sale.findFirst({
         where: { tenantId },
         orderBy: { saleNumber: 'desc' },
@@ -127,6 +121,7 @@ export class SalesService {
           cost,
           paymentMethod: dto.paymentMethod,
           notes: dto.notes,
+          sessionId,
           createdById: userId,
           items: { create: items },
         },
@@ -148,9 +143,8 @@ export class SalesService {
       await notifyLowStock(tx, tenantId, items.map((i) => i.productId), warehouse.id);
 
       let registerId: string | null = null;
-      let debtId: string | null = null;
       const part = PAYMENT_METHOD_PART[dto.paymentMethod];
-      if (part && total.greaterThan(0)) {
+      if (total.greaterThan(0)) {
         registerId = await this.resolveRegister(tx, tenantId, cart.branchId, part, dto.registerId);
         await recordCashTransaction(tx, {
           tenantId,
@@ -162,21 +156,8 @@ export class SalesService {
           note: `Sale #${created.saleNumber}`,
           referenceType: 'sale',
           referenceId: created.id,
+          sessionId,
         });
-      } else if (unpaid && total.greaterThan(0)) {
-        const debt = await createDebt(tx, {
-          tenantId,
-          direction: 'RECEIVABLE',
-          kind: dto.paymentMethod === 'LOAN' ? 'LOAN' : 'DEFICIT',
-          partyName: partyName!,
-          amount: total,
-          dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-          referenceType: 'sale',
-          referenceId: created.id,
-          notes: `Sale #${created.saleNumber}`,
-          createdById: userId,
-        });
-        debtId = debt.id;
       }
 
       await recordCommission(tx, tenantId, {
@@ -189,7 +170,7 @@ export class SalesService {
       await tx.cart.delete({ where: { id: cart.id } });
       return tx.sale.update({
         where: { id: created.id },
-        data: { registerId, debtId },
+        data: { registerId },
         include: {
           branch: { select: { name: true } },
           createdBy: { select: { fullName: true } },

@@ -9,6 +9,7 @@ import { debtStatusFor } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
+import { resolveSessionId } from '../work-sessions/session-link';
 import { CreateDebtDto, DebtListQueryDto, PayDebtDto } from './dto/debt.dto';
 
 @Injectable()
@@ -214,6 +215,7 @@ export class DebtsService {
         note: debt.partyName,
         referenceType: 'debt',
         referenceId: id,
+        sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
       });
       const paidAmount = debt.paidAmount.add(amount);
       await tx.debt.update({

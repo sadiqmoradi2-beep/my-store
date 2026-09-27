@@ -9,6 +9,7 @@ import {
 } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
+import { resolveSessionId } from '../work-sessions/session-link';
 import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 
 const DAY_MS = 86_400_000;
@@ -22,7 +23,7 @@ export class CashService {
   async listRegisters(tenantId: string, branchId?: string) {
     await this.ensureRegisters(tenantId);
     const rows = await this.prisma.cashRegister.findMany({
-      where: { tenantId, isActive: true, ...(branchId && { branchId }) },
+      where: { tenantId, isActive: true, branch: { isActive: true }, ...(branchId && { branchId }) },
       include: { branch: { select: { name: true } } },
       orderBy: [{ branchId: 'asc' }, { part: 'asc' }, { isDefault: 'desc' }, { createdAt: 'asc' }],
     });
@@ -60,14 +61,19 @@ export class CashService {
         where,
         skip,
         take: query.limit,
-        include: { performedBy: { select: { fullName: true } } },
+        include: {
+          performedBy: { select: { fullName: true } },
+          session: { select: { code: true, personName: true } },
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.cashTransaction.count({ where }),
     ]);
-    const items = rows.map(({ performedBy, ...t }) => ({
+    const items = rows.map(({ performedBy, session, ...t }) => ({
       ...t,
       performedByName: performedBy.fullName,
+      sessionCode: session?.code ?? null,
+      sessionPerson: session?.personName ?? null,
     }));
     return { items, meta: paginationMeta(query.page, query.limit, total) };
   }
@@ -79,7 +85,7 @@ export class CashService {
     dto: CreateCashTransactionDto,
   ) {
     await this.getRegister(tenantId, registerId);
-    return this.prisma.$transaction((tx) =>
+    return this.prisma.$transaction(async (tx) =>
       recordCashTransaction(tx, {
         tenantId,
         userId,
@@ -88,6 +94,7 @@ export class CashService {
         amount: new Prisma.Decimal(dto.amount),
         category: dto.category,
         note: dto.note,
+        sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
       }),
     );
   }
@@ -95,7 +102,6 @@ export class CashService {
   /**
    * Income overview: per part (Cash / EBT / Zelle) the current balance, the money that came in and went out
    * during the range, and the profit of the sales paid into it — plus the totals across all parts.
-   * Loan / Deficit sales are unpaid, so they are counted in the total sales and profit but not in any part's income.
    */
   async incomeSummary(tenantId: string, query: IncomeSummaryQueryDto) {
     await this.ensureRegisters(tenantId);
@@ -155,7 +161,6 @@ export class CashService {
       else target.expenses = target.expenses.add(amount);
     }
 
-    const unpaid = { total: zero(), profit: zero(), salesCount: 0 };
     let totalSales = zero();
     let totalProfit = zero();
     let salesCount = 0;
@@ -166,23 +171,15 @@ export class CashService {
       totalSales = totalSales.add(total);
       totalProfit = totalProfit.add(profit);
       salesCount += count;
-      const part = PAYMENT_METHOD_PART[row.paymentMethod as PaymentMethod];
-      if (part) {
-        const target = byPart.get(part)!;
-        target.profit = target.profit.add(profit);
-        target.salesCount += count;
-      } else {
-        unpaid.total = unpaid.total.add(total);
-        unpaid.profit = unpaid.profit.add(profit);
-        unpaid.salesCount += count;
-      }
+      const target = byPart.get(PAYMENT_METHOD_PART[row.paymentMethod as PaymentMethod])!;
+      target.profit = target.profit.add(profit);
+      target.salesCount += count;
     }
 
     return {
       from,
       to,
       parts,
-      unpaid,
       totals: {
         totalIncome: parts.reduce((sum, p) => sum.add(p.income), zero()),
         totalBalance: parts.reduce((sum, p) => sum.add(p.balance), zero()),
@@ -211,6 +208,8 @@ interface CashTransactionInput {
   note?: string;
   referenceType?: string;
   referenceId?: string;
+  /** The work session whose cash box is behind this movement */
+  sessionId?: string | null;
 }
 
 /** Record a register transaction inside a database transaction: updates the balance + rejects if it would go negative */
@@ -247,6 +246,7 @@ export async function recordCashTransaction(
       note: input.note,
       referenceType: input.referenceType,
       referenceId: input.referenceId,
+      sessionId: input.sessionId ?? null,
       performedById: input.userId,
     },
   });

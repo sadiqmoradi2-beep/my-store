@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "CartItem" ALTER COLUMN "unitPrice" SET DATA TYPE DECIMAL(18,4);
+
+-- AlterTable
+ALTER TABLE "SaleItem" ALTER COLUMN "unitPrice" SET DATA TYPE DECIMAL(18,4);

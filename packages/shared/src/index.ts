@@ -3,6 +3,7 @@ export * from './constants/permissions';
 export * from './constants/modules';
 export * from './constants/plans';
 export * from './constants/sales';
+export * from './constants/sessions';
 export * from './constants/phase3';
 export * from './constants/phase4';
 export * from './constants/phase5';

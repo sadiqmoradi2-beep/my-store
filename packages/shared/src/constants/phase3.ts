@@ -24,12 +24,6 @@ export const DEBT_KIND_NAMES: Record<DebtKind, string> = {
 
 export type DebtStatus = (typeof DEBT_STATUSES)[number];
 
-export const SEASON_STATUSES = ['OPEN', 'CLOSED'] as const;
-export type SeasonStatus = (typeof SEASON_STATUSES)[number];
-
-export const CAPITAL_ENTRY_TYPES = ['DEPOSIT', 'WITHDRAWAL'] as const;
-export type CapitalEntryType = (typeof CAPITAL_ENTRY_TYPES)[number];
-
 export const CURRENCIES = ['USDT'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -68,11 +62,6 @@ export const DEBT_STATUS_NAMES: Record<DebtStatus, string> = {
   OPEN: 'Open',
   PARTIAL: 'Partial',
   SETTLED: 'Settled',
-};
-
-export const CAPITAL_ENTRY_TYPE_NAMES: Record<CapitalEntryType, string> = {
-  DEPOSIT: 'Capital in',
-  WITHDRAWAL: 'Capital out',
 };
 
 export const SALARY_PAYMENT_STATUSES = ['PENDING', 'PAID'] as const;

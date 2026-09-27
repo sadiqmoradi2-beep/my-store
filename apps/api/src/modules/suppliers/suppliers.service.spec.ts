@@ -19,9 +19,10 @@ describe('SuppliersService.createPurchase', () => {
   const branch = {
     id: 'b1',
     tenantId: 't1',
+    name: 'Main',
     isActive: true,
-    warehouses: [{ id: 'w1', isDefault: true, isActive: true }],
   };
+  const warehouse = { id: 'w1', isDefault: true, isActive: true };
   const products = [
     { id: 'p1', name: 'محصول ۱', purchasePrice: D(50) },
     { id: 'p2', name: 'محصول ۲', purchasePrice: D(30) },
@@ -72,6 +73,10 @@ describe('SuppliersService.createPurchase', () => {
     prisma = {
       supplier: { findFirst: jest.fn().mockResolvedValue({ ...supplier }) },
       branch: { findFirst: jest.fn().mockResolvedValue({ ...branch }) },
+      warehouse: {
+        findFirst: jest.fn().mockResolvedValue({ ...warehouse }),
+        create: jest.fn().mockResolvedValue({ ...warehouse }),
+      },
       product: { findMany: jest.fn().mockResolvedValue(products.map((p) => ({ ...p }))) },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
@@ -160,10 +165,18 @@ describe('SuppliersService.createPurchase', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('شعبه بدون گدام پیش‌فرض فعال → 404', async () => {
-    prisma.branch.findFirst.mockResolvedValue({ ...branch, warehouses: [] });
+  it('branch not found → 404', async () => {
+    prisma.branch.findFirst.mockResolvedValue(null);
     await expect(service.createPurchase('t1', 'u1', baseDto)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('branch without a warehouse (after a reset) → the default warehouse is created on demand', async () => {
+    prisma.warehouse.findFirst.mockResolvedValue(null);
+    await service.createPurchase('t1', 'u1', baseDto);
+    expect(prisma.warehouse.create).toHaveBeenCalledWith({
+      data: { tenantId: 't1', branchId: 'b1', name: 'Main Warehouse', isDefault: true },
+    });
   });
 });

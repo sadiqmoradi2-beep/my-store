@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { applyMovement } from '../inventory/inventory.service';
 import { notifyLowStock } from '../notifications/notifications.service';
+import { findDefaultWarehouse } from '../branches/default-warehouse';
 import { recordCashTransaction } from '../cash/cash.service';
 import { createDebt } from '../debts/debts.service';
 import {
@@ -85,10 +86,10 @@ export class SuppliersService {
     const supplier = await this.get(tenantId, dto.supplierId);
     const branch = await this.prisma.branch.findFirst({
       where: { id: dto.branchId, tenantId, isActive: true },
-      include: { warehouses: { where: { isDefault: true, isActive: true }, take: 1 } },
+      select: { id: true, name: true },
     });
-    const warehouse = branch?.warehouses[0];
-    if (!warehouse) throw new NotFoundException('Branch or its default warehouse not found');
+    if (!branch) throw new NotFoundException('Branch not found');
+    const warehouse = await findDefaultWarehouse(this.prisma, tenantId, branch);
 
     const productIds = [...new Set(dto.items.map((i) => i.productId))];
     if (productIds.length !== dto.items.length) {

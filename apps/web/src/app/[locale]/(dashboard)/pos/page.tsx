@@ -1,11 +1,10 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, CreditCard, HandCoins, Landmark, Minus, Pencil, Plus, ReceiptText, ScanBarcode, Search, Trash2, X } from 'lucide-react';
+import { Banknote, CreditCard, Landmark, Minus, Pencil, Plus, ReceiptText, ScanBarcode, Search, Trash2, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useRef, useState } from 'react';
 import {
-  isUnpaidMethod,
   PAYMENT_METHODS,
   type BranchDto,
   type CartDto,
@@ -24,8 +23,6 @@ const METHOD_ICONS: Record<PaymentMethod, typeof Banknote> = {
   CARD: CreditCard,
   EBT: ReceiptText,
   ZELLE: Landmark,
-  LOAN: HandCoins,
-  DEFICIT: HandCoins,
 };
 
 export default function PosPage() {
@@ -39,8 +36,6 @@ export default function PosPage() {
   const [cartId, setCartId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('CASH');
-  const [partyName, setPartyName] = useState('');
-  const [dueDate, setDueDate] = useState('');
   const [result, setResult] = useState<PosSaleResultDto | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -48,15 +43,15 @@ export default function PosPage() {
     queryKey: ['branches'],
     queryFn: () => api.get<BranchDto[]>('/branches'),
   });
-  const effectiveBranchId = branchId || branches?.[0]?.id || '';
+  // A saved branch may no longer exist (e.g. after a full data reset)
+  const effectiveBranchId =
+    (branches?.some((b) => b.id === branchId) ? branchId : branches?.[0]?.id) || '';
 
   const { data: cart } = useQuery({
     queryKey: ['pos-cart', cartId],
     queryFn: () => api.get<CartDto>(`/carts/${cartId}`),
     enabled: !!cartId,
   });
-
-  const unpaid = isUnpaidMethod(method);
 
   const invalidateCart = () => queryClient.invalidateQueries({ queryKey: ['pos-cart'] });
 
@@ -81,15 +76,12 @@ export default function PosPage() {
         cartId,
         paymentMethod: method,
         ...(method === 'CASH' && cashReceived !== '' && { cashReceived: Number(cashReceived) }),
-        ...(unpaid && { partyName: partyName.trim(), dueDate: dueDate || undefined }),
       }),
     onSuccess: (sale) => {
       setResult(sale);
       setCartId(null);
       setCashReceived('');
       setMethod('CASH');
-      setPartyName('');
-      setDueDate('');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stocks'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -105,8 +97,6 @@ export default function PosPage() {
     onSuccess: () => {
       setCartId(null);
       setCashReceived('');
-      setPartyName('');
-      setDueDate('');
     },
   });
 
@@ -215,23 +205,12 @@ export default function PosPage() {
                   </>
                 )}
 
-                {unpaid && (
-                  <>
-                    <Field label={t('partyName')} hint={t('partyHint')}>
-                      <Input required value={partyName} onChange={(e) => setPartyName(e.target.value)} />
-                    </Field>
-                    <Field label={t('dueDate')}>
-                      <Input type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                    </Field>
-                  </>
-                )}
                 <ErrorText error={saleMutation.error} />
                 <ErrorText error={clearCart.error} />
                 <div className="flex gap-2">
                   <Button
                     className="flex-1"
                     loading={saleMutation.isPending}
-                    disabled={unpaid && !partyName.trim()}
                     onClick={() => saleMutation.mutate()}
                   >
                     {t('completeSale')}
@@ -386,8 +365,9 @@ function CartRow({
   const t = useTranslations('pos');
   const locale = useLocale() as Locale;
   const [editingPrice, setEditingPrice] = useState(false);
-  const [priceMode, setPriceMode] = useState<'unit' | 'total'>('unit');
-  const [priceInput, setPriceInput] = useState<string | number>(item.unitPrice);
+  const [priceMode, setPriceMode] = useState<'unit' | 'total'>('total');
+  const lineTotal = Math.round(Number(item.unitPrice) * item.quantity * 100) / 100;
+  const [priceInput, setPriceInput] = useState<string | number>(lineTotal);
 
   const updateQty = useMutation({
     mutationFn: (quantity: number) =>
@@ -419,7 +399,7 @@ function CartRow({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              updatePrice.mutate(Math.round(effectiveUnitPrice * 100) / 100);
+              updatePrice.mutate(Math.round(effectiveUnitPrice * 10000) / 10000);
             }}
             className="mt-1 space-y-1.5"
           >
@@ -430,7 +410,7 @@ function CartRow({
                   type="button"
                   onClick={() => {
                     setPriceMode(mode);
-                    setPriceInput(mode === 'total' ? Number(item.unitPrice) * item.quantity : item.unitPrice);
+                    setPriceInput(mode === 'total' ? lineTotal : Number(item.unitPrice));
                   }}
                   className={cn(
                     'cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors duration-200',
@@ -461,8 +441,8 @@ function CartRow({
                 type="button"
                 onClick={() => {
                   setEditingPrice(false);
-                  setPriceMode('unit');
-                  setPriceInput(item.unitPrice);
+                  setPriceMode('total');
+                  setPriceInput(lineTotal);
                 }}
                 className="cursor-pointer text-xs text-ink-faint hover:text-ink"
               >
@@ -474,12 +454,14 @@ function CartRow({
           <button
             type="button"
             onClick={() => {
-              setPriceInput(item.unitPrice);
+              setPriceMode('total');
+              setPriceInput(lineTotal);
               setEditingPrice(true);
             }}
             className="flex cursor-pointer items-center gap-1 text-xs text-ink-faint hover:text-ink"
           >
-            {formatMoney(item.unitPrice, locale)} × {formatNumber(item.quantity, locale)}
+            {formatMoney(item.unitPrice, locale)} × {formatNumber(item.quantity, locale)} ={' '}
+            <span className="font-bold text-ink">{formatMoney(lineTotal, locale)}</span>
             <Pencil className="h-3 w-3" aria-hidden />
           </button>
         )}
@@ -563,9 +545,7 @@ function SaleResultModal({ result, onClose }: { result: PosSaleResultDto; onClos
           label={t('total')}
           value={`${formatMoney(result.sale.total, locale)} ${tc('currency')}`}
         />
-        {result.sale.debtId && (
-          <p className="rounded-lg bg-surface-3 p-3 text-xs text-ink-muted">{t('unpaidNote')}</p>
-        )}
+        {result.sale.sessionId && <p className="rounded-lg bg-surface-3 p-3 text-xs text-ink-muted">{t('sessionNote')}</p>}
         {Number(result.change) > 0 && (
           <div className="flex items-center justify-between rounded-lg bg-accent-100 p-3 text-base font-black text-accent-700 dark:bg-accent-700/20 dark:text-accent-300">
             <span>{t('change')}</span>

@@ -31,6 +31,7 @@ describe('DebtsService.pay', () => {
         update: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
       debt: { update: jest.fn() },
     };
     prisma = {
@@ -245,6 +246,7 @@ describe('DebtsService.create — Loan & Deficit', () => {
         update: jest.fn(),
       },
       cashTransaction: { create: jest.fn() },
+      workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
       debt: { create: jest.fn().mockImplementation(({ data }) => ({ id: 'debt1', ...data })) },

@@ -3,22 +3,25 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
-import type {
-  BranchDto,
-  BranchReportRow,
-  CashReportRow,
-  Locale,
-  ProductReportRow,
-  ReportGranularity,
-  SalesReportDto,
-  SellerReportRow,
+import {
+  PERMISSIONS,
+  type BranchDto,
+  type BranchReportRow,
+  type CashReportRow,
+  type Locale,
+  type ProductReportRow,
+  type ReportGranularity,
+  type SalesReportDto,
+  type SellerReportRow,
 } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { SalesChart } from '@/components/reports/sales-chart';
 import { BarList } from '@/components/reports/bar-list';
+import { SessionReport } from '@/components/sessions/session-report';
 import { Button, Card, ErrorText, Field, Input, Select, Spinner, cn } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
+import { useAuthStore } from '@/stores/auth-store';
 import { Printer } from 'lucide-react';
 
 const DAY_MS = 86_400_000;
@@ -49,6 +52,8 @@ export default function ReportsPage() {
   const [productTab, setProductTab] = useState<'top' | 'low'>('top');
 
   const range = `from=${from}&to=${to}`;
+  const canSeeSessions = !!useAuthStore((st) => st.user)?.permissions?.includes(PERMISSIONS.SESSIONS_READ);
+  const tSessions = useTranslations('sessions');
   const activePreset = PRESETS.find(
     (days) => from === isoDate(new Date(Date.now() - days * DAY_MS)) && to === isoDate(new Date()),
   );
@@ -377,6 +382,13 @@ export default function ReportsPage() {
               </table>
             )}
           </Card>
+        </div>
+      )}
+
+      {canSeeSessions && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-ink">{tSessions('title')}</h2>
+          <SessionReport from={from} to={to} showCards={false} />
         </div>
       )}
     </div>

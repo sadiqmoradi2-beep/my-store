@@ -27,7 +27,7 @@ import { CartsModule } from './modules/carts/carts.module';
 import { PosModule } from './modules/pos/pos.module';
 import { SellersModule } from './modules/sellers/sellers.module';
 import { EmployeesModule } from './modules/employees/employees.module';
-import { WorkSeasonsModule } from './modules/work-seasons/work-seasons.module';
+import { WorkSessionsModule } from './modules/work-sessions/work-sessions.module';
 import { DebtsModule } from './modules/debts/debts.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ReturnsModule } from './modules/returns/returns.module';
@@ -71,7 +71,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     PosModule,
     SellersModule,
     EmployeesModule,
-    WorkSeasonsModule,
+    WorkSessionsModule,
     DebtsModule,
     SuppliersModule,
     ReturnsModule,

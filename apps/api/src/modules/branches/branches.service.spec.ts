@@ -15,7 +15,7 @@ describe('BranchesService', () => {
   };
   let prisma: {
     subscription: { findUnique: jest.Mock };
-    branch: { count: jest.Mock };
+    branch: { count: jest.Mock; findFirst: jest.Mock };
   };
 
   const dto = { name: 'شعبه دوم', code: 'BR-2' };
@@ -37,7 +37,11 @@ describe('BranchesService', () => {
       subscription: {
         findUnique: jest.fn().mockResolvedValue({ plan: { limits: { maxBranches: 3 } } }),
       },
-      branch: { count: jest.fn().mockResolvedValue(1) },
+      branch: {
+        count: jest.fn().mockResolvedValue(1),
+        // 1st call: duplicate-code check (none), 2nd call: an existing active branch
+        findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'b1' }),
+      },
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -59,7 +63,19 @@ describe('BranchesService', () => {
   it('ایجاد شعبه زیر سقف پلن → موفق', async () => {
     prisma.branch.count.mockResolvedValue(1);
     await service.create('t1', dto);
-    expect(repo.createWithDefaultWarehouse).toHaveBeenCalledWith('t1', dto);
+    expect(repo.createWithDefaultWarehouse).toHaveBeenCalledWith('t1', { ...dto, isMain: false });
+  });
+
+  it('first branch of the store (e.g. after a full reset) becomes the main branch', async () => {
+    prisma.branch.findFirst.mockReset().mockResolvedValue(null);
+    await service.create('t1', dto);
+    expect(repo.createWithDefaultWarehouse).toHaveBeenCalledWith('t1', { ...dto, isMain: true });
+  });
+
+  it('duplicate branch code → 400', async () => {
+    prisma.branch.findFirst.mockReset().mockResolvedValue({ id: 'old' });
+    await expect(service.create('t1', dto)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.createWithDefaultWarehouse).not.toHaveBeenCalled();
   });
 
   it('پلن نامحدود (maxBranches: -1) → بدون شمارش شعبه‌ها', async () => {

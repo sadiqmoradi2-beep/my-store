@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       { source: '/:locale/finance/cash', destination: '/:locale/income', permanent: false },
       { source: '/:locale/finance/debts/:path*', destination: '/:locale/loans/:path*', permanent: false },
       { source: '/:locale/orders', destination: '/:locale/income', permanent: false },
+      { source: '/:locale/work-seasons', destination: '/:locale/sessions', permanent: false },
     ];
   },
   async rewrites() {
