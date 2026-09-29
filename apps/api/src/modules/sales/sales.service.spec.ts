@@ -95,6 +95,38 @@ describe('SalesService.createFromCart', () => {
     expect(result.sale.profit.toString()).toBe('130');
   });
 
+  it('fixed amount: the register receives the full amount paid (not just the sale total), no change given back', async () => {
+    const result = await service.createFromCart('t1', 'u1', {
+      cartId: 'cart-1',
+      paymentMethod: 'CASH',
+      cashReceived: 500,
+      fixedAmount: true,
+    });
+    expect((recordCashTransaction as jest.Mock).mock.calls[0][1].amount.toString()).toBe('500');
+    expect(result.change.toString()).toBe('0');
+    expect(result.extraKept?.toString()).toBe('50');
+    const data = tx.sale.create.mock.calls[0][0].data;
+    expect(data.total.toString()).toBe('450'); // the sale's own total is unaffected — only the register amount changes
+  });
+
+  it('fixed amount without cashReceived → 422', async () => {
+    await expect(
+      service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH', fixedAmount: true }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('fixed amount with cashReceived exactly equal to the total → no extra kept, note has no "+kept" suffix', async () => {
+    const result = await service.createFromCart('t1', 'u1', {
+      cartId: 'cart-1',
+      paymentMethod: 'CASH',
+      cashReceived: 450,
+      fixedAmount: true,
+    });
+    expect(result.extraKept).toBeUndefined();
+    expect((recordCashTransaction as jest.Mock).mock.calls[0][1].note).toBe('Sale #7');
+  });
+
   it.each([
     ['EBT', 'EBT'],
     ['ZELLE', 'ZELLE'],

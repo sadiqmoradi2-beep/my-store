@@ -235,6 +235,8 @@ export interface CashTransactionDto {
 export interface PosSaleResultDto {
   sale: SaleDto;
   change: string;
+  /** Set when Fixed Amount was used and cashReceived exceeded the sale total — the extra kept as income */
+  extraKept?: string;
 }
 
 export interface IncomePartSummaryDto {

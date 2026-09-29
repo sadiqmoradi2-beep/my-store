@@ -104,6 +104,13 @@ export class SalesService {
         `Amount received is less than the sale amount (amount: ${total.toString()})`,
       );
     }
+    if (dto.fixedAmount && !cashReceived) {
+      throw new UnprocessableEntityException('Fixed amount requires cashReceived');
+    }
+    // Fixed amount: the customer paid a round amount and no change is given back — the extra is
+    // kept and recorded in the register too, instead of just the sale's own total.
+    const registerAmount = dto.fixedAmount && cashReceived ? cashReceived : total;
+    const extraKept = dto.fixedAmount && cashReceived ? cashReceived.sub(total) : D(0);
 
     const sale = await this.prisma.$transaction(async (tx) => {
       const warehouse = await findDefaultWarehouse(tx, tenantId, branch);
@@ -145,16 +152,18 @@ export class SalesService {
 
       let registerId: string | null = null;
       const part = PAYMENT_METHOD_PART[dto.paymentMethod];
-      if (part && total.greaterThan(0)) {
+      if (part && registerAmount.greaterThan(0)) {
         registerId = await this.resolveRegister(tx, tenantId, cart.branchId, part, dto.registerId);
         await recordCashTransaction(tx, {
           tenantId,
           userId,
           registerId,
           type: 'SALE',
-          amount: total,
+          amount: registerAmount,
           category: PAYMENT_METHOD_NAMES[dto.paymentMethod],
-          note: `Sale #${created.saleNumber}`,
+          note: extraKept.greaterThan(0)
+            ? `Sale #${created.saleNumber} (fixed amount, +${extraKept.toString()} kept)`
+            : `Sale #${created.saleNumber}`,
           referenceType: 'sale',
           referenceId: created.id,
           sessionId,
@@ -198,7 +207,9 @@ export class SalesService {
 
     return {
       sale: toSaleDto(sale),
-      change: cashReceived ? cashReceived.sub(total) : D(0),
+      // Fixed amount: nothing is handed back as change — the extra was kept as income instead.
+      change: cashReceived && !dto.fixedAmount ? cashReceived.sub(total) : D(0),
+      extraKept: extraKept.greaterThan(0) ? extraKept : undefined,
     };
   }
 

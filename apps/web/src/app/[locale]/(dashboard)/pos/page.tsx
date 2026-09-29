@@ -36,6 +36,7 @@ export default function PosPage() {
   const [branchId, setBranchId] = useState(user?.branchId ?? '');
   const [cartId, setCartId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState('');
+  const [fixedAmount, setFixedAmount] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [debtPartyName, setDebtPartyName] = useState('');
   const [result, setResult] = useState<PosSaleResultDto | null>(null);
@@ -78,12 +79,14 @@ export default function PosPage() {
         cartId,
         paymentMethod: method,
         ...(method === 'CASH' && cashReceived !== '' && { cashReceived: Number(cashReceived) }),
+        ...(method === 'CASH' && fixedAmount && { fixedAmount: true }),
         ...(method === 'DEBT' && { debtPartyName: debtPartyName.trim() }),
       }),
     onSuccess: (sale) => {
       setResult(sale);
       setCartId(null);
       setCashReceived('');
+      setFixedAmount(false);
       setDebtPartyName('');
       setMethod('CASH');
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -200,10 +203,31 @@ export default function PosPage() {
                         onChange={(e) => setCashReceived(e.target.value)}
                       />
                     </Field>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={fixedAmount}
+                        onChange={(e) => setFixedAmount(e.target.checked)}
+                        className="h-4 w-4 cursor-pointer accent-primary-600"
+                      />
+                      {t('fixedAmount')}
+                    </label>
+                    {fixedAmount && <p className="text-xs text-ink-faint">{t('fixedAmountHint')}</p>}
                     {cashReceived !== '' && Number(cashReceived) >= Number(cart.total) && (
                       <p className="text-sm font-bold text-primary-700 dark:text-primary-300">
-                        {t('change')}: {formatMoney(Number(cashReceived) - Number(cart.total), locale)}{' '}
-                        {tc('currency')}
+                        {fixedAmount ? (
+                          Number(cashReceived) > Number(cart.total) ? (
+                            <>
+                              {t('extraKept')}: {formatMoney(Number(cashReceived) - Number(cart.total), locale)}{' '}
+                              {tc('currency')}
+                            </>
+                          ) : null
+                        ) : (
+                          <>
+                            {t('change')}: {formatMoney(Number(cashReceived) - Number(cart.total), locale)}{' '}
+                            {tc('currency')}
+                          </>
+                        )}
                       </p>
                     )}
                   </>
@@ -221,7 +245,10 @@ export default function PosPage() {
                   <Button
                     className="flex-1"
                     loading={saleMutation.isPending}
-                    disabled={method === 'DEBT' && !debtPartyName.trim()}
+                    disabled={
+                      (method === 'DEBT' && !debtPartyName.trim()) ||
+                      (method === 'CASH' && fixedAmount && cashReceived === '')
+                    }
                     onClick={() => saleMutation.mutate()}
                   >
                     {t('completeSale')}
@@ -562,6 +589,14 @@ function SaleResultModal({ result, onClose }: { result: PosSaleResultDto; onClos
             <span>{t('change')}</span>
             <span>
               {formatMoney(result.change, locale)} {tc('currency')}
+            </span>
+          </div>
+        )}
+        {result.extraKept && Number(result.extraKept) > 0 && (
+          <div className="flex items-center justify-between rounded-lg bg-primary-100 p-3 text-base font-black text-primary-700 dark:bg-primary-700/20 dark:text-primary-300">
+            <span>{t('extraKept')}</span>
+            <span>
+              {formatMoney(result.extraKept, locale)} {tc('currency')}
             </span>
           </div>
         )}
