@@ -126,18 +126,27 @@ describe('SellersService', () => {
   describe('list', () => {
     it('seller with no sales/commission → defaults to zero', async () => {
       prisma.sellerProfile.findMany.mockResolvedValue([
-        { id: 'sp1', userId: 'u1', user: { fullName: 'Ali', email: 'a@x.com' } },
+        {
+          id: 'sp1',
+          userId: 'u1',
+          user: { fullName: 'Ali', email: 'a@x.com', roleId: 'role-seller', role: { name: 'Seller' } },
+        },
       ]);
       const result = await service.list('t1');
       expect(result[0].salesCount).toBe(0);
       expect(result[0].salesTotal.toString()).toBe('0');
       expect(result[0].commissionTotal.toString()).toBe('0');
       expect(result[0].fullName).toBe('Ali');
+      expect(result[0].roleName).toBe('Seller');
     });
 
     it('sale and commission stats are mapped to the corresponding seller', async () => {
       prisma.sellerProfile.findMany.mockResolvedValue([
-        { id: 'sp1', userId: 'u1', user: { fullName: 'Ali', email: 'a@x.com' } },
+        {
+          id: 'sp1',
+          userId: 'u1',
+          user: { fullName: 'Ali', email: 'a@x.com', roleId: 'role-seller', role: { name: 'Seller' } },
+        },
       ]);
       prisma.sale.groupBy.mockResolvedValue([
         { createdById: 'u1', _count: { _all: 4 }, _sum: { total: D(4000) } },

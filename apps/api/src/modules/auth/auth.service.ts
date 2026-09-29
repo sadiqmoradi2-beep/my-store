@@ -51,6 +51,9 @@ export class AuthService {
     if (!licenseKey || licenseKey.status !== 'ACTIVE') {
       throw new BadRequestException('This license key is invalid, already used, or has been revoked');
     }
+    if (licenseKey.expiresAt && licenseKey.expiresAt < new Date()) {
+      throw new BadRequestException('This license key has expired');
+    }
 
     const adminRole = await this.repo.findSystemRole(ROLES.ADMIN);
     const freePlan = await this.repo.findPlan('FREE');
@@ -58,6 +61,7 @@ export class AuthService {
     if (!adminRole || !freePlan) {
       throw new ConflictException('System base data has not been seeded');
     }
+    const grantedPlanId = licenseKey.planId ?? freePlan.id;
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
@@ -66,7 +70,11 @@ export class AuthService {
         data: { name: dto.storeName, slug: dto.slug, phone: dto.phone },
       });
       const consumed = await tx.licenseKey.updateMany({
-        where: { key: dto.licenseKey, status: 'ACTIVE' },
+        where: {
+          key: dto.licenseKey,
+          status: 'ACTIVE',
+          OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }],
+        },
         data: { status: 'USED', usedByTenantId: tenant.id, usedAt: new Date() },
       });
       if (consumed.count === 0) {
@@ -100,7 +108,7 @@ export class AuthService {
         },
       });
       await tx.subscription.create({
-        data: { tenantId: tenant.id, planId: freePlan.id, status: 'ACTIVE' },
+        data: { tenantId: tenant.id, planId: grantedPlanId, status: 'ACTIVE' },
       });
       if (coreModules.length) {
         await tx.tenantModule.createMany({

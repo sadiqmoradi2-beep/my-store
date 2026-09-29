@@ -282,6 +282,8 @@ export interface SellerDto {
   salesTotal?: string;
   commissionTotal?: string;
   createdAt: string;
+  roleId: string | null;
+  roleName: string | null;
 }
 
 export interface CommissionEntryDto {
@@ -315,6 +317,10 @@ export interface EmployeeDto {
   notes: string | null;
   createdAt: string;
   tempPassword?: string;
+  /** Linked login account, if this employee has one (null if never given login access) */
+  userId: string | null;
+  roleId: string | null;
+  roleName: string | null;
 }
 
 export interface SalaryPaymentDto {
@@ -696,6 +702,9 @@ export interface LicenseKeyDto {
   usedByTenantName?: string | null;
   usedAt: string | null;
   createdAt: string;
+  planCode: PlanDto['code'];
+  planName: string;
+  expiresAt: string | null;
 }
 
 export interface PurchaseReturnDto {

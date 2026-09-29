@@ -1,12 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PERMISSIONS } from '@my-store/shared';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesRepository } from './roles.repository';
+
+/** Platform-only permission keys — never grantable to a tenant-scoped (custom) role. */
+const PLATFORM_ONLY_PERMISSIONS: readonly string[] = [
+  PERMISSIONS.TENANTS_MANAGE_ALL,
+  PERMISSIONS.SUBSCRIPTION_APPROVE,
+  PERMISSIONS.PLANS_MANAGE,
+  PERMISSIONS.FEEDBACK_MANAGE,
+];
 
 @Injectable()
 export class RolesService {
@@ -24,8 +34,11 @@ export class RolesService {
     }));
   }
 
-  listPermissions() {
-    return this.repo.findAllPermissions();
+  async listPermissions() {
+    const permissions = await this.repo.findAllPermissions();
+    // Tenant admins create/edit only tenant-scoped roles, so platform-only
+    // permissions must never appear as an assignable option here.
+    return permissions.filter((p) => !PLATFORM_ONLY_PERMISSIONS.includes(p.key));
   }
 
   async create(tenantId: string, dto: CreateRoleDto) {
@@ -57,6 +70,12 @@ export class RolesService {
   }
 
   private async resolvePermissions(keys: string[]): Promise<string[]> {
+    const platformOnly = keys.filter((k) => PLATFORM_ONLY_PERMISSIONS.includes(k));
+    if (platformOnly.length > 0) {
+      throw new ForbiddenException(
+        `Platform-only permission(s) cannot be assigned to a store role: ${platformOnly.join(', ')}`,
+      );
+    }
     const permissions = await this.repo.findPermissionsByKeys(keys);
     if (permissions.length !== keys.length) {
       const found = new Set(permissions.map((p) => p.key));

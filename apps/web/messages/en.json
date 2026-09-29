@@ -343,6 +343,7 @@
     "title": "Sellers",
     "new": "New seller",
     "seller": "Seller",
+    "role": "Role",
     "user": "User",
     "selectUser": "Select user…",
     "accountSource": "Account",
@@ -414,6 +415,7 @@
       "COMMISSION": "Commission"
     },
     "accessLevel": "Manager access",
+    "noLoginAccount": "No login account — role cannot be assigned",
     "accessLevels": {
       "FULL": "Full control",
       "CUSTOM": "Custom role"
@@ -788,6 +790,10 @@
     "licensesHint": "Generate one-time activation keys — a new store must enter one to complete registration.",
     "newLicenseKey": "New license key",
     "licenseKeyCol": "Key",
+    "licensePlan": "Plan",
+    "licenseExpires": "Expires",
+    "licenseExpiresHint": "Days until this key can no longer be redeemed",
+    "licenseNeverExpires": "Never expires",
     "licenseNote": "Note",
     "licenseNoteHint": "Optional — who this key is for, to help you keep track",
     "licenseUsedBy": "Used by",

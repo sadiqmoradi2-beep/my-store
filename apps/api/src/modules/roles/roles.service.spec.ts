@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { PERMISSIONS } from '@my-store/shared';
 import { RolesRepository } from './roles.repository';
 import { RolesService } from './roles.service';
 
@@ -62,5 +63,44 @@ describe('RolesService', () => {
     repo.findTenantRole.mockResolvedValue({ id: 'role-1', _count: { users: 0 } });
     await service.remove('t1', 'role-1');
     expect(repo.delete).toHaveBeenCalledWith('role-1');
+  });
+
+  it('platform-only permission key on a tenant role → 403, never reaches the repository (privilege-escalation guard)', async () => {
+    await expect(
+      service.create('t1', {
+        key: 'FAKE_ADMIN',
+        name: 'Fake platform admin',
+        permissionKeys: [PERMISSIONS.TENANTS_MANAGE_ALL],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.findPermissionsByKeys).not.toHaveBeenCalled();
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('platform-only permission key on a tenant role update → 403', async () => {
+    repo.findTenantRole.mockResolvedValue({ id: 'role-1', _count: { users: 0 } });
+    await expect(
+      service.update('t1', 'role-1', { permissionKeys: [PERMISSIONS.SUBSCRIPTION_APPROVE] }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it('listPermissions excludes platform-only keys from what a tenant admin can assign', async () => {
+    repo.findAllPermissions.mockResolvedValue([
+      { id: 'p1', key: 'orders.view' },
+      { id: 'p2', key: PERMISSIONS.TENANTS_MANAGE_ALL },
+      { id: 'p3', key: PERMISSIONS.SUBSCRIPTION_APPROVE },
+      { id: 'p4', key: PERMISSIONS.PLANS_MANAGE },
+      { id: 'p5', key: PERMISSIONS.FEEDBACK_MANAGE },
+    ]);
+    const result = await service.listPermissions();
+    expect(result.map((p) => p.key)).not.toEqual(
+      expect.arrayContaining([
+        PERMISSIONS.TENANTS_MANAGE_ALL,
+        PERMISSIONS.SUBSCRIPTION_APPROVE,
+        PERMISSIONS.PLANS_MANAGE,
+        PERMISSIONS.FEEDBACK_MANAGE,
+      ]),
+    );
   });
 });

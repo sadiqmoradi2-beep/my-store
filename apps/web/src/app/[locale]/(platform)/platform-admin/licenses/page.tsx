@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Copy, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import type { LicenseKeyDto, Locale } from '@my-store/shared';
+import type { LicenseKeyDto, Locale, PlanCode } from '@my-store/shared';
+import { PLANS } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
-import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
+import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 
 const STATUS_TONES: Record<LicenseKeyDto['status'], string> = {
   ACTIVE: 'APPROVED',
@@ -58,6 +59,8 @@ export default function LicenseKeysPage() {
               <tr className="border-b border-line text-xs text-ink-muted">
                 <th className="p-3 text-start font-medium">{t('licenseKeyCol')}</th>
                 <th className="p-3 text-start font-medium">{tc('status')}</th>
+                <th className="p-3 text-start font-medium">{t('licensePlan')}</th>
+                <th className="p-3 text-start font-medium">{t('licenseExpires')}</th>
                 <th className="p-3 text-start font-medium">{t('licenseNote')}</th>
                 <th className="p-3 text-start font-medium">{t('licenseUsedBy')}</th>
                 <th className="p-3 text-start font-medium">{t('licenseCreatedBy')}</th>
@@ -68,7 +71,7 @@ export default function LicenseKeysPage() {
             <tbody>
               {keys?.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-ink-faint">
+                  <td colSpan={9} className="p-8 text-center text-ink-faint">
                     {tc('noData')}
                   </td>
                 </tr>
@@ -94,6 +97,10 @@ export default function LicenseKeysPage() {
                   </td>
                   <td className="p-3">
                     <Badge tone={STATUS_TONES[key.status]}>{t(`licenseStatuses.${key.status}`)}</Badge>
+                  </td>
+                  <td className="p-3 text-ink-muted">{key.planName}</td>
+                  <td className="p-3 text-xs text-ink-faint">
+                    {key.expiresAt ? formatDate(key.expiresAt, locale) : '—'}
                   </td>
                   <td className="p-3 text-ink-muted">{key.note ?? '—'}</td>
                   <td className="p-3 text-ink-muted">{key.usedByTenantName ?? '—'}</td>
@@ -131,11 +138,18 @@ function NewLicenseKeyModal({ onClose }: { onClose: () => void }) {
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
   const [note, setNote] = useState('');
+  const [planCode, setPlanCode] = useState<PlanCode>('FREE');
+  const [expiresInDays, setExpiresInDays] = useState('');
   const [created, setCreated] = useState<LicenseKeyDto | null>(null);
   const [copied, setCopied] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => api.post<LicenseKeyDto>('/license-keys', { note: note || undefined }),
+    mutationFn: () =>
+      api.post<LicenseKeyDto>('/license-keys', {
+        note: note || undefined,
+        planCode,
+        expiresInDays: expiresInDays ? Number(expiresInDays) : undefined,
+      }),
     onSuccess: (data) => {
       setCreated(data);
       queryClient.invalidateQueries({ queryKey: ['license-keys'] });
@@ -173,6 +187,25 @@ function NewLicenseKeyModal({ onClose }: { onClose: () => void }) {
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
+          <Field label={t('licensePlan')}>
+            <Select value={planCode} onChange={(e) => setPlanCode(e.target.value as PlanCode)}>
+              {PLANS.map((plan) => (
+                <option key={plan.code} value={plan.code}>
+                  {plan.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t('licenseExpires')} hint={t('licenseExpiresHint')}>
+            <Input
+              type="number"
+              min={1}
+              max={3650}
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(e.target.value)}
+              placeholder={t('licenseNeverExpires')}
+            />
+          </Field>
           <Field label={t('licenseNote')} hint={t('licenseNoteHint')}>
             <Input value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>

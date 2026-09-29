@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Banknote, Pencil, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import { SELLER_PAY_TYPES, SELLER_PAY_TYPE_NAMES, type CashRegisterDto, type Locale, type SellerDto, type SellerPayType, type UserDto } from '@my-store/shared';
+import { SELLER_PAY_TYPES, SELLER_PAY_TYPE_NAMES, type CashRegisterDto, type Locale, type RoleDto, type SellerDto, type SellerPayType, type UserDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner, Textarea } from '@/components/ui';
@@ -171,6 +171,17 @@ function SellerModal({
     enabled: !seller && accountSource === 'EXISTING',
   });
 
+  const { data: roles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api.get<RoleDto[]>('/roles'),
+    enabled: !!seller,
+  });
+  const [reassignRoleId, setReassignRoleId] = useState(seller?.roleId ?? '');
+  const reassignRole = useMutation({
+    mutationFn: () => api.patch(`/users/${seller!.userId}`, { roleId: reassignRoleId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sellers'] }),
+  });
+
   const mutation = useMutation({
     mutationFn: () => {
       const payload = {
@@ -299,6 +310,30 @@ function SellerModal({
             />
             {tc('active')}
           </label>
+        )}
+        {seller && (
+          <Field label={t('role')}>
+            <div className="flex items-center gap-2">
+              <Select value={reassignRoleId} onChange={(e) => setReassignRoleId(e.target.value)}>
+                {roles?.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-8 shrink-0 px-2.5 text-xs"
+                loading={reassignRole.isPending}
+                disabled={!reassignRoleId || reassignRoleId === seller.roleId}
+                onClick={() => reassignRole.mutate()}
+              >
+                {tc('save')}
+              </Button>
+            </div>
+            <ErrorText error={reassignRole.error} />
+          </Field>
         )}
         <Field label={t('notes')}>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />

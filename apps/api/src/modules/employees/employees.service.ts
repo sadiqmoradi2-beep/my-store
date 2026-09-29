@@ -25,10 +25,26 @@ const BCRYPT_ROUNDS = 10;
 export class EmployeesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(tenantId: string) {
-    return this.prisma.employee.findMany({
+  async list(tenantId: string) {
+    const employees = await this.prisma.employee.findMany({
       where: { tenantId },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+    });
+    const userIds = employees.map((e) => e.userId).filter((id): id is string => !!id);
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds }, tenantId },
+          select: { id: true, roleId: true, role: { select: { name: true } } },
+        })
+      : [];
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    return employees.map((employee) => {
+      const user = employee.userId ? usersById.get(employee.userId) : undefined;
+      return {
+        ...employee,
+        roleId: user?.roleId ?? null,
+        roleName: user?.role.name ?? null,
+      };
     });
   }
 

@@ -176,13 +176,27 @@ describe('AuthService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it('license key expired → 400 and no transaction started', async () => {
+      prisma.licenseKey.findUnique.mockResolvedValue({
+        key: 'LICENSE-1',
+        status: 'ACTIVE',
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      await expect(service.registerTenant(dto)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('valid license key → tenant created and the key is marked USED against the new tenant', async () => {
       const result = await service.registerTenant(dto);
       expect(tx.tenant.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ name: 'New Store', slug: 'new-store' }) }),
       );
       expect(tx.licenseKey.updateMany).toHaveBeenCalledWith({
-        where: { key: 'LICENSE-1', status: 'ACTIVE' },
+        where: {
+          key: 'LICENSE-1',
+          status: 'ACTIVE',
+          OR: [{ expiresAt: null }, { expiresAt: { gte: expect.any(Date) } }],
+        },
         data: { status: 'USED', usedByTenantId: 'tenant-new', usedAt: expect.any(Date) },
       });
       expect(result.accessToken).toBe('signed-token');

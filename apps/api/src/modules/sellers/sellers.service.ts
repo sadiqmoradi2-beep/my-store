@@ -26,7 +26,9 @@ export class SellersService {
   async list(tenantId: string) {
     const profiles = await this.prisma.sellerProfile.findMany({
       where: { tenantId },
-      include: { user: { select: { fullName: true, email: true } } },
+      include: {
+        user: { select: { fullName: true, email: true, roleId: true, role: { select: { name: true } } } },
+      },
       orderBy: { createdAt: 'asc' },
     });
     const [saleStats, commissionStats] = await Promise.all([
@@ -51,6 +53,8 @@ export class SellersService {
       ...profile,
       fullName: user.fullName,
       email: user.email,
+      roleId: user.roleId,
+      roleName: user.role.name,
       salesCount: saleByUser.get(profile.userId)?._count._all ?? 0,
       salesTotal: saleByUser.get(profile.userId)?._sum.total ?? new Prisma.Decimal(0),
       commissionTotal:

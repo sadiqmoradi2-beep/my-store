@@ -145,6 +145,7 @@ model Plan {
   isActive         Boolean        @default(true)
   subscriptions    Subscription[] @relation("SubscriptionPlan")
   pendingFor       Subscription[] @relation("SubscriptionPendingPlan")
+  licenseKeys      LicenseKey[]
 }
 
 model Subscription {
@@ -1230,9 +1231,14 @@ model LicenseKey {
   usedByTenantId String?
   usedAt         DateTime?
   createdAt      DateTime         @default(now())
+  /** Plan the redeeming tenant is provisioned with. Null = default FREE (legacy keys). */
+  planId         String?
+  /** Key can no longer be redeemed after this time, even if still ACTIVE. Null = never expires. */
+  expiresAt      DateTime?
 
   createdBy    User    @relation("LicenseKeyCreatedBy", fields: [createdById], references: [id])
   usedByTenant Tenant? @relation(fields: [usedByTenantId], references: [id])
+  plan         Plan?   @relation(fields: [planId], references: [id])
 
   @@index([status])
   @@index([usedByTenantId])

@@ -288,9 +288,14 @@ function EmployeeModal({
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => api.get<RoleDto[]>('/roles'),
-    enabled: !employee && positionPreset === 'MANAGER',
   });
   const customRoles = roles?.filter((r) => !r.isSystem) ?? [];
+
+  const [reassignRoleId, setReassignRoleId] = useState(employee?.roleId ?? '');
+  const reassignRole = useMutation({
+    mutationFn: () => api.patch(`/users/${employee!.userId}`, { roleId: reassignRoleId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
+  });
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -453,6 +458,32 @@ function EmployeeModal({
             />
             {tc('active')}
           </label>
+        )}
+        {employee && (
+          <Field label={t('accessLevel')} hint={employee.userId ? undefined : t('noLoginAccount')}>
+            {employee.userId ? (
+              <div className="flex items-center gap-2">
+                <Select value={reassignRoleId} onChange={(e) => setReassignRoleId(e.target.value)}>
+                  {roles?.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-8 shrink-0 px-2.5 text-xs"
+                  loading={reassignRole.isPending}
+                  disabled={!reassignRoleId || reassignRoleId === employee.roleId}
+                  onClick={() => reassignRole.mutate()}
+                >
+                  {tc('save')}
+                </Button>
+              </div>
+            ) : null}
+            <ErrorText error={reassignRole.error} />
+          </Field>
         )}
         <Field label={t('notes')}>
           <Input value={form.notes} onChange={(e) => set({ notes: e.target.value })} />

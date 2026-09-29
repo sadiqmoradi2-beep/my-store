@@ -22,22 +22,35 @@ export class LicenseKeysService {
       include: {
         createdBy: { select: { fullName: true } },
         usedByTenant: { select: { name: true } },
+        plan: { select: { code: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map(({ createdBy, usedByTenant, ...key }) => ({
+    return rows.map(({ createdBy, usedByTenant, plan, ...key }) => ({
       ...key,
       createdByName: createdBy.fullName,
       usedByTenantName: usedByTenant?.name ?? null,
+      planCode: plan?.code ?? 'FREE',
+      planName: plan?.name ?? 'Free',
     }));
   }
 
   /** Generate a new one-time activation key for a new store to register with */
   async create(createdById: string, dto: CreateLicenseKeyDto) {
+    let planId: string | undefined;
+    if (dto.planCode) {
+      const plan = await this.prisma.plan.findUnique({ where: { code: dto.planCode } });
+      if (!plan) throw new ConflictException(`Plan "${dto.planCode}" is not configured`);
+      planId = plan.id;
+    }
+    const expiresAt = dto.expiresInDays
+      ? new Date(Date.now() + dto.expiresInDays * 24 * 60 * 60 * 1000)
+      : undefined;
+
     for (let attempt = 0; attempt < 10; attempt++) {
       try {
         return await this.prisma.licenseKey.create({
-          data: { key: generateLicenseKey(), note: dto.note, createdById },
+          data: { key: generateLicenseKey(), note: dto.note, createdById, planId, expiresAt },
         });
       } catch {
         // key collision — extremely unlikely, retry with a freshly generated key
