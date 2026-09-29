@@ -1,12 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
 import { PAYMENT_METHODS, PaymentMethod } from '@my-store/shared';
 
 export class PosSaleDto {
   @IsString()
   cartId: string;
 
-  /** Cash / Card / EBT / Zelle — Loan and Deficit are handled only in Loan & Deficit */
+  /** Cash / Card / EBT / Zelle / Debt (sold on credit — no money received yet) */
   @IsEnum(PAYMENT_METHODS)
   paymentMethod: PaymentMethod;
 
@@ -21,6 +21,16 @@ export class PosSaleDto {
   @IsOptional()
   @IsString()
   registerId?: string;
+
+  /** DEBT only: who owes the store this amount — becomes the Debt record's party name */
+  @ValidateIf((dto) => dto.paymentMethod === 'DEBT')
+  @IsString()
+  debtPartyName?: string;
+
+  /** DEBT only: optional due date for the resulting Debt record */
+  @IsOptional()
+  @IsString()
+  debtDueDate?: string;
 
   @IsOptional()
   @IsString()

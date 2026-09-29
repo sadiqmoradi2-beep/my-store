@@ -309,6 +309,8 @@ function EmployeeModal({
     isActive: employee?.isActive ?? true,
     notes: employee?.notes ?? '',
   });
+  const [commissionPercent, setCommissionPercent] = useState('');
+  const [fixedSalaryAmount, setFixedSalaryAmount] = useState('');
   const [email, setEmail] = useState('');
   const [createLogin, setCreateLogin] = useState(true);
   const [accessLevel, setAccessLevel] = useState<'FULL' | 'CUSTOM'>('FULL');
@@ -353,6 +355,10 @@ function EmployeeModal({
         email: email || undefined,
         createLogin: email ? createLogin : undefined,
         roleId: useCustomRole ? customRoleId : undefined,
+        ...(positionPreset === 'SELLER' && {
+          commissionPercent: commissionPercent !== '' ? Number(commissionPercent) : undefined,
+          fixedSalaryAmount: fixedSalaryAmount !== '' ? Number(fixedSalaryAmount) : undefined,
+        }),
       });
     },
     onSuccess: (data) => {
@@ -419,6 +425,34 @@ function EmployeeModal({
           <Field label={t('positionOther')}>
             <Input required value={customPosition} onChange={(e) => setCustomPosition(e.target.value)} />
           </Field>
+        )}
+        {!employee && positionPreset === 'SELLER' && (
+          <div className="grid grid-cols-2 gap-3">
+            {form.payType === 'COMMISSION' ? (
+              <Field label={t('commissionPercent')} hint={t('commissionPercentHint')}>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  dir="ltr"
+                  value={commissionPercent}
+                  onChange={(e) => setCommissionPercent(e.target.value)}
+                />
+              </Field>
+            ) : (
+              <Field label={t('fixedSalaryAmount')}>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  dir="ltr"
+                  value={fixedSalaryAmount}
+                  onChange={(e) => setFixedSalaryAmount(e.target.value)}
+                />
+              </Field>
+            )}
+          </div>
         )}
         <Field label={t('phone')}>
           <Input dir="ltr" value={form.phone} onChange={(e) => set({ phone: e.target.value })} />

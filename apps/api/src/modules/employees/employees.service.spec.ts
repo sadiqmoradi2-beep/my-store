@@ -2,9 +2,11 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SellersService } from '../sellers/sellers.service';
 import { EmployeesService } from './employees.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
+const sellersServiceMock = { create: jest.fn(), paySalary: jest.fn() };
 
 describe('EmployeesService.paySalary', () => {
   let service: EmployeesService;
@@ -31,7 +33,11 @@ describe('EmployeesService.paySalary', () => {
     };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [EmployeesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(EmployeesService);
   });
@@ -91,9 +97,14 @@ describe('EmployeesService.create', () => {
       role: { findFirst: jest.fn().mockResolvedValue({ id: 'role-seller' }) },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
+    sellersServiceMock.create.mockReset();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [EmployeesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(EmployeesService);
   });
@@ -128,6 +139,45 @@ describe('EmployeesService.create', () => {
     const tempPassword = (result as { tempPassword?: string }).tempPassword;
     expect(tempPassword).toBeDefined();
     expect(typeof tempPassword).toBe('string');
+  });
+
+  it('positionPreset SELLER → a linked seller profile is created via SellersService, carrying pay/commission fields', async () => {
+    await service.create('t1', {
+      fullName: 'Zahra',
+      position: 'Seller',
+      positionPreset: 'SELLER',
+      payType: 'COMMISSION',
+      commissionPercent: 12.5,
+      salary: 0,
+      email: 'zahra@demo.af',
+    });
+    expect(sellersServiceMock.create).toHaveBeenCalledWith('t1', {
+      userId: 'user-new',
+      payType: 'COMMISSION',
+      commissionPercent: 12.5,
+      fixedSalaryAmount: undefined,
+    });
+  });
+
+  it('positionPreset other than SELLER → no seller profile is created', async () => {
+    await service.create('t1', {
+      fullName: 'Karim',
+      position: 'Worker',
+      positionPreset: 'WORKER',
+      salary: 4000,
+      email: 'karim2@demo.af',
+    });
+    expect(sellersServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it('positionPreset SELLER but no login created (no email) → no seller profile either (no user to link)', async () => {
+    await service.create('t1', {
+      fullName: 'Zahra',
+      position: 'Seller',
+      positionPreset: 'SELLER',
+      salary: 0,
+    });
+    expect(sellersServiceMock.create).not.toHaveBeenCalled();
   });
 
   it('with roleId → overrides the positionPreset-derived role (custom manager role)', async () => {
@@ -182,6 +232,123 @@ describe('EmployeesService.create', () => {
   });
 });
 
+describe('EmployeesService.payCommission', () => {
+  let service: EmployeesService;
+  let prisma: Record<string, Record<string, jest.Mock>>;
+
+  beforeEach(async () => {
+    prisma = {
+      employee: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'emp1', tenantId: 't1', userId: 'user-1' }),
+      },
+      sellerProfile: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'seller-1', userId: 'user-1' }),
+      },
+    };
+    sellersServiceMock.paySalary.mockReset().mockResolvedValue({ id: 'payment-1' });
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
+    }).compile();
+    service = moduleRef.get(EmployeesService);
+  });
+
+  it('resolves the employee\'s linked seller profile and delegates to SellersService.paySalary', async () => {
+    const dto = { amount: 200, period: '1405-07' } as never;
+    await service.payCommission('t1', 'admin-1', 'emp1', dto);
+    expect(prisma.sellerProfile.findFirst).toHaveBeenCalledWith({
+      where: { userId: 'user-1', tenantId: 't1' },
+    });
+    expect(sellersServiceMock.paySalary).toHaveBeenCalledWith('t1', 'admin-1', 'seller-1', dto);
+  });
+
+  it('employee has no linked user → 404, never calls SellersService', async () => {
+    prisma.employee.findFirst.mockResolvedValue({ id: 'emp1', tenantId: 't1', userId: null });
+    await expect(
+      service.payCommission('t1', 'admin-1', 'emp1', { amount: 200, period: '1405-07' } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(sellersServiceMock.paySalary).not.toHaveBeenCalled();
+  });
+
+  it('employee has a user but no linked seller profile → 404', async () => {
+    prisma.sellerProfile.findFirst.mockResolvedValue(null);
+    await expect(
+      service.payCommission('t1', 'admin-1', 'emp1', { amount: 200, period: '1405-07' } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(sellersServiceMock.paySalary).not.toHaveBeenCalled();
+  });
+});
+
+describe('EmployeesService.list', () => {
+  let service: EmployeesService;
+  let prisma: Record<string, Record<string, jest.Mock>>;
+
+  beforeEach(async () => {
+    prisma = {
+      employee: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'emp1', tenantId: 't1', userId: 'user-1', fullName: 'Ali', isActive: true },
+          { id: 'emp2', tenantId: 't1', userId: 'user-2', fullName: 'Sara', isActive: true },
+          { id: 'emp3', tenantId: 't1', userId: null, fullName: 'NoLogin', isActive: true },
+        ]),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'user-1', roleId: 'role-seller', role: { name: 'Seller' } },
+          { id: 'user-2', roleId: 'role-worker', role: { name: 'Worker' } },
+        ]),
+      },
+      sellerProfile: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'seller-1', userId: 'user-1', commissionPercent: D(10) },
+        ]),
+      },
+      sale: { groupBy: jest.fn().mockResolvedValue([{ createdById: 'user-1', _count: { _all: 3 }, _sum: { total: D(900) } }]) },
+      commissionEntry: {
+        groupBy: jest.fn().mockResolvedValue([{ sellerProfileId: 'seller-1', _sum: { amount: D(90) } }]),
+      },
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
+    }).compile();
+    service = moduleRef.get(EmployeesService);
+  });
+
+  it('an employee with a linked seller profile gets commission/sales stats merged in', async () => {
+    const result = await service.list('t1');
+    const ali = result.find((e) => e.id === 'emp1')!;
+    expect(ali.sellerProfileId).toBe('seller-1');
+    expect(ali.commissionPercent?.toString()).toBe('10');
+    expect(ali.salesCount).toBe(3);
+    expect(ali.salesTotal?.toString()).toBe('900');
+    expect(ali.commissionTotal?.toString()).toBe('90');
+    expect(ali.roleName).toBe('Seller');
+  });
+
+  it('a plain employee (no seller profile) gets nulls for every commission field', async () => {
+    const result = await service.list('t1');
+    const sara = result.find((e) => e.id === 'emp2')!;
+    expect(sara.sellerProfileId).toBeNull();
+    expect(sara.commissionPercent).toBeNull();
+    expect(sara.salesCount).toBeNull();
+    expect(sara.roleName).toBe('Worker');
+  });
+
+  it('an employee with no linked login account gets nulls for role and seller fields, no crash', async () => {
+    const result = await service.list('t1');
+    const noLogin = result.find((e) => e.id === 'emp3')!;
+    expect(noLogin.roleId).toBeNull();
+    expect(noLogin.sellerProfileId).toBeNull();
+  });
+});
+
 describe('EmployeesService.startShift/endShift', () => {
   let service: EmployeesService;
   let prisma: Record<string, Record<string, jest.Mock>>;
@@ -198,7 +365,11 @@ describe('EmployeesService.startShift/endShift', () => {
       },
     };
     const moduleRef = await Test.createTestingModule({
-      providers: [EmployeesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(EmployeesService);
   });
@@ -255,7 +426,11 @@ describe('EmployeesService.attendance/markAttendance', () => {
       },
     };
     const moduleRef = await Test.createTestingModule({
-      providers: [EmployeesService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(EmployeesService);
   });

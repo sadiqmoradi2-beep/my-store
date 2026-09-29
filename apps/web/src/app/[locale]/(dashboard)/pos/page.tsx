@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, CreditCard, Landmark, Minus, Pencil, Plus, ReceiptText, ScanBarcode, Search, Trash2, X } from 'lucide-react';
+import { Banknote, CreditCard, HandCoins, Landmark, Minus, Pencil, Plus, ReceiptText, ScanBarcode, Search, Trash2, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useRef, useState } from 'react';
 import {
@@ -23,6 +23,7 @@ const METHOD_ICONS: Record<PaymentMethod, typeof Banknote> = {
   CARD: CreditCard,
   EBT: ReceiptText,
   ZELLE: Landmark,
+  DEBT: HandCoins,
 };
 
 export default function PosPage() {
@@ -36,6 +37,7 @@ export default function PosPage() {
   const [cartId, setCartId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('CASH');
+  const [debtPartyName, setDebtPartyName] = useState('');
   const [result, setResult] = useState<PosSaleResultDto | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -76,11 +78,13 @@ export default function PosPage() {
         cartId,
         paymentMethod: method,
         ...(method === 'CASH' && cashReceived !== '' && { cashReceived: Number(cashReceived) }),
+        ...(method === 'DEBT' && { debtPartyName: debtPartyName.trim() }),
       }),
     onSuccess: (sale) => {
       setResult(sale);
       setCartId(null);
       setCashReceived('');
+      setDebtPartyName('');
       setMethod('CASH');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stocks'] });
@@ -158,7 +162,7 @@ export default function PosPage() {
 
               <div className="mt-4 space-y-3 border-t border-line pt-4">
                 <Field label={t('paymentMethod')}>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {PAYMENT_METHODS.map((m) => {
                       const Icon = METHOD_ICONS[m];
                       return (
@@ -205,12 +209,19 @@ export default function PosPage() {
                   </>
                 )}
 
+                {method === 'DEBT' && (
+                  <Field label={t('debtPartyName')} hint={t('debtPartyNameHint')}>
+                    <Input value={debtPartyName} onChange={(e) => setDebtPartyName(e.target.value)} />
+                  </Field>
+                )}
+
                 <ErrorText error={saleMutation.error} />
                 <ErrorText error={clearCart.error} />
                 <div className="flex gap-2">
                   <Button
                     className="flex-1"
                     loading={saleMutation.isPending}
+                    disabled={method === 'DEBT' && !debtPartyName.trim()}
                     onClick={() => saleMutation.mutate()}
                   >
                     {t('completeSale')}

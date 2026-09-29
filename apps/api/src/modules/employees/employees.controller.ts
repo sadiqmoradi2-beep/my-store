@@ -15,6 +15,7 @@ import {
   StartShiftDto,
   UpdateEmployeeDto,
 } from './dto/employee.dto';
+import { PaySellerSalaryDto } from '../sellers/dto/seller.dto';
 import { EmployeesService } from './employees.service';
 import { RequireModule } from '../../common/decorators/require-module.decorator';
 
@@ -70,6 +71,17 @@ export class EmployeesController {
     @Body() dto: MarkSalaryPaidDto,
   ) {
     return this.employeesService.markSalaryPaid(tenantId, user.userId, id, paymentId, dto.registerId);
+  }
+
+  @Post(':id/commission-payments')
+  @RequirePermissions(PERMISSIONS.EMPLOYEES_MANAGE)
+  payCommission(
+    @TenantId() tenantId: string,
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: PaySellerSalaryDto,
+  ) {
+    return this.employeesService.payCommission(tenantId, user.userId, id, dto);
   }
 
   @Get(':id/shifts')

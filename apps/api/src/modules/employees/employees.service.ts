@@ -8,6 +8,8 @@ import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
+import { SellersService } from '../sellers/sellers.service';
+import { PaySellerSalaryDto } from '../sellers/dto/seller.dto';
 import {
   AttendanceQueryDto,
   CreateEmployeeDto,
@@ -23,7 +25,10 @@ const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sellersService: SellersService,
+  ) {}
 
   async list(tenantId: string) {
     const employees = await this.prisma.employee.findMany({
@@ -31,21 +36,64 @@ export class EmployeesService {
       orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
     });
     const userIds = employees.map((e) => e.userId).filter((id): id is string => !!id);
-    const users = userIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: userIds }, tenantId },
-          select: { id: true, roleId: true, role: { select: { name: true } } },
-        })
-      : [];
+    const [users, sellerProfiles] = await Promise.all([
+      userIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: userIds }, tenantId },
+            select: { id: true, roleId: true, role: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+      userIds.length
+        ? this.prisma.sellerProfile.findMany({ where: { userId: { in: userIds }, tenantId } })
+        : Promise.resolve([]),
+    ]);
     const usersById = new Map(users.map((u) => [u.id, u]));
+    const sellerByUserId = new Map(sellerProfiles.map((s) => [s.userId, s]));
+    const sellerProfileIds = sellerProfiles.map((s) => s.id);
+    const [saleStats, commissionStats] = sellerProfileIds.length
+      ? await Promise.all([
+          this.prisma.sale.groupBy({
+            by: ['createdById'],
+            where: { tenantId, createdById: { in: sellerProfiles.map((s) => s.userId) } },
+            _count: { _all: true },
+            _sum: { total: true },
+          }),
+          this.prisma.commissionEntry.groupBy({
+            by: ['sellerProfileId'],
+            where: { tenantId, sellerProfileId: { in: sellerProfileIds } },
+            _sum: { amount: true },
+          }),
+        ])
+      : [[], []];
+    const saleByUser = new Map(saleStats.map((s) => [s.createdById, s]));
+    const commissionByProfile = new Map(commissionStats.map((s) => [s.sellerProfileId, s]));
+
     return employees.map((employee) => {
       const user = employee.userId ? usersById.get(employee.userId) : undefined;
+      const seller = employee.userId ? sellerByUserId.get(employee.userId) : undefined;
       return {
         ...employee,
         roleId: user?.roleId ?? null,
         roleName: user?.role.name ?? null,
+        sellerProfileId: seller?.id ?? null,
+        commissionPercent: seller?.commissionPercent ?? null,
+        salesCount: seller ? (saleByUser.get(employee.userId!)?._count._all ?? 0) : null,
+        salesTotal: seller ? (saleByUser.get(employee.userId!)?._sum.total ?? new Prisma.Decimal(0)) : null,
+        commissionTotal: seller
+          ? (commissionByProfile.get(seller.id)?._sum.amount ?? new Prisma.Decimal(0))
+          : null,
       };
     });
+  }
+
+  /** Pay commission to an employee's linked seller profile (created when they were hired as position=Seller) */
+  async payCommission(tenantId: string, userId: string, employeeId: string, dto: PaySellerSalaryDto) {
+    const employee = await this.get(tenantId, employeeId);
+    const seller = employee.userId
+      ? await this.prisma.sellerProfile.findFirst({ where: { userId: employee.userId, tenantId } })
+      : null;
+    if (!seller) throw new NotFoundException('This employee has no linked seller/commission profile');
+    return this.sellersService.paySalary(tenantId, userId, seller.id, dto);
   }
 
   /**
@@ -114,6 +162,15 @@ export class EmployeesService {
         },
       });
     });
+
+    if (dto.positionPreset === 'SELLER' && employee.userId) {
+      await this.sellersService.create(tenantId, {
+        userId: employee.userId,
+        payType: dto.payType,
+        commissionPercent: dto.commissionPercent,
+        fixedSalaryAmount: dto.fixedSalaryAmount,
+      });
+    }
     return { ...employee, tempPassword };
   }
 

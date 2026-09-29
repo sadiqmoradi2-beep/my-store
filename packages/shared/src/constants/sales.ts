@@ -1,7 +1,7 @@
 /** Shared sales constants — payment methods, income parts, cash transactions */
 
 /** How a sale is paid at the POS */
-export const PAYMENT_METHODS = ['CASH', 'CARD', 'EBT', 'ZELLE'] as const;
+export const PAYMENT_METHODS = ['CASH', 'CARD', 'EBT', 'ZELLE', 'DEBT'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
@@ -9,6 +9,7 @@ export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
   CARD: 'Card',
   EBT: 'EBT',
   ZELLE: 'Zelle',
+  DEBT: 'Debt',
 };
 
 export const PAYMENT_METHOD_HINTS: Record<PaymentMethod, string> = {
@@ -16,6 +17,7 @@ export const PAYMENT_METHOD_HINTS: Record<PaymentMethod, string> = {
   CARD: 'Debit / credit card payment',
   EBT: 'Government assistance (Electronic Benefit Transfer)',
   ZELLE: 'Bank transfer payment',
+  DEBT: 'Customer owes the store — no money received yet, tracked in Loans & Deficit',
 };
 
 /** The three parts of Income — every payment received lands in one of them */
@@ -28,8 +30,13 @@ export const INCOME_PART_NAMES: Record<IncomePart, string> = {
   ZELLE: 'Zelle',
 };
 
-/** Which Income part receives the money of each payment method (Card goes to the bank/Zelle part). */
-export const PAYMENT_METHOD_PART: Record<PaymentMethod, IncomePart> = {
+/**
+ * Which Income part receives the money of each payment method (Card goes to the bank/Zelle part).
+ * DEBT has no entry — no money is received at sale time, so it lands in no Income part; it's tracked
+ * as a receivable (Loans & Deficit) until collected, at which point that collection payment picks its
+ * own Income part.
+ */
+export const PAYMENT_METHOD_PART: Partial<Record<PaymentMethod, IncomePart>> = {
   CASH: 'CASH',
   CARD: 'ZELLE',
   EBT: 'EBT',

@@ -82,6 +82,31 @@ export default function EmployeeAccountPage({ params }: { params: Promise<{ id: 
         </div>
       </Card>
 
+      {employee.sellerProfileId && (
+        <section className="space-y-3">
+          <h2 className="text-base font-bold text-ink">{t('commissionTitle')}</h2>
+          <Card className="grid gap-3 p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-ink-faint">{t('commissionPercent')}</p>
+              <p className="mt-1 font-bold text-ink">
+                {employee.commissionPercent ? `${formatNumber(Number(employee.commissionPercent), locale)}%` : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-faint">{t('salesTotal')}</p>
+              <p className="mt-1 font-bold text-ink">{formatMoney(employee.salesTotal ?? 0, locale)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-faint">{t('commissionTotal')}</p>
+              <p className="mt-1 font-bold text-primary-700 dark:text-primary-300">
+                {formatMoney(employee.commissionTotal ?? 0, locale)}
+              </p>
+            </div>
+          </Card>
+          <PayCommissionForm employeeId={id} />
+        </section>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-base font-bold text-ink">{t('financialLedger')}</h2>
         <DebtLedgerView kind="employee" id={id} showHeader={false} />
@@ -97,6 +122,65 @@ export default function EmployeeAccountPage({ params }: { params: Promise<{ id: 
         <AttendanceSection employeeId={id} />
       </section>
     </div>
+  );
+}
+
+function PayCommissionForm({ employeeId }: { employeeId: string }) {
+  const t = useTranslations('employees');
+  const tc = useTranslations('common');
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState('');
+  const [period, setPeriod] = useState('');
+  const [note, setNote] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.post(`/employees/${employeeId}/commission-payments`, {
+        amount: Number(amount),
+        period,
+        note: note || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setAmount('');
+      setPeriod('');
+      setNote('');
+    },
+  });
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    mutation.mutate();
+  }
+
+  return (
+    <Card className="p-4">
+      <h3 className="mb-3 text-sm font-bold text-ink">{t('payCommission')}</h3>
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+        <Field label={t('amount')}>
+          <Input
+            required
+            type="number"
+            min={0.01}
+            step="0.01"
+            dir="ltr"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-32"
+          />
+        </Field>
+        <Field label={t('period')} hint={t('periodHint')}>
+          <Input required dir="ltr" value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="1405-04" />
+        </Field>
+        <Field label={t('note')}>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        <Button type="submit" loading={mutation.isPending}>
+          {tc('confirm')}
+        </Button>
+      </form>
+      <ErrorText error={mutation.error} />
+    </Card>
   );
 }
 

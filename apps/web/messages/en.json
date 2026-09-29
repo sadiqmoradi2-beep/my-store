@@ -279,8 +279,13 @@
     "parts": {
       "CASH": "Cash",
       "EBT": "EBT",
-      "ZELLE": "Zelle"
+      "ZELLE": "Zelle",
+      "DEBT": "Debt"
     },
+    "debtSold": "Sold on debt",
+    "debtCollected": "Collected",
+    "debtOutstanding": "Outstanding now",
+    "debtViewInLoans": "View in Loans & Deficit →",
     "ranges": {
       "today": "Today",
       "week": "Last 7 days",
@@ -329,14 +334,18 @@
       "CASH": "Cash",
       "CARD": "Card",
       "EBT": "EBT",
-      "ZELLE": "Zelle"
+      "ZELLE": "Zelle",
+      "DEBT": "Debt"
     },
     "methodHints": {
       "CASH": "Cash payment — the money goes to Income → Cash",
       "CARD": "Debit / credit card payment — the money goes to Income → Zelle (bank)",
       "EBT": "Government assistance (Electronic Benefit Transfer) — the money goes to Income → EBT",
-      "ZELLE": "Bank transfer payment — the money goes to Income → Zelle"
+      "ZELLE": "Bank transfer payment — the money goes to Income → Zelle",
+      "DEBT": "No money received now — tracked as a debt owed by the customer, in Loans & Deficit"
     },
+    "debtPartyName": "Customer / party name",
+    "debtPartyNameHint": "Who owes this amount — shown in Loans & Deficit",
     "sessionNote": "This sale was added to the seller's open work session."
   },
   "sellers": {
@@ -390,6 +399,10 @@
     "hiredAt": "Hired",
     "notes": "Notes",
     "paySalary": "Pay salary",
+    "commissionTitle": "Commission",
+    "commissionTotal": "Commission total",
+    "salesTotal": "Sales total",
+    "payCommission": "Pay commission",
     "amount": "Amount",
     "period": "Period",
     "periodHint": "e.g. 2026-09",
@@ -420,6 +433,9 @@
     },
     "accessLevel": "Manager access",
     "noLoginAccount": "No login account — role cannot be assigned",
+    "commissionPercent": "Commission %",
+    "commissionPercentHint": "Percent of each sale paid as commission",
+    "fixedSalaryAmount": "Monthly fixed salary",
     "accessLevels": {
       "FULL": "Full control",
       "CUSTOM": "Custom role"

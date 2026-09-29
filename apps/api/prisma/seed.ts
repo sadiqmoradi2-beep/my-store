@@ -269,7 +269,7 @@ async function seedDemoTenant() {
   // Sales with different payment methods; some today and some earlier in the month
   const now = new Date();
   const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000);
-  const partOf: Record<PaymentMethod, IncomePart> = {
+  const partOf: Partial<Record<PaymentMethod, IncomePart>> = {
     CASH: 'CASH', CARD: 'ZELLE', EBT: 'EBT', ZELLE: 'ZELLE',
   };
   const saleDefs: {
@@ -321,7 +321,7 @@ async function seedDemoTenant() {
     });
     const total = items.reduce((sum, i) => sum.add(i.total), D(0));
     const cost = items.reduce((sum, i) => sum.add(i.unitCost.mul(i.quantity)), D(0));
-    const part = partOf[def.method];
+    const part = partOf[def.method]!;
     const register = registerByPart.get(part)!;
 
     const sale = await prisma.sale.create({

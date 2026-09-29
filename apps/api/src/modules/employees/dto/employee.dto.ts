@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -56,6 +57,21 @@ export class CreateEmployeeDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   salary: number;
+
+  /** positionPreset SELLER only: commission percent for a linked seller profile */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  commissionPercent?: number;
+
+  /** positionPreset SELLER only, payType FIXED_SALARY: fixed salary on the linked seller profile */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  fixedSalaryAmount?: number;
 
   @IsOptional()
   @IsDateString()

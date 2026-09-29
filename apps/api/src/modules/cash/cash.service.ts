@@ -123,7 +123,7 @@ export class CashService {
       select: { id: true, part: true, balance: true },
     });
     const partOfRegister = new Map(registers.map((r) => [r.id, r.part]));
-    const [flows, salesByMethod] = await Promise.all([
+    const [flows, salesByMethod, debtCollected, debtOutstanding] = await Promise.all([
       this.prisma.cashTransaction.groupBy({
         by: ['registerId', 'type'],
         where: {
@@ -138,6 +138,14 @@ export class CashService {
         where: saleWhere,
         _sum: { total: true, cost: true },
         _count: { _all: true },
+      }),
+      this.prisma.debtPayment.aggregate({
+        where: { tenantId, createdAt: { gte: from, lte: to }, debt: { referenceType: 'sale' } },
+        _sum: { amount: true },
+      }),
+      this.prisma.debt.aggregate({
+        where: { tenantId, referenceType: 'sale', status: { not: 'SETTLED' } },
+        _sum: { amount: true, paidAmount: true },
       }),
     ]);
 
@@ -164,6 +172,8 @@ export class CashService {
     let totalSales = zero();
     let totalProfit = zero();
     let salesCount = 0;
+    let debtSold = zero();
+    let debtSoldCount = 0;
     for (const row of salesByMethod) {
       const total = row._sum.total ?? zero();
       const profit = total.sub(row._sum.cost ?? zero());
@@ -171,7 +181,12 @@ export class CashService {
       totalSales = totalSales.add(total);
       totalProfit = totalProfit.add(profit);
       salesCount += count;
-      const target = byPart.get(PAYMENT_METHOD_PART[row.paymentMethod as PaymentMethod])!;
+      if (row.paymentMethod === 'DEBT') {
+        debtSold = debtSold.add(total);
+        debtSoldCount += count;
+        continue;
+      }
+      const target = byPart.get(PAYMENT_METHOD_PART[row.paymentMethod as PaymentMethod]!)!;
       target.profit = target.profit.add(profit);
       target.salesCount += count;
     }
@@ -180,6 +195,12 @@ export class CashService {
       from,
       to,
       parts,
+      debt: {
+        soldThisPeriod: debtSold,
+        salesCount: debtSoldCount,
+        collectedThisPeriod: debtCollected._sum.amount ?? zero(),
+        outstandingTotal: (debtOutstanding._sum.amount ?? zero()).sub(debtOutstanding._sum.paidAmount ?? zero()),
+      },
       totals: {
         totalIncome: parts.reduce((sum, p) => sum.add(p.income), zero()),
         totalBalance: parts.reduce((sum, p) => sum.add(p.balance), zero()),

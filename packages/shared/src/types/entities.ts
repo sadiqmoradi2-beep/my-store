@@ -255,6 +255,14 @@ export interface IncomeSummaryDto {
   from: string;
   to: string;
   parts: IncomePartSummaryDto[];
+  /** Sales paid by Debt — no Income part receives them until the debt is collected */
+  debt: {
+    soldThisPeriod: string;
+    salesCount: number;
+    collectedThisPeriod: string;
+    /** Current total still owed across all sale-linked debts (not period-bound) */
+    outstandingTotal: string;
+  };
   totals: {
     /** Sum of the income of Cash, EBT and Zelle */
     totalIncome: string;
@@ -321,6 +329,12 @@ export interface EmployeeDto {
   userId: string | null;
   roleId: string | null;
   roleName: string | null;
+  /** Set only when hired as position=Seller — a linked commission/sales profile exists */
+  sellerProfileId: string | null;
+  commissionPercent: string | null;
+  salesCount: number | null;
+  salesTotal: string | null;
+  commissionTotal: string | null;
 }
 
 export interface SalaryPaymentDto {
