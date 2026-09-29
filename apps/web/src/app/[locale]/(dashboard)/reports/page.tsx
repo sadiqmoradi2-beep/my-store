@@ -23,6 +23,7 @@ import { Button, Card, ErrorText, Field, Input, Select, Spinner, cn } from '@/co
 import { ExportButtons } from '@/components/export-buttons';
 import { useAuthStore } from '@/stores/auth-store';
 import { Printer } from 'lucide-react';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const DAY_MS = 86_400_000;
 const PRESETS = [7, 30, 90] as const;
@@ -52,6 +53,7 @@ export default function ReportsPage() {
   const [productTab, setProductTab] = useState<'top' | 'low'>('top');
 
   const range = `from=${from}&to=${to}`;
+  const allowed = useRequirePermission(PERMISSIONS.REPORTS_VIEW);
   const canSeeSessions = !!useAuthStore((st) => st.user)?.permissions?.includes(PERMISSIONS.SESSIONS_READ);
   const tSessions = useTranslations('sessions');
   const activePreset = PRESETS.find(
@@ -69,11 +71,13 @@ export default function ReportsPage() {
         `/reports/sales?${range}&granularity=${granularity}${branchId ? `&branchId=${branchId}` : ''}`,
       ),
     placeholderData: keepPreviousData,
+    enabled: allowed,
   });
   const products = useQuery({
     queryKey: ['report-products', range],
     queryFn: () => api.get<{ top: ProductReportRow[]; low: ProductReportRow[] }>(`/reports/products?${range}`),
     placeholderData: keepPreviousData,
+    enabled: allowed,
   });
   const cash = useQuery({
     queryKey: ['report-cash', range],
@@ -107,6 +111,10 @@ export default function ReportsPage() {
     cash.isFetching ||
     branchReport.isFetching ||
     sellerReport.isFetching;
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

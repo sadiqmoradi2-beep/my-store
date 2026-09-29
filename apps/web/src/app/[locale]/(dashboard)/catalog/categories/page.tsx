@@ -4,20 +4,28 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, FolderOpen, Plus, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { CategoryDto, Locale } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatNumber } from '@/lib/format';
 import { Button, Card, ErrorText, Field, Input, Modal, Spinner, cn } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function CategoriesPage() {
   const t = useTranslations('categories');
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
+  const allowed = useRequirePermission(PERMISSIONS.CATEGORIES_READ);
 
   const { data: tree, isPending, error } = useQuery({
     queryKey: ['categories'],
     queryFn: () => api.get<CategoryDto[]>('/categories/tree'),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const [modalParent, setModalParent] = useState<CategoryDto | null | 'root'>(null);
 

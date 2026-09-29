@@ -28,19 +28,41 @@ import { api } from '@/lib/api-client';
 import { cn } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
-/** module: the feature-gating module key — without it, the item is always visible */
+/**
+ * module/modules: the feature-gating module key(s) — without it, the item is always module-visible.
+ * permission: a single required permission key.
+ * anyPermission: visible if the user holds at least one of these (used for group links whose
+ * sub-pages each require a different permission, e.g. Catalog, Team).
+ */
 const NAV_ITEMS = [
-  { key: 'dashboard', href: 'dashboard', icon: LayoutDashboard },
+  { key: 'dashboard', href: 'dashboard', icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: 'alerts', href: 'alerts', icon: AlertTriangle },
-  { key: 'pos', href: 'pos', icon: ScanBarcode, module: 'cash-register' },
-  { key: 'catalog', href: 'catalog', icon: Package },
-  { key: 'income', href: 'income', icon: Vault, module: 'cash-register' },
-  { key: 'loans', href: 'loans', icon: HandCoins, module: 'debts' },
-  { key: 'returns', href: 'returns', icon: Undo2, module: 'returns' },
-  { key: 'suppliers', href: 'suppliers', icon: Truck, module: 'suppliers' },
-  { key: 'team', href: 'team', icon: Contact, modules: ['sellers', 'employees', 'partners'] },
-  { key: 'sessions', href: 'sessions', icon: Timer, module: 'work-sessions' },
-  { key: 'reports', href: 'reports', icon: ChartColumn, module: 'reports' },
+  { key: 'pos', href: 'pos', icon: ScanBarcode, module: 'cash-register', permission: PERMISSIONS.POS_USE },
+  {
+    key: 'catalog',
+    href: 'catalog',
+    icon: Package,
+    anyPermission: [PERMISSIONS.PRODUCTS_READ, PERMISSIONS.INVENTORY_READ, PERMISSIONS.CATEGORIES_READ],
+  },
+  { key: 'income', href: 'income', icon: Vault, module: 'cash-register', permission: PERMISSIONS.CASH_READ },
+  { key: 'loans', href: 'loans', icon: HandCoins, module: 'debts', permission: PERMISSIONS.DEBTS_READ },
+  { key: 'returns', href: 'returns', icon: Undo2, module: 'returns', permission: PERMISSIONS.RETURNS_READ },
+  { key: 'suppliers', href: 'suppliers', icon: Truck, module: 'suppliers', permission: PERMISSIONS.SUPPLIERS_READ },
+  {
+    key: 'team',
+    href: 'team',
+    icon: Contact,
+    modules: ['employees', 'partners'],
+    anyPermission: [PERMISSIONS.EMPLOYEES_READ, PERMISSIONS.PARTNERS_READ],
+  },
+  {
+    key: 'sessions',
+    href: 'sessions',
+    icon: Timer,
+    module: 'work-sessions',
+    anyPermission: [PERMISSIONS.SESSIONS_READ, PERMISSIONS.SESSIONS_READ_OWN, PERMISSIONS.SESSIONS_MANAGE],
+  },
+  { key: 'reports', href: 'reports', icon: ChartColumn, module: 'reports', permission: PERMISSIONS.REPORTS_VIEW },
   {
     key: 'activityLog',
     href: 'sys-log-audit',
@@ -78,7 +100,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       (!('modules' in item) ||
         !enabledModules ||
         (item.modules as readonly string[]).some((m) => enabledModules.includes(m))) &&
-      (!('permission' in item) || !user || user.permissions?.includes(item.permission as string)),
+      (!('permission' in item) || !user || user.permissions?.includes(item.permission as string)) &&
+      (!('anyPermission' in item) ||
+        !user ||
+        (item.anyPermission as readonly string[]).some((p) => user.permissions?.includes(p))),
   ).sort((a, b) => {
     if (!menuOrder?.length) return 0;
     const ia = menuOrder.indexOf(a.key);

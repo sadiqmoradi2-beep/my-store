@@ -1,18 +1,23 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, Pencil, Plus } from 'lucide-react';
+import { Banknote, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import { SELLER_PAY_TYPES, SELLER_PAY_TYPE_NAMES, type CashRegisterDto, type Locale, type RoleDto, type SellerDto, type SellerPayType, type UserDto } from '@my-store/shared';
+import { PERMISSIONS, SELLER_PAY_TYPES, SELLER_PAY_TYPE_NAMES, type CashRegisterDto, type Locale, type RoleDto, type SellerDto, type SellerPayType, type UserDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner, Textarea } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
+import { useAuthStore } from '@/stores/auth-store';
 
 export default function SellersPage() {
   const t = useTranslations('sellers');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.SELLERS_READ);
+  const canDeleteAccount = !!useAuthStore((s) => s.user)?.permissions?.includes(PERMISSIONS.USERS_DELETE);
+  const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<SellerDto | null | 'new'>(null);
   const [payingSalary, setPayingSalary] = useState<SellerDto | null>(null);
@@ -21,7 +26,17 @@ export default function SellersPage() {
   const { data: sellers, isPending, error } = useQuery({
     queryKey: ['sellers'],
     queryFn: () => api.get<SellerDto[]>('/sellers'),
+    enabled: allowed,
   });
+
+  const deleteAccount = useMutation({
+    mutationFn: (seller: SellerDto) => api.delete(`/users/${seller.userId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sellers'] }),
+  });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">
@@ -115,6 +130,19 @@ export default function SellersPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                      {canDeleteAccount && (
+                        <button
+                          onClick={() => {
+                            if (confirm(t('deleteAccountConfirm'))) deleteAccount.mutate(seller);
+                          }}
+                          disabled={deleteAccount.isPending}
+                          aria-label={t('deleteAccount')}
+                          title={t('deleteAccount')}
+                          className="cursor-pointer rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -123,6 +151,7 @@ export default function SellersPage() {
           </table>
         </Card>
       )}
+      <ErrorText error={deleteAccount.error} />
 
       {editing !== null && (
         <SellerModal

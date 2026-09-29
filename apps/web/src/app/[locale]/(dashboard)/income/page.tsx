@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { SalesList } from '@/components/income/sales-list';
 import { SessionReport } from '@/components/sessions/session-report';
 import { TransactionModal } from '@/components/income/transaction-modal';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const TX_TONES: Record<CashTransactionType, string> = {
   SALE: 'APPROVED',
@@ -58,6 +59,7 @@ export default function IncomePage() {
 
   const user = useAuthStore((s) => s.user);
   const canSeeSessions = !!user?.permissions?.includes(PERMISSIONS.SESSIONS_READ);
+  const allowed = useRequirePermission(PERMISSIONS.CASH_READ);
   const [range, setRange] = useState<RangeKey>('month');
   const [selectedPart, setSelectedPart] = useState<IncomePart>('CASH');
   const [registerId, setRegisterId] = useState<string | null>(null);
@@ -67,11 +69,17 @@ export default function IncomePage() {
   const { data: summary, isPending, error } = useQuery({
     queryKey: ['income-summary', from, to],
     queryFn: () => api.get<IncomeSummaryDto>(`/cash-registers/income-summary?from=${from}&to=${to}`),
+    enabled: allowed,
   });
   const { data: registers } = useQuery({
     queryKey: ['cash-registers'],
     queryFn: () => api.get<CashRegisterDto[]>('/cash-registers'),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const partRegisters = (registers ?? []).filter((r) => r.part === selectedPart);
   const selected = partRegisters.find((r) => r.id === registerId) ?? partRegisters[0] ?? null;

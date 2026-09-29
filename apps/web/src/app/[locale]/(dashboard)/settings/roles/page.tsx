@@ -4,21 +4,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FormEvent, useMemo, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { PermissionDto, RoleDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatNumber } from '@/lib/format';
-import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
+import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function RolesPage() {
   const t = useTranslations('roles');
   const tc = useTranslations('common');
+  const allowed = useRequirePermission(PERMISSIONS.ROLES_READ, '/settings');
 
   const [editing, setEditing] = useState<RoleDto | null | 'new'>(null);
 
   const { data: roles, isPending, error } = useQuery({
     queryKey: ['roles'],
     queryFn: () => api.get<RoleDto[]>('/roles'),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/roles/${id}`),
@@ -108,11 +116,24 @@ function RoleModal({ role, onClose }: { role: RoleDto | null; onClose: () => voi
   const [key, setKey] = useState(role?.key ?? '');
   const [name, setName] = useState(role?.name ?? '');
   const [selected, setSelected] = useState<Set<string>>(new Set(role?.permissions ?? []));
+  const [startFrom, setStartFrom] = useState('');
 
   const { data: permissions } = useQuery({
     queryKey: ['permissions'],
     queryFn: () => api.get<PermissionDto[]>('/roles/permissions'),
   });
+
+  const { data: existingRoles } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api.get<RoleDto[]>('/roles'),
+    enabled: !role,
+  });
+
+  const applyStartFrom = (roleId: string) => {
+    setStartFrom(roleId);
+    const source = existingRoles?.find((r) => r.id === roleId);
+    setSelected(new Set(source?.permissions ?? []));
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, PermissionDto[]>();
@@ -168,6 +189,18 @@ function RoleModal({ role, onClose }: { role: RoleDto | null; onClose: () => voi
         {!role && (
           <Field label={t('key')} hint={t('keyHint')}>
             <Input required dir="ltr" value={key} onChange={(e) => setKey(e.target.value)} placeholder="STORE_SUPERVISOR" />
+          </Field>
+        )}
+        {!role && (
+          <Field label={t('startFrom')} hint={t('startFromHint')}>
+            <Select value={startFrom} onChange={(e) => applyStartFrom(e.target.value)}>
+              <option value="">{t('startFromBlank')}</option>
+              {existingRoles?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
           </Field>
         )}
         <div>

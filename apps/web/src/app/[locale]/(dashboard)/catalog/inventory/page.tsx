@@ -14,12 +14,14 @@ import {
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { BranchDto, CategoryDto, Locale, ProductDto, StockDto, SupplierDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
 import { flattenTree } from '@/components/products/product-form';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 type ModalKind = 'in' | 'out' | 'pay' | 'adjust' | 'transfer' | null;
 
@@ -27,6 +29,7 @@ export default function InventoryPage() {
   const t = useTranslations('inventory');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.INVENTORY_READ);
 
   const [warehouseId, setWarehouseId] = useState('');
   const [modal, setModal] = useState<ModalKind>(null);
@@ -50,7 +53,12 @@ export default function InventoryPage() {
     queryKey: ['stocks', warehouseId],
     queryFn: () =>
       api.get<StockDto[]>(`/inventory/stocks${warehouseId ? `?warehouseId=${warehouseId}` : ''}`),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

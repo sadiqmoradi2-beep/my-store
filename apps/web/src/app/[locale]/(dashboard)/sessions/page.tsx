@@ -5,7 +5,7 @@ import { HandCoins, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   PERMISSIONS,
   SESSION_ROLES,
@@ -32,6 +32,16 @@ export default function SessionsPage() {
   const user = useAuthStore((s) => s.user);
   const canManage = !!user?.permissions?.includes(PERMISSIONS.SESSIONS_MANAGE);
   const canCollect = !!user?.permissions?.includes(PERMISSIONS.SESSIONS_HARVEST);
+  const sessionsPermissions: string[] = [
+    PERMISSIONS.SESSIONS_READ,
+    PERMISSIONS.SESSIONS_READ_OWN,
+    PERMISSIONS.SESSIONS_MANAGE,
+  ];
+  const allowed = !!user?.permissions?.some((p) => sessionsPermissions.includes(p));
+
+  useEffect(() => {
+    if (user && !allowed) router.replace(`/${locale}/dashboard`);
+  }, [user, allowed, locale, router]);
 
   const [starting, setStarting] = useState(false);
   const [harvesting, setHarvesting] = useState<WorkSessionDto | null>(null);
@@ -53,6 +63,7 @@ export default function SessionsPage() {
     queryKey: ['work-sessions', 'active'],
     queryFn: () => api.getPaged<WorkSessionDto[]>('/work-sessions?status=ACTIVE&limit=100'),
     refetchInterval: 30_000,
+    enabled: allowed,
   });
   const { data: people } = useQuery({
     queryKey: ['session-people'],
@@ -71,7 +82,12 @@ export default function SessionsPage() {
       if (filters.to) qs.set('to', filters.to);
       return api.getPaged<WorkSessionDto[]>(`/work-sessions?${qs.toString()}`);
     },
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const money = (value: string | number) => formatMoney(value, locale);
 

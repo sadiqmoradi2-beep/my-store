@@ -3,10 +3,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { Locale, PurchaseDto, SupplierDto } from '@my-store/shared';
 import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { BackLink, Button, Card, ErrorText, Field, Input, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const DAY_MS = 86_400_000;
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -17,6 +19,7 @@ export default function PurchaseReportPage() {
   const ts = useTranslations('suppliers');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.PURCHASES_READ);
 
   const [from, setFrom] = useState(() => isoDate(new Date(Date.now() - 30 * DAY_MS)));
   const [to, setTo] = useState(() => isoDate(new Date()));
@@ -26,6 +29,7 @@ export default function PurchaseReportPage() {
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api.get<SupplierDto[]>('/suppliers'),
+    enabled: allowed,
   });
 
   const query = `from=${from}&to=${to}${supplierId ? `&supplierId=${supplierId}` : ''}&page=${page}&limit=20`;
@@ -33,7 +37,12 @@ export default function PurchaseReportPage() {
     queryKey: ['purchase-report', query],
     queryFn: () => api.getPaged<PurchaseDto[]>(`/suppliers/purchases?${query}`),
     placeholderData: keepPreviousData,
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

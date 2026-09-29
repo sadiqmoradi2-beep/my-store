@@ -9,16 +9,16 @@ import { api } from '@/lib/api-client';
 import { cn } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
-const TAB_KEYS = ['sellers', 'employees', 'partners'] as const;
+// 'sellers' intentionally excluded from the Team tab bar — the page/API/data still exist,
+// just no longer surfaced as a Team nav tab.
+const TAB_KEYS = ['employees', 'partners'] as const;
 
 const TAB_MODULE: Record<(typeof TAB_KEYS)[number], string> = {
-  sellers: 'sellers',
   employees: 'employees',
   partners: 'partners',
 };
 
 const TAB_PERMISSION: Record<(typeof TAB_KEYS)[number], string> = {
-  sellers: PERMISSIONS.SELLERS_READ,
   employees: PERMISSIONS.EMPLOYEES_READ,
   partners: PERMISSIONS.PARTNERS_READ,
 };

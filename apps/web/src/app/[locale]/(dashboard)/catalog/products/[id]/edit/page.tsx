@@ -3,11 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
+import { PERMISSIONS } from '@my-store/shared';
 import type { Locale, PriceHistoryDto, ProductDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney } from '@/lib/format';
 import { ProductForm, ProductFormValues } from '@/components/products/product-form';
 import { BackLink, Badge, Card, ErrorText, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function EditProductPage() {
   const t = useTranslations('products');
@@ -16,15 +18,18 @@ export default function EditProductPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
+  const allowed = useRequirePermission(PERMISSIONS.PRODUCTS_UPDATE);
 
   const { data: product, isPending, error } = useQuery({
     queryKey: ['product', id],
     queryFn: () => api.get<ProductDto>(`/products/${id}`),
+    enabled: allowed,
   });
 
   const { data: history } = useQuery({
     queryKey: ['price-history', id],
     queryFn: () => api.get<PriceHistoryDto[]>(`/products/${id}/price-history`),
+    enabled: allowed,
   });
 
   const mutation = useMutation({
@@ -37,6 +42,9 @@ export default function EditProductPage() {
     },
   });
 
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
   if (isPending) return <Spinner />;
   if (error) return <ErrorText error={error} />;
   if (!product) return null;

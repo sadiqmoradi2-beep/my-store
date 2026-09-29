@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
 import {
   PARTNER_ENTRY_TYPES,
+  PERMISSIONS,
   type CashRegisterDto,
   type Locale,
   type PartnerDto,
@@ -15,6 +16,7 @@ import {
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const ENTRY_TONES: Record<PartnerEntryType, string> = {
   PROFIT: 'APPROVED',
@@ -27,6 +29,7 @@ export default function PartnersPage() {
   const t = useTranslations('partners');
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
+  const allowed = useRequirePermission(PERMISSIONS.PARTNERS_READ);
 
   const [editing, setEditing] = useState<PartnerDto | null | 'new'>(null);
   const [entryFor, setEntryFor] = useState<PartnerDto | null>(null);
@@ -35,12 +38,17 @@ export default function PartnersPage() {
   const { data: partners, isPending, error } = useQuery({
     queryKey: ['partners'],
     queryFn: () => api.get<PartnerDto[]>('/partners'),
+    enabled: allowed,
   });
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/partners/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['partners'] }),
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

@@ -5,17 +5,20 @@ import { PackageSearch, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { BranchDto, Locale, ProductDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function ProductsPage() {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
   const queryClient = useQueryClient();
+  const allowed = useRequirePermission(PERMISSIONS.PRODUCTS_READ);
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -27,7 +30,12 @@ export default function ProductsPage() {
       api.getPaged<ProductDto[]>(
         `/products?page=${page}&limit=15${search ? `&search=${encodeURIComponent(search)}` : ''}`,
       ),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/products/${id}`),

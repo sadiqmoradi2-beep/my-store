@@ -7,6 +7,7 @@ import { FormEvent, use, useState } from 'react';
 import {
   ATTENDANCE_STATUSES,
   ATTENDANCE_STATUS_NAMES,
+  PERMISSIONS,
   type AttendanceStatus,
   type DebtDirection,
   type EmployeeAttendanceDto,
@@ -18,6 +19,7 @@ import { DebtLedgerView } from '@/components/debts/debt-ledger-view';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { BackLink, Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const ATTENDANCE_TONES: Record<AttendanceStatus, string> = {
   PRESENT: 'DELIVERED',
@@ -33,14 +35,20 @@ function todayISODate() {
 export default function EmployeeAccountPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const t = useTranslations('employees');
+  const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.EMPLOYEES_READ);
 
   const { data: employees, isPending, error } = useQuery({
     queryKey: ['employees'],
     queryFn: () => api.get<EmployeeDto[]>('/employees'),
+    enabled: allowed,
   });
   const employee = employees?.find((e) => e.id === id);
 
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
   if (isPending) return <Spinner />;
   if (error) return <ErrorText error={error} />;
   if (!employee) return <ErrorText error={new Error(t('title'))} />;

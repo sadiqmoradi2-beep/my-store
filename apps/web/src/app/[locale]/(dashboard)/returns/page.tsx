@@ -4,22 +4,30 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { BranchDto, Locale, ProductDto, PurchaseReturnDto, SupplierDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function ReturnPurchasePage() {
   const t = useTranslations('returns');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.RETURNS_READ);
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
 
   const { data, isPending, error } = useQuery({
     queryKey: ['purchase-returns', page],
     queryFn: () => api.getPaged<PurchaseReturnDto[]>(`/purchase-returns?page=${page}&limit=15`),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

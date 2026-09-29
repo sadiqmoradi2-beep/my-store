@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArchiveRestore, DatabaseBackup, HardDriveDownload, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { BackupDto, Locale } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { apiDownload } from '@/lib/download';
 import { formatDate, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 function formatSize(bytes: number, locale: Locale): string {
   if (bytes >= 1_048_576) return `${formatNumber(Math.round(bytes / 104857.6) / 10, locale)} MB`;
@@ -20,6 +22,7 @@ export default function BackupsPage() {
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
   const queryClient = useQueryClient();
+  const allowed = useRequirePermission(PERMISSIONS.BACKUPS_MANAGE);
 
   const [page, setPage] = useState(1);
   const [note, setNote] = useState('');
@@ -33,11 +36,17 @@ export default function BackupsPage() {
   const { data, isPending, error } = useQuery({
     queryKey: ['backups', page],
     queryFn: () => api.getPaged<BackupDto[]>(`/backups?page=${page}&limit=20`),
+    enabled: allowed,
   });
   const settings = useQuery({
     queryKey: ['backup-settings'],
     queryFn: () => api.get<{ enabled: boolean }>('/backups/settings'),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const createBackup = useMutation({
     mutationFn: () => api.post<BackupDto>('/backups', note.trim() ? { note: note.trim() } : {}),

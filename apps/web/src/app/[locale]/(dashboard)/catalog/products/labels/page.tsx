@@ -4,11 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type { Locale, ProductDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { code128Rects } from '@/lib/code128';
 import { formatMoney } from '@/lib/format';
 import { BackLink, Button, Card, ErrorText, Input, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 function Barcode({ value }: { value: string }) {
   const encoded = code128Rects(value);
@@ -32,6 +34,7 @@ export default function LabelsPage() {
   const t = useTranslations('labels');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.PRODUCTS_READ);
 
   const [search, setSearch] = useState('');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -43,7 +46,12 @@ export default function LabelsPage() {
       api.getPaged<ProductDto[]>(
         `/products?page=1&limit=50${search ? `&search=${encodeURIComponent(search)}` : ''}`,
       ),
+    enabled: allowed,
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   const setQty = (id: string, qty: number) =>
     setQuantities((q) => {

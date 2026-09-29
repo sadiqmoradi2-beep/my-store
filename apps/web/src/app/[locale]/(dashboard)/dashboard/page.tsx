@@ -4,12 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Banknote, ShoppingBag, TrendingUp } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { PERMISSIONS } from '@my-store/shared';
 import type { DashboardSummaryDto, Locale, SalesReportDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { Card, ErrorText, Spinner, cn } from '@/components/ui';
 import { SalesChart } from '@/components/reports/sales-chart';
 import { BarList } from '@/components/reports/bar-list';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const DAY_MS = 86_400_000;
 
@@ -18,10 +20,12 @@ export default function DashboardPage() {
   const tReports = useTranslations('reports');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.DASHBOARD_VIEW);
 
   const { data, isPending, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.get<DashboardSummaryDto>('/dashboard/summary'),
+    enabled: allowed,
   });
 
   const { data: enabledModules } = useQuery({
@@ -36,10 +40,13 @@ export default function DashboardPage() {
   const sales = useQuery({
     queryKey: ['dashboard-sales-trend', from, to],
     queryFn: () => api.get<SalesReportDto>(`/reports/sales?from=${from}&to=${to}&granularity=day`),
-    enabled: reportsEnabled,
+    enabled: allowed && reportsEnabled,
     retry: false,
   });
 
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
   if (isPending) return <Spinner />;
   if (error) return <ErrorText error={error} />;
   if (!data) return null;

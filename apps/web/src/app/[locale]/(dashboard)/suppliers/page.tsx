@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, PackagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
+import { PERMISSIONS } from '@my-store/shared';
 import type {
   BranchDto,
   CashRegisterDto,
@@ -15,12 +16,14 @@ import type {
 import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function SuppliersPage() {
   const t = useTranslations('suppliers');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
   const queryClient = useQueryClient();
+  const allowed = useRequirePermission(PERMISSIONS.SUPPLIERS_READ);
 
   const [editing, setEditing] = useState<SupplierDto | null | 'new'>(null);
   /** false = closed; '' = open with no preselected supplier; non-empty string = ID of the preselected supplier */
@@ -29,12 +32,17 @@ export default function SuppliersPage() {
   const { data: suppliers, isPending, error } = useQuery({
     queryKey: ['suppliers'],
     queryFn: () => api.get<SupplierDto[]>('/suppliers'),
+    enabled: allowed,
   });
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/suppliers/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">

@@ -1,13 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, Clock, Pencil, Plus, Wallet } from 'lucide-react';
+import { Banknote, Clock, Pencil, Plus, Trash2, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import {
   EMPLOYEE_POSITIONS,
   EMPLOYEE_POSITION_NAMES,
+  PERMISSIONS,
   SELLER_PAY_TYPES,
   type CashRegisterDto,
   type EmployeeDto,
@@ -21,11 +22,16 @@ import {
 import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { useRequirePermission } from '@/hooks/use-require-permission';
+import { useAuthStore } from '@/stores/auth-store';
 
 export default function EmployeesPage() {
   const t = useTranslations('employees');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.EMPLOYEES_READ);
+  const canDeleteAccount = !!useAuthStore((s) => s.user)?.permissions?.includes(PERMISSIONS.USERS_DELETE);
+  const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<EmployeeDto | null | 'new'>(null);
   const [paying, setPaying] = useState<EmployeeDto | null>(null);
@@ -35,7 +41,17 @@ export default function EmployeesPage() {
   const { data: employees, isPending, error } = useQuery({
     queryKey: ['employees'],
     queryFn: () => api.get<EmployeeDto[]>('/employees'),
+    enabled: allowed,
   });
+
+  const deleteAccount = useMutation({
+    mutationFn: (employee: EmployeeDto) => api.delete(`/users/${employee.userId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
+  });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">
@@ -120,6 +136,19 @@ export default function EmployeesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                      {canDeleteAccount && employee.userId && (
+                        <button
+                          onClick={() => {
+                            if (confirm(t('deleteAccountConfirm'))) deleteAccount.mutate(employee);
+                          }}
+                          disabled={deleteAccount.isPending}
+                          aria-label={t('deleteAccount')}
+                          title={t('deleteAccount')}
+                          className="cursor-pointer rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -128,6 +157,7 @@ export default function EmployeesPage() {
           </table>
         </Card>
       )}
+      <ErrorText error={deleteAccount.error} />
 
       <SalaryHistory />
 

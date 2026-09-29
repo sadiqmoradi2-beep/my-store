@@ -16,11 +16,13 @@ import {
   type DebtStatus,
   type Locale,
   type SupplierDto,
+  PERMISSIONS,
 } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner, cn } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
+import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const STATUS_TONES: Record<DebtStatus, string> = {
   OPEN: 'PENDING',
@@ -32,6 +34,7 @@ export default function LoansPage() {
   const t = useTranslations('debts');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const allowed = useRequirePermission(PERMISSIONS.DEBTS_READ);
 
   const [direction, setDirection] = useState<DebtDirection | ''>('');
   const [kind, setKind] = useState<DebtKind | ''>('');
@@ -43,6 +46,7 @@ export default function LoansPage() {
   const { data: summary } = useQuery({
     queryKey: ['debts-summary'],
     queryFn: () => api.get<{ receivable: string; payable: string }>('/debts/summary'),
+    enabled: allowed,
   });
   const { data, isPending, error } = useQuery({
     queryKey: ['debts', direction, kind, page],
@@ -50,6 +54,7 @@ export default function LoansPage() {
       api.getPaged<DebtDto[]>(
         `/debts?page=${page}&limit=15${direction ? `&direction=${direction}` : ''}${kind ? `&kind=${kind}` : ''}`,
       ),
+    enabled: allowed,
   });
 
   const removeMutation = useMutation({
@@ -59,6 +64,10 @@ export default function LoansPage() {
       queryClient.invalidateQueries({ queryKey: ['debts-summary'] });
     },
   });
+
+  if (!allowed) {
+    return <p className="p-8 text-center text-sm text-ink-faint">{tc('accessDenied')}</p>;
+  }
 
   return (
     <div className="space-y-4">
