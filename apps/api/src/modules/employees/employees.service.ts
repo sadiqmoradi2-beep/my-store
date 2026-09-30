@@ -115,8 +115,8 @@ export class EmployeesService {
    * their own first password via an emailed invite link — no temp password is generated or shown.
    */
   async create(tenantId: string, dto: CreateEmployeeDto) {
-    // Only Seller supports commission — every other position is always Fixed Amount
-    const payType = dto.positionPreset === 'SELLER' ? (dto.payType ?? 'FIXED_SALARY') : 'FIXED_SALARY';
+    // Worker is always Fixed Amount — every other position can also earn commission
+    const payType = dto.positionPreset === 'WORKER' ? 'FIXED_SALARY' : (dto.payType ?? 'FIXED_SALARY');
     const shouldCreateLogin = !!dto.email && dto.createLogin !== false;
     if (!shouldCreateLogin) {
       return this.prisma.employee.create({
@@ -179,10 +179,11 @@ export class EmployeesService {
       return { employee, user };
     });
 
-    if (dto.positionPreset === 'SELLER' && employee.userId) {
+    // A Seller always gets a commission/sales profile; any other position only when they're on commission
+    if ((dto.positionPreset === 'SELLER' || payType === 'COMMISSION') && employee.userId) {
       await this.sellersService.create(tenantId, {
         userId: employee.userId,
-        payType: dto.payType,
+        payType,
         commissionPercent: dto.commissionPercent,
         fixedSalaryAmount: dto.fixedSalaryAmount,
       });

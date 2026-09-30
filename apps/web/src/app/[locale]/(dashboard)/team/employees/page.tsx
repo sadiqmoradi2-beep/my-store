@@ -314,20 +314,18 @@ function EmployeeModal({
   const [customRoleId, setCustomRoleId] = useState('');
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
-  /** Only Seller supports commission or a login of their own picks a role beyond the default */
+  /** Worker is always Fixed Amount — every other position can also earn commission */
   function changePositionPreset(next: EmployeePosition) {
     setPositionPreset(next);
-    if (next !== 'SELLER') {
+    if (next === 'WORKER') {
       set({ payType: 'FIXED_SALARY' });
       setCommissionPercent('');
-    }
-    if (next === 'WORKER') {
       setCreateLogin(false);
       setEmail('');
     }
   }
 
-  const isCommissionSeller = !employee && positionPreset === 'SELLER' && form.payType === 'COMMISSION';
+  const isCommission = !employee && positionPreset !== 'WORKER' && form.payType === 'COMMISSION';
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
@@ -363,12 +361,12 @@ function EmployeeModal({
         positionPreset,
         phone: form.phone || undefined,
         payType: form.payType,
-        salary: isCommissionSeller ? 0 : Number(form.salary),
+        salary: isCommission ? 0 : Number(form.salary),
         notes: form.notes || undefined,
         email: canLogin && createLogin ? email : undefined,
         createLogin: canLogin && createLogin ? true : undefined,
         roleId: useCustomRole ? customRoleId : undefined,
-        ...(positionPreset === 'SELLER' && {
+        ...(positionPreset !== 'WORKER' && {
           commissionPercent: commissionPercent !== '' ? Number(commissionPercent) : undefined,
           fixedSalaryAmount: form.payType === 'FIXED_SALARY' ? Number(form.salary) : undefined,
         }),
@@ -413,7 +411,7 @@ function EmployeeModal({
               </Select>
             </Field>
           )}
-          {(employee || positionPreset === 'SELLER') && (
+          {(employee || positionPreset !== 'WORKER') && (
             <Field label={t('payType')}>
               <Select value={form.payType} onChange={(e) => set({ payType: e.target.value as SellerPayType })}>
                 {SELLER_PAY_TYPES.map((pt) => (
@@ -424,7 +422,7 @@ function EmployeeModal({
               </Select>
             </Field>
           )}
-          {!isCommissionSeller && (
+          {!isCommission && (
             <Field label={t('salary')}>
               <Input
                 required
@@ -443,7 +441,7 @@ function EmployeeModal({
             <Input required value={customPosition} onChange={(e) => setCustomPosition(e.target.value)} />
           </Field>
         )}
-        {!employee && positionPreset === 'SELLER' && form.payType === 'COMMISSION' && (
+        {isCommission && (
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('commissionPercent')} hint={t('commissionPercentHint')}>
               <Input

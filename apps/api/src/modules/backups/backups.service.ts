@@ -155,9 +155,10 @@ export class BackupsService {
 
     await this.prisma.$transaction(
       async (tx) => {
-        // Staff logins tied to sellers / employees go together with the team on a full wipe
+        // Staff logins tied to sellers / employees go together with the team, on a full wipe or a TEAM reset
         let staffUserIds: string[] = [];
-        if (isFullWipe) {
+        const removesTeam = isFullWipe || scope === 'TEAM';
+        if (removesTeam) {
           const [sellerRows, employeeRows] = await Promise.all([
             tx.sellerProfile.findMany({ where: { tenantId }, select: { userId: true } }),
             tx.employee.findMany({ where: { tenantId, userId: { not: null } }, select: { userId: true } }),

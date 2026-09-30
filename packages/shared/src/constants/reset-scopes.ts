@@ -43,7 +43,7 @@ export const RESET_SCOPE_DESCRIPTIONS: Record<ResetScope, string> = {
   SELLERS_HISTORY: 'Deletes salary and commission history — seller profiles themselves are kept.',
   WORK_SESSIONS: 'Deletes all work sessions, their harvests, adjustments and audit history.',
   PARTNERS_LEDGER: 'Deletes all partner ledger entries — partner records themselves are kept.',
-  TEAM: 'Deletes every employee, seller profile and partner with their attendance, shifts, salaries, commissions, ledger entries and work sessions. Login accounts are kept (remove them in Settings → Users).',
+  TEAM: 'Deletes every employee, seller profile and partner with their attendance, shifts, salaries, commissions, ledger entries, work sessions, and their login accounts. Your own login and other admins are kept.',
   NOTIFICATIONS: 'Deletes all notifications.',
 };
 

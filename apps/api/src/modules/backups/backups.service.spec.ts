@@ -183,12 +183,36 @@ describe('BackupsService', () => {
       });
     });
 
-    it('scope=TEAM → deletes the team, keeps login users', async () => {
+    it('scope=TEAM → deletes the team and their login accounts (never the current user or admins)', async () => {
+      txCache.sellerProfile = {
+        deleteMany: jest.fn().mockImplementation(() => {
+          callOrder.push('delete:sellerProfile');
+          return Promise.resolve({ count: 1 });
+        }),
+        createMany: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([{ userId: 'su1' }]),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      };
+      txCache.employee = {
+        deleteMany: jest.fn().mockImplementation(() => {
+          callOrder.push('delete:employee');
+          return Promise.resolve({ count: 1 });
+        }),
+        createMany: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([{ userId: 'eu1' }]),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      };
       await service.wipeData('t1', 'u1', 'TEAM');
       expect(callOrder).toContain('delete:employee');
       expect(callOrder).toContain('delete:sellerProfile');
       expect(callOrder).toContain('delete:partner');
-      expect(callOrder).not.toContain('delete:user');
+      expect(txCache.user.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['su1', 'eu1'] }, tenantId: 't1', role: { key: { not: 'ADMIN' } } },
+      });
       expect(callOrder).not.toContain('delete:sale');
     });
 
