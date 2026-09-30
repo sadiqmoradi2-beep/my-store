@@ -681,6 +681,7 @@ model Employee {
   hiredAt   DateTime      @default(now())
   isActive  Boolean       @default(true)
   notes     String?
+  deletedAt DateTime?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

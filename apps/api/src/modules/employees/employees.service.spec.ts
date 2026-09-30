@@ -4,11 +4,15 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
+import { UsersService } from '../users/users.service';
+import { WorkSessionsService } from '../work-sessions/work-sessions.service';
 import { EmployeesService } from './employees.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
 const sellersServiceMock = { create: jest.fn(), paySalary: jest.fn() };
 const authServiceMock = { sendAccountInvite: jest.fn().mockResolvedValue(undefined) };
+const usersServiceMock = { remove: jest.fn() };
+const workSessionsServiceMock = { close: jest.fn() };
 
 describe('EmployeesService.paySalary', () => {
   let service: EmployeesService;
@@ -40,6 +44,8 @@ describe('EmployeesService.paySalary', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -109,6 +115,8 @@ describe('EmployeesService.create', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -175,6 +183,18 @@ describe('EmployeesService.create', () => {
       email: 'karim2@demo.af',
     });
     expect(sellersServiceMock.create).not.toHaveBeenCalled();
+  });
+
+  it('positionPreset WORKER → payType is always FIXED_SALARY, even if COMMISSION is requested', async () => {
+    await service.create('t1', {
+      fullName: 'Karim',
+      position: 'Worker',
+      positionPreset: 'WORKER',
+      payType: 'COMMISSION',
+      salary: 4000,
+      email: 'karim3@demo.af',
+    });
+    expect(tx.employee.create.mock.calls[0][0].data.payType).toBe('FIXED_SALARY');
   });
 
   it('positionPreset SELLER but no login created (no email) → no seller profile either (no user to link)', async () => {
@@ -259,6 +279,8 @@ describe('EmployeesService.payCommission', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -325,6 +347,8 @@ describe('EmployeesService.list', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -390,6 +414,8 @@ describe('EmployeesService.startShift/endShift', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -452,6 +478,8 @@ describe('EmployeesService.attendance/markAttendance', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
         { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -480,5 +508,88 @@ describe('EmployeesService.attendance/markAttendance', () => {
     expect(where.employeeId).toBe('emp1');
     expect(where.date.gte).toBeInstanceOf(Date);
     expect(where.date.lte).toBeInstanceOf(Date);
+  });
+});
+
+describe('EmployeesService.remove', () => {
+  let service: EmployeesService;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let prisma: any;
+
+  const employee = { id: 'emp1', tenantId: 't1', userId: 'user1' };
+
+  beforeEach(async () => {
+    prisma = {
+      employee: {
+        findFirst: jest.fn().mockResolvedValue({ ...employee }),
+        update: jest.fn(),
+      },
+      sellerProfile: { findFirst: jest.fn().mockResolvedValue(null) },
+      workSession: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    usersServiceMock.remove.mockReset();
+    workSessionsServiceMock.close.mockReset();
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        EmployeesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
+        { provide: UsersService, useValue: usersServiceMock },
+        { provide: WorkSessionsService, useValue: workSessionsServiceMock },
+      ],
+    }).compile();
+    service = moduleRef.get(EmployeesService);
+  });
+
+  it('no login, no open session → just soft-deletes the employee record', async () => {
+    prisma.employee.findFirst.mockResolvedValue({ id: 'emp1', tenantId: 't1', userId: null });
+    await service.remove('t1', 'admin1', 'emp1');
+    expect(usersServiceMock.remove).not.toHaveBeenCalled();
+    expect(workSessionsServiceMock.close).not.toHaveBeenCalled();
+    expect(prisma.employee.update).toHaveBeenCalledWith({
+      where: { id: 'emp1' },
+      data: { deletedAt: expect.any(Date) },
+    });
+  });
+
+  it('with a login → the login is also soft-deleted', async () => {
+    await service.remove('t1', 'admin1', 'emp1');
+    expect(usersServiceMock.remove).toHaveBeenCalledWith('t1', 'user1', 'admin1');
+  });
+
+  it('with an open work session tied to the employee → the session is closed before deletion', async () => {
+    prisma.workSession.findMany.mockResolvedValue([
+      {
+        id: 'ws1', tenantId: 't1', status: 'ACTIVE', employeeId: 'emp1', sellerProfileId: null,
+        openingCash: D(0), harvestLimit: D(0),
+      },
+    ]);
+    await service.remove('t1', 'admin1', 'emp1');
+    expect(workSessionsServiceMock.close).toHaveBeenCalledWith(
+      't1', 'admin1', 'ws1',
+      expect.objectContaining({ actualClosingCash: expect.any(Number) }),
+    );
+  });
+
+  it('seller with an open session under their seller profile → that session is closed too', async () => {
+    prisma.sellerProfile.findFirst.mockResolvedValue({ id: 'sp1', tenantId: 't1', userId: 'user1' });
+    prisma.workSession.findMany.mockResolvedValue([
+      {
+        id: 'ws2', tenantId: 't1', status: 'ACTIVE', employeeId: null, sellerProfileId: 'sp1',
+        openingCash: D(0), harvestLimit: D(0),
+      },
+    ]);
+    await service.remove('t1', 'admin1', 'emp1');
+    expect(prisma.workSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ employeeId: 'emp1' }, { sellerProfileId: 'sp1' }],
+        }),
+      }),
+    );
+    expect(workSessionsServiceMock.close).toHaveBeenCalledWith('t1', 'admin1', 'ws2', expect.anything());
   });
 });

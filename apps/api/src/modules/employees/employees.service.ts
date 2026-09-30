@@ -11,6 +11,9 @@ import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
 import { PaySellerSalaryDto } from '../sellers/dto/seller.dto';
+import { UsersService } from '../users/users.service';
+import { WorkSessionsService } from '../work-sessions/work-sessions.service';
+import { computeFigures } from '../work-sessions/session-figures';
 import {
   AttendanceQueryDto,
   CreateEmployeeDto,
@@ -32,11 +35,13 @@ export class EmployeesService {
     private readonly prisma: PrismaService,
     private readonly sellersService: SellersService,
     private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+    private readonly workSessionsService: WorkSessionsService,
   ) {}
 
   async list(tenantId: string) {
     const employees = await this.prisma.employee.findMany({
-      where: { tenantId },
+      where: { tenantId, deletedAt: null },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
     });
     const userIds = employees.map((e) => e.userId).filter((id): id is string => !!id);
@@ -110,6 +115,8 @@ export class EmployeesService {
    * their own first password via an emailed invite link — no temp password is generated or shown.
    */
   async create(tenantId: string, dto: CreateEmployeeDto) {
+    // Only Seller supports commission — every other position is always Fixed Amount
+    const payType = dto.positionPreset === 'SELLER' ? (dto.payType ?? 'FIXED_SALARY') : 'FIXED_SALARY';
     const shouldCreateLogin = !!dto.email && dto.createLogin !== false;
     if (!shouldCreateLogin) {
       return this.prisma.employee.create({
@@ -118,7 +125,7 @@ export class EmployeesService {
           fullName: dto.fullName,
           position: dto.position,
           phone: dto.phone,
-          payType: dto.payType,
+          payType,
           salary: new Prisma.Decimal(dto.salary),
           hiredAt: dto.hiredAt ? new Date(dto.hiredAt) : undefined,
           userId: dto.userId,
@@ -162,7 +169,7 @@ export class EmployeesService {
           fullName: dto.fullName,
           position: dto.position,
           phone: dto.phone,
-          payType: dto.payType,
+          payType,
           salary: new Prisma.Decimal(dto.salary),
           hiredAt: dto.hiredAt ? new Date(dto.hiredAt) : undefined,
           userId: user.id,
@@ -208,9 +215,41 @@ export class EmployeesService {
   }
 
   async get(tenantId: string, id: string) {
-    const employee = await this.prisma.employee.findFirst({ where: { id, tenantId } });
+    const employee = await this.prisma.employee.findFirst({ where: { id, tenantId, deletedAt: null } });
     if (!employee) throw new NotFoundException('Employee not found');
     return employee;
+  }
+
+  /**
+   * Delete an employee: closes any work session still open under their name (as employee or seller),
+   * soft-deletes their login if they have one, and soft-deletes the employee record itself.
+   */
+  async remove(tenantId: string, currentUserId: string, id: string) {
+    const employee = await this.get(tenantId, id);
+    const seller = employee.userId
+      ? await this.prisma.sellerProfile.findFirst({ where: { userId: employee.userId, tenantId } })
+      : null;
+
+    const activeSessions = await this.prisma.workSession.findMany({
+      where: {
+        tenantId,
+        status: 'ACTIVE',
+        OR: [{ employeeId: employee.id }, ...(seller ? [{ sellerProfileId: seller.id }] : [])],
+      },
+    });
+    for (const session of activeSessions) {
+      const figures = (await computeFigures(this.prisma, tenantId, [session])).get(session.id)!;
+      await this.workSessionsService.close(tenantId, currentUserId, session.id, {
+        actualClosingCash: figures.expectedCash.toNumber(),
+        closingNotes: 'Auto-closed — employee account deleted',
+      });
+    }
+
+    if (employee.userId) {
+      await this.usersService.remove(tenantId, employee.userId, currentUserId);
+    }
+    await this.prisma.employee.update({ where: { id: employee.id }, data: { deletedAt: new Date() } });
+    return { deleted: true };
   }
 
   /** Pay salary: payment row + register expense (if a register is selected and the payment is PAID) */

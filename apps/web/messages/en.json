@@ -388,8 +388,8 @@
   "employees": {
     "title": "Employees",
     "new": "New employee",
-    "deleteAccount": "Delete login account",
-    "deleteAccountConfirm": "Permanently delete this person's login account? They will no longer be able to sign in. Their employee record and history are kept.",
+    "deleteAccount": "Delete employee",
+    "deleteAccountConfirm": "Delete this employee? Any open work session of theirs is closed, their login (if any) is removed, and their salary/attendance history is kept.",
     "name": "Name",
     "position": "Position",
     "phone": "Phone",

@@ -30,7 +30,7 @@ export default function EmployeesPage() {
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
   const allowed = useRequirePermission(PERMISSIONS.EMPLOYEES_READ);
-  const canDeleteAccount = !!useAuthStore((s) => s.user)?.permissions?.includes(PERMISSIONS.USERS_DELETE);
+  const canDelete = !!useAuthStore((s) => s.user)?.permissions?.includes(PERMISSIONS.EMPLOYEES_MANAGE);
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState<EmployeeDto | null | 'new'>(null);
@@ -44,8 +44,8 @@ export default function EmployeesPage() {
     enabled: allowed,
   });
 
-  const deleteAccount = useMutation({
-    mutationFn: (employee: EmployeeDto) => api.delete(`/users/${employee.userId}`),
+  const deleteEmployee = useMutation({
+    mutationFn: (employee: EmployeeDto) => api.delete(`/employees/${employee.id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
   });
 
@@ -136,12 +136,12 @@ export default function EmployeesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      {canDeleteAccount && employee.userId && (
+                      {canDelete && (
                         <button
                           onClick={() => {
-                            if (confirm(t('deleteAccountConfirm'))) deleteAccount.mutate(employee);
+                            if (confirm(t('deleteAccountConfirm'))) deleteEmployee.mutate(employee);
                           }}
-                          disabled={deleteAccount.isPending}
+                          disabled={deleteEmployee.isPending}
                           aria-label={t('deleteAccount')}
                           title={t('deleteAccount')}
                           className="cursor-pointer rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/30"
@@ -157,7 +157,7 @@ export default function EmployeesPage() {
           </table>
         </Card>
       )}
-      <ErrorText error={deleteAccount.error} />
+      <ErrorText error={deleteEmployee.error} />
 
       <SalaryHistory />
 
@@ -309,10 +309,25 @@ function EmployeeModal({
   });
   const [commissionPercent, setCommissionPercent] = useState('');
   const [email, setEmail] = useState('');
-  const [createLogin, setCreateLogin] = useState(true);
+  const [createLogin, setCreateLogin] = useState(false);
   const [accessLevel, setAccessLevel] = useState<'FULL' | 'CUSTOM'>('FULL');
   const [customRoleId, setCustomRoleId] = useState('');
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  /** Only Seller supports commission or a login of their own picks a role beyond the default */
+  function changePositionPreset(next: EmployeePosition) {
+    setPositionPreset(next);
+    if (next !== 'SELLER') {
+      set({ payType: 'FIXED_SALARY' });
+      setCommissionPercent('');
+    }
+    if (next === 'WORKER') {
+      setCreateLogin(false);
+      setEmail('');
+    }
+  }
+
+  const isCommissionSeller = !employee && positionPreset === 'SELLER' && form.payType === 'COMMISSION';
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
@@ -341,16 +356,17 @@ function EmployeeModal({
       }
       const position = positionPreset === 'OTHER' ? customPosition : EMPLOYEE_POSITION_NAMES[positionPreset];
       const useCustomRole = positionPreset === 'MANAGER' && accessLevel === 'CUSTOM' && customRoleId;
+      const canLogin = positionPreset !== 'WORKER';
       return api.post<EmployeeDto>('/employees', {
         fullName: form.fullName,
         position,
         positionPreset,
         phone: form.phone || undefined,
         payType: form.payType,
-        salary: Number(form.salary),
+        salary: isCommissionSeller ? 0 : Number(form.salary),
         notes: form.notes || undefined,
-        email: email || undefined,
-        createLogin: email ? createLogin : undefined,
+        email: canLogin && createLogin ? email : undefined,
+        createLogin: canLogin && createLogin ? true : undefined,
         roleId: useCustomRole ? customRoleId : undefined,
         ...(positionPreset === 'SELLER' && {
           commissionPercent: commissionPercent !== '' ? Number(commissionPercent) : undefined,
@@ -387,7 +403,7 @@ function EmployeeModal({
             <Field label={t('positionPreset')}>
               <Select
                 value={positionPreset}
-                onChange={(e) => setPositionPreset(e.target.value as EmployeePosition)}
+                onChange={(e) => changePositionPreset(e.target.value as EmployeePosition)}
               >
                 {EMPLOYEE_POSITIONS.map((preset) => (
                   <option key={preset} value={preset}>
@@ -397,26 +413,30 @@ function EmployeeModal({
               </Select>
             </Field>
           )}
-          <Field label={t('payType')}>
-            <Select value={form.payType} onChange={(e) => set({ payType: e.target.value as SellerPayType })}>
-              {SELLER_PAY_TYPES.map((pt) => (
-                <option key={pt} value={pt}>
-                  {t(`payTypes.${pt}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('salary')}>
-            <Input
-              required
-              type="number"
-              min={0}
-              step="0.01"
-              dir="ltr"
-              value={form.salary}
-              onChange={(e) => set({ salary: e.target.value })}
-            />
-          </Field>
+          {(employee || positionPreset === 'SELLER') && (
+            <Field label={t('payType')}>
+              <Select value={form.payType} onChange={(e) => set({ payType: e.target.value as SellerPayType })}>
+                {SELLER_PAY_TYPES.map((pt) => (
+                  <option key={pt} value={pt}>
+                    {t(`payTypes.${pt}`)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {!isCommissionSeller && (
+            <Field label={t('salary')}>
+              <Input
+                required
+                type="number"
+                min={0}
+                step="0.01"
+                dir="ltr"
+                value={form.salary}
+                onChange={(e) => set({ salary: e.target.value })}
+              />
+            </Field>
+          )}
         </div>
         {!employee && positionPreset === 'OTHER' && (
           <Field label={t('positionOther')}>
@@ -441,23 +461,23 @@ function EmployeeModal({
         <Field label={t('phone')}>
           <Input dir="ltr" value={form.phone} onChange={(e) => set({ phone: e.target.value })} />
         </Field>
-        {!employee && (
+        {!employee && positionPreset !== 'WORKER' && (
           <>
-            <Field label={t('email')} hint={t('createLoginHint')}>
-              <Input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Field>
-            {email && (
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={createLogin}
-                  onChange={(e) => setCreateLogin(e.target.checked)}
-                  className="h-4 w-4 cursor-pointer accent-primary-600"
-                />
-                {t('createLogin')}
-              </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={createLogin}
+                onChange={(e) => setCreateLogin(e.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-primary-600"
+              />
+              {t('createLogin')}
+            </label>
+            {createLogin && (
+              <Field label={t('email')} hint={t('createLoginHint')}>
+                <Input required type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
             )}
-            {email && createLogin && positionPreset === 'MANAGER' && (
+            {createLogin && positionPreset === 'MANAGER' && (
               <Field label={t('accessLevel')}>
                 <div className="space-y-2">
                   <div className="flex gap-1.5">
