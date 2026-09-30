@@ -442,6 +442,8 @@
     "noCustomRoles": "No custom roles yet — create one under Settings → Roles & permissions first",
     "inviteSentTitle": "Invite sent",
     "inviteSentHint": "An email was sent to {email} — {name} can set their own password from the link in it (valid for 7 days).",
+    "inviteFailedTitle": "Account created, email failed",
+    "inviteFailedHint": "{name}'s account was already created with the email {email} — don't create it again, that email is now taken. The invite email could not be sent (a delivery problem on our end). Delete this employee and recreate them once email delivery is fixed, or contact support.",
     "close": "Close",
     "shift": "Shift",
     "startShift": "Start shift",

@@ -36,7 +36,7 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState<EmployeeDto | null | 'new'>(null);
   const [paying, setPaying] = useState<EmployeeDto | null>(null);
   const [shiftFor, setShiftFor] = useState<EmployeeDto | null>(null);
-  const [inviteInfo, setInviteInfo] = useState<{ name: string; email: string } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ name: string; email: string; sent: boolean } | null>(null);
 
   const { data: employees, isPending, error } = useQuery({
     queryKey: ['employees'],
@@ -165,7 +165,7 @@ export default function EmployeesPage() {
         <EmployeeModal
           employee={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onCreatedWithLogin={(name, email) => setInviteInfo({ name, email })}
+          onCreatedWithLogin={(name, email, sent) => setInviteInfo({ name, email, sent })}
         />
       )}
       {paying && <PaySalaryModal employee={paying} onClose={() => setPaying(null)} />}
@@ -290,7 +290,7 @@ function EmployeeModal({
 }: {
   employee: EmployeeDto | null;
   onClose: () => void;
-  onCreatedWithLogin: (name: string, email: string) => void;
+  onCreatedWithLogin: (name: string, email: string, sent: boolean) => void;
 }) {
   const t = useTranslations('employees');
   const tc = useTranslations('common');
@@ -374,8 +374,8 @@ function EmployeeModal({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      if (!employee && data.inviteSent) {
-        onCreatedWithLogin(form.fullName, email);
+      if (!employee && positionPreset !== 'WORKER' && createLogin) {
+        onCreatedWithLogin(form.fullName, email, !!data.inviteSent);
       }
       onClose();
     },
@@ -568,13 +568,23 @@ function EmployeeModal({
   );
 }
 
-function InviteSentModal({ info, onClose }: { info: { name: string; email: string }; onClose: () => void }) {
+function InviteSentModal({
+  info,
+  onClose,
+}: {
+  info: { name: string; email: string; sent: boolean };
+  onClose: () => void;
+}) {
   const t = useTranslations('employees');
 
   return (
-    <Modal open title={t('inviteSentTitle')} onClose={onClose}>
+    <Modal open title={info.sent ? t('inviteSentTitle') : t('inviteFailedTitle')} onClose={onClose}>
       <div className="space-y-4">
-        <p className="text-sm text-ink-muted">{t('inviteSentHint', { name: info.name, email: info.email })}</p>
+        <p className="text-sm text-ink-muted">
+          {info.sent
+            ? t('inviteSentHint', { name: info.name, email: info.email })
+            : t('inviteFailedHint', { name: info.name, email: info.email })}
+        </p>
         <Button type="button" onClick={onClose}>
           {t('close')}
         </Button>
