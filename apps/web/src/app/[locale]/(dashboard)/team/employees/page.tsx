@@ -36,7 +36,7 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState<EmployeeDto | null | 'new'>(null);
   const [paying, setPaying] = useState<EmployeeDto | null>(null);
   const [shiftFor, setShiftFor] = useState<EmployeeDto | null>(null);
-  const [tempPasswordInfo, setTempPasswordInfo] = useState<{ name: string; password: string } | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{ name: string; email: string } | null>(null);
 
   const { data: employees, isPending, error } = useQuery({
     queryKey: ['employees'],
@@ -165,14 +165,12 @@ export default function EmployeesPage() {
         <EmployeeModal
           employee={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onCreatedWithLogin={(name, password) => setTempPasswordInfo({ name, password })}
+          onCreatedWithLogin={(name, email) => setInviteInfo({ name, email })}
         />
       )}
       {paying && <PaySalaryModal employee={paying} onClose={() => setPaying(null)} />}
       {shiftFor && <ShiftModal employee={shiftFor} onClose={() => setShiftFor(null)} />}
-      {tempPasswordInfo && (
-        <TempPasswordModal info={tempPasswordInfo} onClose={() => setTempPasswordInfo(null)} />
-      )}
+      {inviteInfo && <InviteSentModal info={inviteInfo} onClose={() => setInviteInfo(null)} />}
     </div>
   );
 }
@@ -292,7 +290,7 @@ function EmployeeModal({
 }: {
   employee: EmployeeDto | null;
   onClose: () => void;
-  onCreatedWithLogin: (name: string, password: string) => void;
+  onCreatedWithLogin: (name: string, email: string) => void;
 }) {
   const t = useTranslations('employees');
   const tc = useTranslations('common');
@@ -362,8 +360,8 @@ function EmployeeModal({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      if (!employee && data.tempPassword) {
-        onCreatedWithLogin(form.fullName, data.tempPassword);
+      if (!employee && data.inviteSent) {
+        onCreatedWithLogin(form.fullName, email);
       }
       onClose();
     },
@@ -552,36 +550,13 @@ function EmployeeModal({
   );
 }
 
-function TempPasswordModal({
-  info,
-  onClose,
-}: {
-  info: { name: string; password: string };
-  onClose: () => void;
-}) {
+function InviteSentModal({ info, onClose }: { info: { name: string; email: string }; onClose: () => void }) {
   const t = useTranslations('employees');
-  const tc = useTranslations('common');
-  const [copied, setCopied] = useState(false);
 
   return (
-    <Modal open title={t('tempPasswordTitle')} onClose={onClose}>
+    <Modal open title={t('inviteSentTitle')} onClose={onClose}>
       <div className="space-y-4">
-        <p className="text-sm text-ink-muted">{t('tempPasswordHint', { name: info.name })}</p>
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-3/50 px-3 py-2.5">
-          <code dir="ltr" className="text-sm font-bold text-ink">{info.password}</code>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-8 px-2.5 text-xs"
-            onClick={() => {
-              navigator.clipboard.writeText(info.password);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
-          >
-            {copied ? tc('confirm') : t('copy')}
-          </Button>
-        </div>
+        <p className="text-sm text-ink-muted">{t('inviteSentHint', { name: info.name, email: info.email })}</p>
         <Button type="button" onClick={onClose}>
           {t('close')}
         </Button>

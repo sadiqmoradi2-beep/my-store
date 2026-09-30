@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -14,13 +15,19 @@ import { paginationMeta, PaginationQueryDto } from '../../common/dto/pagination-
 import { recordCashTransaction } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
+import { AuthService } from '../auth/auth.service';
 import { CreateSellerDto, PaySellerSalaryDto, UpdateSellerDto } from './dto/seller.dto';
 
 const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class SellersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SellersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
 
   /** Sellers + performance (sales and commission) */
   async list(tenantId: string) {
@@ -65,7 +72,7 @@ export class SellersService {
   /** Create a seller profile — either for an existing user, or by creating a brand-new SELLER-role login account */
   async create(tenantId: string, dto: CreateSellerDto) {
     let userId = dto.userId;
-    let tempPassword: string | undefined;
+    let invitedUser: { id: string; email: string; locale: string } | undefined;
 
     if (userId) {
       const user = await this.prisma.user.findFirst({
@@ -89,8 +96,8 @@ export class SellersService {
       });
       if (!role) throw new NotFoundException('System role SELLER not found');
 
-      tempPassword = randomBytes(9).toString('base64url');
-      const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+      // Unusable until the seller sets their own via the invite link below
+      const passwordHash = await bcrypt.hash(randomBytes(24).toString('hex'), BCRYPT_ROUNDS);
       const user = await this.prisma.user.create({
         data: {
           tenantId,
@@ -102,6 +109,7 @@ export class SellersService {
         },
       });
       userId = user.id;
+      invitedUser = user;
     }
 
     const existing = await this.prisma.sellerProfile.findUnique({ where: { userId } });
@@ -117,7 +125,16 @@ export class SellersService {
         notes: dto.notes,
       },
     });
-    return tempPassword ? { ...profile, tempPassword } : profile;
+    if (!invitedUser) return profile;
+    // The account is already created either way — a mail outage must not fail the whole request
+    const inviteSent = await this.authService
+      .sendAccountInvite(invitedUser)
+      .then(() => true)
+      .catch((err) => {
+        this.logger.error(`Failed to send account-invite email to ${invitedUser.email}`, err);
+        return false;
+      });
+    return { ...profile, inviteSent };
   }
 
   async update(tenantId: string, id: string, dto: UpdateSellerDto) {

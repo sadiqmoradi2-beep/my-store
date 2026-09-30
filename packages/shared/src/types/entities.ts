@@ -319,7 +319,8 @@ export interface EmployeeDto {
   isActive: boolean;
   notes: string | null;
   createdAt: string;
-  tempPassword?: string;
+  /** Set when a login account was just created — the employee sets their own password via an emailed invite link */
+  inviteSent?: boolean;
   /** Linked login account, if this employee has one (null if never given login access) */
   userId: string | null;
   roleId: string | null;

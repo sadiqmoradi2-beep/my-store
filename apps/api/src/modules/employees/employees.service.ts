@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -8,6 +8,7 @@ import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
+import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
 import { PaySellerSalaryDto } from '../sellers/dto/seller.dto';
 import {
@@ -25,9 +26,12 @@ const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class EmployeesService {
+  private readonly logger = new Logger(EmployeesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sellersService: SellersService,
+    private readonly authService: AuthService,
   ) {}
 
   async list(tenantId: string) {
@@ -102,8 +106,8 @@ export class EmployeesService {
 
   /**
    * Create employee — if email is provided (and createLogin is not explicitly false), a real user account
-   * is created with the role matching the selected position and linked to the employee; the initial password
-   * is returned only once in the response (it is never logged or stored).
+   * is created with the role matching the selected position and linked to the employee. The employee sets
+   * their own first password via an emailed invite link — no temp password is generated or shown.
    */
   async create(tenantId: string, dto: CreateEmployeeDto) {
     const shouldCreateLogin = !!dto.email && dto.createLogin !== false;
@@ -138,10 +142,10 @@ export class EmployeesService {
         });
     if (!role) throw new NotFoundException('Role not found');
 
-    const tempPassword = randomBytes(9).toString('base64url');
-    const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+    // Unusable until the employee sets their own via the invite link below
+    const passwordHash = await bcrypt.hash(randomBytes(24).toString('hex'), BCRYPT_ROUNDS);
 
-    const employee = await this.prisma.$transaction(async (tx) => {
+    const { employee, user } = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           tenantId,
@@ -152,7 +156,7 @@ export class EmployeesService {
           roleId: role.id,
         },
       });
-      return tx.employee.create({
+      const employee = await tx.employee.create({
         data: {
           tenantId,
           fullName: dto.fullName,
@@ -165,6 +169,7 @@ export class EmployeesService {
           notes: dto.notes,
         },
       });
+      return { employee, user };
     });
 
     if (dto.positionPreset === 'SELLER' && employee.userId) {
@@ -175,7 +180,15 @@ export class EmployeesService {
         fixedSalaryAmount: dto.fixedSalaryAmount,
       });
     }
-    return { ...employee, tempPassword };
+    // The account is already created either way — a mail outage must not fail the whole request
+    const inviteSent = await this.authService
+      .sendAccountInvite(user)
+      .then(() => true)
+      .catch((err) => {
+        this.logger.error(`Failed to send account-invite email to ${user.email}`, err);
+        return false;
+      });
+    return { ...employee, inviteSent };
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {

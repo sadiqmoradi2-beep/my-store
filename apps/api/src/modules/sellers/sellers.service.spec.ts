@@ -7,9 +7,11 @@ import {
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { recordCommission, SellersService } from './sellers.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
+const authServiceMock = { sendAccountInvite: jest.fn().mockResolvedValue(undefined) };
 
 describe('SellersService', () => {
   let service: SellersService;
@@ -38,9 +40,14 @@ describe('SellersService', () => {
       sale: { groupBy: jest.fn().mockResolvedValue([]) },
       commissionEntry: { groupBy: jest.fn().mockResolvedValue([]) },
     };
+    authServiceMock.sendAccountInvite.mockReset().mockResolvedValue(undefined);
 
     const moduleRef = await Test.createTestingModule({
-      providers: [SellersService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        SellersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuthService, useValue: authServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(SellersService);
   });
@@ -82,7 +89,7 @@ describe('SellersService', () => {
       expect(prisma.user.create).not.toHaveBeenCalled();
     });
 
-    it('fullName+email → creates a new SELLER-role account and returns a temp password', async () => {
+    it('fullName+email → creates a new SELLER-role account and sends an invite email', async () => {
       const result = await service.create('t1', {
         fullName: 'New Seller',
         email: 'newseller@demo.af',
@@ -96,7 +103,10 @@ describe('SellersService', () => {
       expect(userData.roleId).toBe('role-seller');
       const profileData = prisma.sellerProfile.create.mock.calls[0][0].data;
       expect(profileData.userId).toBe('user-new');
-      expect((result as { tempPassword?: string }).tempPassword).toEqual(expect.any(String));
+      expect(authServiceMock.sendAccountInvite).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'newseller@demo.af' }),
+      );
+      expect((result as { inviteSent?: boolean }).inviteSent).toBe(true);
     });
 
     it('email already registered → 409 and no user created', async () => {
@@ -188,7 +198,11 @@ describe('SellersService.paySalary', () => {
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
     const moduleRef = await Test.createTestingModule({
-      providers: [SellersService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        SellersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuthService, useValue: authServiceMock },
+      ],
     }).compile();
     service = moduleRef.get(SellersService);
   });

@@ -23,6 +23,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type UserWithRole = NonNullable<Awaited<ReturnType<AuthRepository['findUserByEmail']>>>;
 
@@ -300,13 +301,8 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.repo.findUserByEmail(dto.email);
     if (user && !user.deletedAt) {
-      const rawToken = randomBytes(32).toString('hex');
-      const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
-      const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
-      await this.repo.updateResetToken(user.id, tokenHash, expiresAt);
-
-      const webOrigin = this.config.get<string>('webOrigin');
-      const resetUrl = `${webOrigin}/${user.locale}/reset-password?email=${encodeURIComponent(user.email)}&token=${rawToken}`;
+      const rawToken = await this.issueResetToken(user.id, RESET_TOKEN_TTL_MS);
+      const resetUrl = this.setPasswordUrl(user.email, user.locale, rawToken);
       await this.mail.send({
         to: user.email,
         subject: 'Reset your MY STORE password',
@@ -314,6 +310,29 @@ export class AuthService {
       });
     }
     return { message: 'If this email is registered, a reset link has been sent to it' };
+  }
+
+  /** New employee/seller login: email a "set up your account" link instead of handing the owner a temp password */
+  async sendAccountInvite(user: { id: string; email: string; locale: string }): Promise<void> {
+    const rawToken = await this.issueResetToken(user.id, INVITE_TOKEN_TTL_MS);
+    const inviteUrl = this.setPasswordUrl(user.email, user.locale, rawToken);
+    await this.mail.send({
+      to: user.email,
+      subject: 'Welcome to MY STORE — set up your account',
+      html: `<p>An account was created for you. Click below to set your password (link valid for 7 days):</p><p><a href="${inviteUrl}">${inviteUrl}</a></p>`,
+    });
+  }
+
+  private async issueResetToken(userId: string, ttlMs: number): Promise<string> {
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(rawToken, BCRYPT_ROUNDS);
+    await this.repo.updateResetToken(userId, tokenHash, new Date(Date.now() + ttlMs));
+    return rawToken;
+  }
+
+  private setPasswordUrl(email: string, locale: string, rawToken: string): string {
+    const webOrigin = this.config.get<string>('webOrigin');
+    return `${webOrigin}/${locale}/reset-password?email=${encodeURIComponent(email)}&token=${rawToken}`;
   }
 
   /** Set a new password with the reset token — the reason it's invalid (missing user/expired/mismatch) is not revealed */

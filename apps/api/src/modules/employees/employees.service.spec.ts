@@ -2,11 +2,13 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
 import { EmployeesService } from './employees.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
 const sellersServiceMock = { create: jest.fn(), paySalary: jest.fn() };
+const authServiceMock = { sendAccountInvite: jest.fn().mockResolvedValue(undefined) };
 
 describe('EmployeesService.paySalary', () => {
   let service: EmployeesService;
@@ -37,6 +39,7 @@ describe('EmployeesService.paySalary', () => {
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -98,12 +101,14 @@ describe('EmployeesService.create', () => {
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
     sellersServiceMock.create.mockReset();
+    authServiceMock.sendAccountInvite.mockReset().mockResolvedValue(undefined);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -117,10 +122,11 @@ describe('EmployeesService.create', () => {
     });
     expect(prisma.employee.create).toHaveBeenCalled();
     expect(tx.user.create).not.toHaveBeenCalled();
-    expect((result as { tempPassword?: string }).tempPassword).toBeUndefined();
+    expect((result as { inviteSent?: boolean }).inviteSent).toBeUndefined();
+    expect(authServiceMock.sendAccountInvite).not.toHaveBeenCalled();
   });
 
-  it('with email → a user account is created with the position\'s matching role + a temp password is returned', async () => {
+  it('with email → a user account is created with the position\'s matching role + an invite email is sent', async () => {
     const result = await service.create('t1', {
       fullName: 'Zahra',
       position: 'Seller',
@@ -136,9 +142,10 @@ describe('EmployeesService.create', () => {
     expect(userData.roleId).toBe('role-seller');
     const empData = tx.employee.create.mock.calls[0][0].data;
     expect(empData.userId).toBe('user-new');
-    const tempPassword = (result as { tempPassword?: string }).tempPassword;
-    expect(tempPassword).toBeDefined();
-    expect(typeof tempPassword).toBe('string');
+    expect(authServiceMock.sendAccountInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'zahra@demo.af' }),
+    );
+    expect((result as { inviteSent?: boolean }).inviteSent).toBe(true);
   });
 
   it('positionPreset SELLER → a linked seller profile is created via SellersService, carrying pay/commission fields', async () => {
@@ -251,6 +258,7 @@ describe('EmployeesService.payCommission', () => {
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -316,6 +324,7 @@ describe('EmployeesService.list', () => {
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -380,6 +389,7 @@ describe('EmployeesService.startShift/endShift', () => {
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
@@ -441,6 +451,7 @@ describe('EmployeesService.attendance/markAttendance', () => {
         EmployeesService,
         { provide: PrismaService, useValue: prisma },
         { provide: SellersService, useValue: sellersServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
     service = moduleRef.get(EmployeesService);
