@@ -17,4 +17,9 @@ export default () => ({
     pass: process.env.SMTP_PASS,
     from: process.env.SMTP_FROM ?? 'MY STORE <no-reply@my-store.local>',
   },
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY,
+    fromEmail: process.env.BREVO_FROM_EMAIL,
+    fromName: process.env.BREVO_FROM_NAME ?? 'MY STORE',
+  },
 });
