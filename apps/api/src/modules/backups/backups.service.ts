@@ -155,10 +155,17 @@ export class BackupsService {
 
     await this.prisma.$transaction(
       async (tx) => {
-        // Staff logins tied to sellers / employees go together with the team, on a full wipe or a TEAM reset
+        // A full wipe removes every non-admin login outright — not just ones still traceable through an
+        // Employee/SellerProfile row, so a login orphaned by an earlier (buggy) reset can't survive forever.
+        // A TEAM reset only removes logins still linked to a seller/employee being deleted right now.
         let staffUserIds: string[] = [];
-        const removesTeam = isFullWipe || scope === 'TEAM';
-        if (removesTeam) {
+        if (isFullWipe) {
+          const nonAdmins = await tx.user.findMany({
+            where: { tenantId, id: { not: currentUserId }, role: { key: { not: 'ADMIN' } } },
+            select: { id: true },
+          });
+          staffUserIds = nonAdmins.map((u) => u.id);
+        } else if (scope === 'TEAM') {
           const [sellerRows, employeeRows] = await Promise.all([
             tx.sellerProfile.findMany({ where: { tenantId }, select: { userId: true } }),
             tx.employee.findMany({ where: { tenantId, userId: { not: null } }, select: { userId: true } }),

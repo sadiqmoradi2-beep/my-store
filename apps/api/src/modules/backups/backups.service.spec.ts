@@ -157,29 +157,25 @@ describe('BackupsService', () => {
       readFileMock.mockResolvedValue(JSON.stringify(buildPayload()));
     });
 
-    it('full wipe also deletes staff login users linked to sellers/employees (never the current user or admins)', async () => {
-      txCache.sellerProfile = {
+    it('full wipe deletes every non-admin login directly — even one orphaned by an earlier reset (never the current user or admins)', async () => {
+      txCache.user = {
         deleteMany: jest.fn().mockImplementation(() => {
-          callOrder.push('delete:sellerProfile');
-          return Promise.resolve({ count: 1 });
+          callOrder.push('delete:user');
+          return Promise.resolve({ count: 2 });
         }),
         createMany: jest.fn(),
         create: jest.fn(),
-        findMany: jest.fn().mockResolvedValue([{ userId: 'su1' }, { userId: 'u1' }]),
+        findMany: jest.fn().mockResolvedValue([{ id: 'su1' }, { id: 'eu1' }, { id: 'orphan1' }]),
         update: jest.fn(),
-        updateMany: jest.fn(),
-      };
-      txCache.employee = {
-        deleteMany: jest.fn(),
-        createMany: jest.fn(),
-        create: jest.fn(),
-        findMany: jest.fn().mockResolvedValue([{ userId: 'eu1' }, { userId: 'su1' }]),
-        update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       };
       await service.wipeData('t1', 'u1');
+      expect(txCache.user.findMany).toHaveBeenCalledWith({
+        where: { tenantId: 't1', id: { not: 'u1' }, role: { key: { not: 'ADMIN' } } },
+        select: { id: true },
+      });
       expect(txCache.user.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['su1', 'eu1'] }, tenantId: 't1', role: { key: { not: 'ADMIN' } } },
+        where: { id: { in: ['su1', 'eu1', 'orphan1'] }, tenantId: 't1', role: { key: { not: 'ADMIN' } } },
       });
     });
 
