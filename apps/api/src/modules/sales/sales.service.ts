@@ -4,7 +4,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PAYMENT_METHOD_NAMES, PAYMENT_METHOD_PART } from '@my-store/shared';
+import { IncomePart, PAYMENT_METHOD_NAMES, PAYMENT_METHOD_PART } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { findIncomeRegister, recordCashTransaction } from '../cash/cash.service';
@@ -68,9 +68,8 @@ export class SalesService {
 
   /**
    * POS checkout — one transaction: the cart becomes a sale, stock is deducted from the branch's default
-   * warehouse, and the money lands in its Income part (Cash / EBT / Zelle; Card goes to Zelle). A Debt
-   * sale receives no money now — it creates a linked receivable Debt instead, tracked in Loans & Deficit
-   * until collected. A sale made by a seller who has an active work session belongs to that session.
+   * warehouse, and the money lands in its Income part (Cash / EBT / Zelle / Debit Card — all immediate
+   * income). A sale made by a seller who has an active work session belongs to that session.
    */
   async createFromCart(tenantId: string, userId: string, dto: PosSaleDto) {
     const cart = await this.prisma.cart.findFirst({
@@ -152,7 +151,7 @@ export class SalesService {
 
       let registerId: string | null = null;
       const part = PAYMENT_METHOD_PART[dto.paymentMethod];
-      if (part && registerAmount.greaterThan(0)) {
+      if (registerAmount.greaterThan(0)) {
         registerId = await this.resolveRegister(tx, tenantId, cart.branchId, part, dto.registerId);
         await recordCashTransaction(tx, {
           tenantId,
@@ -167,22 +166,6 @@ export class SalesService {
           referenceType: 'sale',
           referenceId: created.id,
           sessionId,
-        });
-      }
-
-      if (dto.paymentMethod === 'DEBT' && total.greaterThan(0)) {
-        await tx.debt.create({
-          data: {
-            tenantId,
-            direction: 'RECEIVABLE',
-            kind: 'DEFICIT',
-            partyName: dto.debtPartyName!,
-            amount: total,
-            dueDate: dto.debtDueDate ? new Date(dto.debtDueDate) : undefined,
-            referenceType: 'sale',
-            referenceId: created.id,
-            createdById: userId,
-          },
         });
       }
 
@@ -218,7 +201,7 @@ export class SalesService {
     tx: Prisma.TransactionClient,
     tenantId: string,
     branchId: string,
-    part: 'CASH' | 'EBT' | 'ZELLE',
+    part: IncomePart,
     registerId?: string,
   ) {
     if (registerId) {

@@ -257,16 +257,8 @@ export interface IncomeSummaryDto {
   from: string;
   to: string;
   parts: IncomePartSummaryDto[];
-  /** Sales paid by Debt — no Income part receives them until the debt is collected */
-  debt: {
-    soldThisPeriod: string;
-    salesCount: number;
-    collectedThisPeriod: string;
-    /** Current total still owed across all sale-linked debts (not period-bound) */
-    outstandingTotal: string;
-  };
   totals: {
-    /** Sum of the income of Cash, EBT and Zelle */
+    /** Sum of the income of every Income part (Cash, EBT, Zelle, Debit Card) */
     totalIncome: string;
     totalBalance: string;
     /** Every sale of the range, paid or not */

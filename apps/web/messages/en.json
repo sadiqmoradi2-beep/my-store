@@ -280,12 +280,8 @@
       "CASH": "Cash",
       "EBT": "EBT",
       "ZELLE": "Zelle",
-      "DEBT": "Debt"
+      "DEBIT_CARD": "Debit Card"
     },
-    "debtSold": "Sold on debt",
-    "debtCollected": "Collected",
-    "debtOutstanding": "Outstanding now",
-    "debtViewInLoans": "View in Loans & Deficit →",
     "ranges": {
       "today": "Today",
       "week": "Last 7 days",
@@ -338,17 +334,15 @@
       "CARD": "Card",
       "EBT": "EBT",
       "ZELLE": "Zelle",
-      "DEBT": "Debt"
+      "DEBIT_CARD": "Debit Card"
     },
     "methodHints": {
       "CASH": "Cash payment — the money goes to Income → Cash",
       "CARD": "Debit / credit card payment — the money goes to Income → Zelle (bank)",
       "EBT": "Government assistance (Electronic Benefit Transfer) — the money goes to Income → EBT",
       "ZELLE": "Bank transfer payment — the money goes to Income → Zelle",
-      "DEBT": "No money received now — tracked as a debt owed by the customer, in Loans & Deficit"
+      "DEBIT_CARD": "Card payment — the money goes to Income → Debit Card"
     },
-    "debtPartyName": "Customer / party name",
-    "debtPartyNameHint": "Who owes this amount — shown in Loans & Deficit",
     "sessionNote": "This sale was added to the seller's open work session."
   },
   "sellers": {

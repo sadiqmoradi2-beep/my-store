@@ -55,7 +55,6 @@ describe('SalesService.createFromCart', () => {
       cashRegister: { findFirst: jest.fn().mockResolvedValue({ id: 'reg-chosen' }) },
       warehouse: { findFirst: jest.fn().mockResolvedValue({ id: 'w1' }), create: jest.fn().mockResolvedValue({ id: 'w-new' }) },
       cart: { delete: jest.fn() },
-      debt: { create: jest.fn() },
     };
     prisma = {
       cart: { findFirst: jest.fn().mockResolvedValue({ ...cart }) },
@@ -200,30 +199,18 @@ describe('SalesService.createFromCart', () => {
     expect(tx.sale.create.mock.calls[0][0].data.sessionId).toBeNull();
   });
 
-  it('DEBT payment: no register/cash transaction, a receivable Debt is created linked to the sale', async () => {
-    await service.createFromCart('t1', 'u1', {
-      cartId: 'cart-1',
-      paymentMethod: 'DEBT',
-      debtPartyName: 'Karim Ahmadi',
-    });
-    expect(findIncomeRegister).not.toHaveBeenCalled();
-    expect(recordCashTransaction).not.toHaveBeenCalled();
-    expect(tx.debt.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: 't1',
-        direction: 'RECEIVABLE',
-        kind: 'DEFICIT',
-        partyName: 'Karim Ahmadi',
-        referenceType: 'sale',
-        referenceId: 'sale-1',
-        createdById: 'u1',
-      }),
-    });
-    expect(tx.debt.create.mock.calls[0][0].data.amount.toString()).toBe('450');
+  it('DEBIT_CARD payment: recorded as immediate income in its own part, like EBT/Zelle', async () => {
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'DEBIT_CARD' });
+    expect(findIncomeRegister).toHaveBeenCalledWith(tx, 't1', 'b1', 'DEBIT_CARD');
+    expect(recordCashTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ registerId: 'reg-auto', type: 'SALE', category: 'Debit Card' }),
+    );
+    expect((recordCashTransaction as jest.Mock).mock.calls[0][1].amount.toString()).toBe('450');
   });
 
-  it('DEBT payment still records the commission and deletes the cart', async () => {
-    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'DEBT', debtPartyName: 'Karim' });
+  it('DEBIT_CARD payment still records the commission and deletes the cart', async () => {
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'DEBIT_CARD' });
     expect(recordCommission).toHaveBeenCalled();
     expect(tx.cart.delete).toHaveBeenCalled();
   });

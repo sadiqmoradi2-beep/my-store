@@ -29,8 +29,6 @@ describe('CashService', () => {
       },
       cashTransaction: { groupBy: jest.fn().mockResolvedValue([]) },
       sale: { groupBy: jest.fn().mockResolvedValue([]) },
-      debtPayment: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }) },
-      debt: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null, paidAmount: null } }) },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
 
@@ -95,7 +93,7 @@ describe('CashService', () => {
         { paymentMethod: 'EBT', _sum: { total: D(80), cost: D(50) }, _count: { _all: 1 } },
         { paymentMethod: 'ZELLE', _sum: { total: D(70), cost: D(40) }, _count: { _all: 1 } },
         { paymentMethod: 'CARD', _sum: { total: D(50), cost: D(30) }, _count: { _all: 2 } },
-        { paymentMethod: 'DEBT', _sum: { total: D(90), cost: D(60) }, _count: { _all: 1 } },
+        { paymentMethod: 'DEBIT_CARD', _sum: { total: D(90), cost: D(60) }, _count: { _all: 1 } },
       ]);
     });
 
@@ -114,33 +112,20 @@ describe('CashService', () => {
       expect(zelle.salesCount).toBe(3);
     });
 
-    it('total sales, profit and count cover every payment method, including Debt', async () => {
+    it('Debit Card gets its own Income part, separate from Zelle/Card', async () => {
       const result = await service.incomeSummary('t1', {});
-      expect(result.totals.totalSales.toString()).toBe('690'); // 600 + 90 debt
+      const debitCard = result.parts.find((p) => p.part === 'DEBIT_CARD')!;
+      expect(debitCard.profit.toString()).toBe('30'); // 90 - 60
+      expect(debitCard.salesCount).toBe(1);
+      const zelle = result.parts.find((p) => p.part === 'ZELLE')!;
+      expect(zelle.salesCount).toBe(3); // unaffected by the Debit Card sale
+    });
+
+    it('total sales, profit and count cover every payment method', async () => {
+      const result = await service.incomeSummary('t1', {});
+      expect(result.totals.totalSales.toString()).toBe('690'); // 600 + 90 debit card
       expect(result.totals.totalProfit.toString()).toBe('210'); // 180 + (90-60)
       expect(result.totals.salesCount).toBe(9);
-    });
-
-    it('Debt sales are excluded from every Income part (no money received yet)', async () => {
-      const result = await service.incomeSummary('t1', {});
-      const zelle = result.parts.find((p) => p.part === 'ZELLE')!;
-      expect(zelle.profit.toString()).toBe('50'); // unaffected by the 90 debt sale
-      expect(zelle.salesCount).toBe(3);
-      const cash = result.parts.find((p) => p.part === 'CASH')!;
-      expect(cash.salesCount).toBe(4); // unaffected by the 90 debt sale
-    });
-
-    it('the debt block reports sold/collected/outstanding, separately from Income parts', async () => {
-      prisma.debtPayment.aggregate.mockResolvedValue({ _sum: { amount: D(35) } });
-      prisma.debt.aggregate.mockResolvedValue({ _sum: { amount: D(500), paidAmount: D(120) } });
-      const result = await service.incomeSummary('t1', {});
-      expect(result.debt.soldThisPeriod.toString()).toBe('90');
-      expect(result.debt.salesCount).toBe(1);
-      expect(result.debt.collectedThisPeriod.toString()).toBe('35');
-      expect(result.debt.outstandingTotal.toString()).toBe('380'); // 500 - 120
-      expect(prisma.debtPayment.aggregate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ debt: { referenceType: 'sale' } }) }),
-      );
     });
 
     it('total income is the sum of the Cash, EBT and Zelle incomes', async () => {

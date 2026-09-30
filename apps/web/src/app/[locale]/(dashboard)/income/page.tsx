@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { HandCoins, Landmark, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { useState } from 'react';
 import {
   PERMISSIONS,
@@ -37,6 +36,7 @@ const PART_ICONS: Record<IncomePart, typeof Wallet> = {
   CASH: Wallet,
   EBT: ReceiptText,
   ZELLE: Landmark,
+  DEBIT_CARD: HandCoins,
 };
 
 const RANGES = ['today', 'week', 'month', 'all'] as const;
@@ -193,34 +193,6 @@ export default function IncomePage() {
                   </div>
                 );
               })}
-              <div className="rounded-xl border border-line bg-surface-2 p-4 text-start">
-                <div className="flex items-center gap-2">
-                  <HandCoins className="h-4 w-4 text-primary-600" aria-hidden />
-                  <span className="font-bold text-ink">{t('parts.DEBT')}</span>
-                </div>
-                <p className="mt-2 text-xs text-ink-muted">{t('debtOutstanding')}</p>
-                <p className="text-lg font-black text-ink">{money(summary.debt.outstandingTotal)}</p>
-                <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <dt className="text-ink-faint">{t('debtSold')}</dt>
-                    <dd className="font-bold text-ink">
-                      {formatMoney(summary.debt.soldThisPeriod, locale)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-ink-faint">{t('debtCollected')}</dt>
-                    <dd className="font-bold text-primary-700 dark:text-primary-300">
-                      {formatMoney(summary.debt.collectedThisPeriod, locale)}
-                    </dd>
-                  </div>
-                </dl>
-                <Link
-                  href={`/${locale}/loans`}
-                  className="mt-2 inline-block text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
-                >
-                  {t('debtViewInLoans')}
-                </Link>
-              </div>
             </div>
 
           </>

@@ -32,16 +32,20 @@ enum SubscriptionStatus {
 
 enum PaymentMethod {
   CASH
+  /// Legacy value — no longer offered at checkout (superseded by DEBIT_CARD, which has its own
+  /// Income tracking). Kept only so historical Sale rows using it remain valid/readable.
   CARD
   EBT
   ZELLE
-  DEBT
+  /// Immediate income, own Income bucket — like Cash/EBT/Zelle, just a card swipe.
+  DEBIT_CARD
 }
 
 enum IncomePart {
   CASH
   EBT
   ZELLE
+  DEBIT_CARD
 }
 
 enum SessionRole {
