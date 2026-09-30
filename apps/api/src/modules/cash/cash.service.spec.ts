@@ -105,11 +105,14 @@ describe('CashService', () => {
       expect(cash.expenses.toString()).toBe('150');
     });
 
-    it('Card is counted in the Zelle part: profit and sale count of Zelle + Card together', async () => {
+    it('Card gets its own Income part, separate from Zelle', async () => {
       const result = await service.incomeSummary('t1', {});
+      const card = result.parts.find((p) => p.part === 'CARD')!;
+      expect(card.profit.toString()).toBe('20'); // 50 - 30
+      expect(card.salesCount).toBe(2);
       const zelle = result.parts.find((p) => p.part === 'ZELLE')!;
-      expect(zelle.profit.toString()).toBe('50'); // (70-40) + (50-30)
-      expect(zelle.salesCount).toBe(3);
+      expect(zelle.profit.toString()).toBe('30'); // 70 - 40
+      expect(zelle.salesCount).toBe(1);
     });
 
     it('Debit Card gets its own Income part, separate from Zelle/Card', async () => {
@@ -118,7 +121,7 @@ describe('CashService', () => {
       expect(debitCard.profit.toString()).toBe('30'); // 90 - 60
       expect(debitCard.salesCount).toBe(1);
       const zelle = result.parts.find((p) => p.part === 'ZELLE')!;
-      expect(zelle.salesCount).toBe(3); // unaffected by the Debit Card sale
+      expect(zelle.salesCount).toBe(1); // unaffected by the Debit Card sale
     });
 
     it('total sales, profit and count cover every payment method', async () => {

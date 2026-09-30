@@ -278,6 +278,7 @@
     "profit": "Profit",
     "parts": {
       "CASH": "Cash",
+      "CARD": "Card",
       "EBT": "EBT",
       "ZELLE": "Zelle",
       "DEBIT_CARD": "Debit Card"
@@ -338,7 +339,7 @@
     },
     "methodHints": {
       "CASH": "Cash payment — the money goes to Income → Cash",
-      "CARD": "Debit / credit card payment — the money goes to Income → Zelle (bank)",
+      "CARD": "Card payment — the money goes to Income → Card",
       "EBT": "Government assistance (Electronic Benefit Transfer) — the money goes to Income → EBT",
       "ZELLE": "Bank transfer payment — the money goes to Income → Zelle",
       "DEBIT_CARD": "Card payment — the money goes to Income → Debit Card"
@@ -1006,8 +1007,10 @@
     },
     "parts": {
       "CASH": "Cash",
+      "CARD": "Card",
       "EBT": "EBT",
-      "ZELLE": "Zelle"
+      "ZELLE": "Zelle",
+      "DEBIT_CARD": "Debit Card"
     },
     "view": "Open",
     "pendingCount": "{count} pending",

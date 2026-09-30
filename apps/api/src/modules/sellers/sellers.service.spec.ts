@@ -18,8 +18,10 @@ describe('SellersService', () => {
   beforeEach(async () => {
     prisma = {
       user: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'u1' }),
-        findUnique: jest.fn().mockResolvedValue(null),
+        // by id (existing-user lookup) → found; by email (dup-email check) → not found, by default
+        findFirst: jest.fn().mockImplementation(({ where }: { where: { id?: string } }) =>
+          where.id ? { id: 'u1' } : null,
+        ),
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'user-new', ...data })),
       },
       role: { findFirst: jest.fn().mockResolvedValue({ id: 'role-seller' }) },
@@ -98,7 +100,7 @@ describe('SellersService', () => {
     });
 
     it('email already registered → 409 and no user created', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'existing' });
+      prisma.user.findFirst.mockResolvedValue({ id: 'existing' });
       await expect(
         service.create('t1', { fullName: 'New Seller', email: 'dup@demo.af' }),
       ).rejects.toBeInstanceOf(ConflictException);

@@ -123,7 +123,7 @@ export class EmployeesService {
       });
     }
 
-    if (await this.prisma.user.findUnique({ where: { email: dto.email } })) {
+    if (await this.prisma.user.findFirst({ where: { email: dto.email, deletedAt: null } })) {
       throw new ConflictException('This email is already registered');
     }
     await assertPlanLimit(this.prisma, tenantId, 'users');

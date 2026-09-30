@@ -310,7 +310,6 @@ function EmployeeModal({
     notes: employee?.notes ?? '',
   });
   const [commissionPercent, setCommissionPercent] = useState('');
-  const [fixedSalaryAmount, setFixedSalaryAmount] = useState('');
   const [email, setEmail] = useState('');
   const [createLogin, setCreateLogin] = useState(true);
   const [accessLevel, setAccessLevel] = useState<'FULL' | 'CUSTOM'>('FULL');
@@ -357,7 +356,7 @@ function EmployeeModal({
         roleId: useCustomRole ? customRoleId : undefined,
         ...(positionPreset === 'SELLER' && {
           commissionPercent: commissionPercent !== '' ? Number(commissionPercent) : undefined,
-          fixedSalaryAmount: fixedSalaryAmount !== '' ? Number(fixedSalaryAmount) : undefined,
+          fixedSalaryAmount: form.payType === 'FIXED_SALARY' ? Number(form.salary) : undefined,
         }),
       });
     },
@@ -426,32 +425,19 @@ function EmployeeModal({
             <Input required value={customPosition} onChange={(e) => setCustomPosition(e.target.value)} />
           </Field>
         )}
-        {!employee && positionPreset === 'SELLER' && (
+        {!employee && positionPreset === 'SELLER' && form.payType === 'COMMISSION' && (
           <div className="grid grid-cols-2 gap-3">
-            {form.payType === 'COMMISSION' ? (
-              <Field label={t('commissionPercent')} hint={t('commissionPercentHint')}>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.01"
-                  dir="ltr"
-                  value={commissionPercent}
-                  onChange={(e) => setCommissionPercent(e.target.value)}
-                />
-              </Field>
-            ) : (
-              <Field label={t('fixedSalaryAmount')}>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  dir="ltr"
-                  value={fixedSalaryAmount}
-                  onChange={(e) => setFixedSalaryAmount(e.target.value)}
-                />
-              </Field>
-            )}
+            <Field label={t('commissionPercent')} hint={t('commissionPercentHint')}>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                dir="ltr"
+                value={commissionPercent}
+                onChange={(e) => setCommissionPercent(e.target.value)}
+              />
+            </Field>
           </div>
         )}
         <Field label={t('phone')}>

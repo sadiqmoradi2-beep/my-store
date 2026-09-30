@@ -37,7 +37,7 @@ export class UsersRepository {
   }
 
   findByEmail(email: string) {
-    return this.prisma.user.findUnique({ where: { email } });
+    return this.prisma.user.findFirst({ where: { email, deletedAt: null } });
   }
 
   create(data: Prisma.UserUncheckedCreateInput) {
@@ -51,7 +51,13 @@ export class UsersRepository {
   softDelete(id: string) {
     return this.prisma.user.update({
       where: { id },
-      data: { deletedAt: new Date(), status: 'INACTIVE', refreshTokenHash: null },
+      data: {
+        deletedAt: new Date(),
+        status: 'INACTIVE',
+        refreshTokenHash: null,
+        // Frees the email for reuse — email is @unique at the DB level so the live row must vacate it.
+        email: `deleted-${Date.now()}-${id}`,
+      },
     });
   }
 }

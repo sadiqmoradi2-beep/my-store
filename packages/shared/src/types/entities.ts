@@ -221,6 +221,7 @@ export interface CashTransactionDto {
   balanceAfter: string;
   category: string | null;
   note: string | null;
+  receiptUrl: string | null;
   referenceType: string | null;
   referenceId: string | null;
   sessionId?: string | null;

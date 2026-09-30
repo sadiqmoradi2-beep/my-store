@@ -76,6 +76,8 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const isPerson = type === 'EXPENSE' && category === PERSON_CATEGORY;
   const isPartnerWithdrawal = type === 'WITHDRAWAL' && category === PARTNER_CATEGORY;
   const needsPartner = isPartnerWithdrawal || (isPerson && personRole === 'PARTNER');
+  /** Plain Income / Withdrawal entries (not a partner payout) can attach a pay slip / receipt */
+  const showGenericReceipt = (type === 'INCOME' || type === 'WITHDRAWAL') && !needsPartner;
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -117,6 +119,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
     setType(next);
     setCategory(CATEGORIES[next][0].value);
     setPerson('');
+    setReceipt(null);
   }
 
   function changePerson(key: string) {
@@ -144,7 +147,13 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
       if (needsPartner) {
         return api.post(`/partners/${person}/entries`, { type: 'WITHDRAWAL', ...common, registerId: register.id });
       }
-      return api.post(`/cash-registers/${register.id}/transactions`, { type, ...common, category });
+      let receiptUrl: string | undefined;
+      if (showGenericReceipt && receipt) {
+        const form = new FormData();
+        form.append('file', receipt);
+        receiptUrl = (await api.upload<{ url: string }>('/uploads/cash-receipts', form)).url;
+      }
+      return api.post(`/cash-registers/${register.id}/transactions`, { type, ...common, category, receiptUrl });
     },
     onSuccess: () => {
       for (const key of [
@@ -254,7 +263,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           </Select>
         </Field>
 
-        {isPerson && personRole !== 'PARTNER' && (
+        {((isPerson && personRole !== 'PARTNER') || showGenericReceipt) && (
           <Field label={t('receipt')} hint={t('receiptHint')}>
             <input
               type="file"

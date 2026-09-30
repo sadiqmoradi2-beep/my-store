@@ -79,7 +79,7 @@ export class SellersService {
           'Provide either an existing user, or a full name and email to create a new account',
         );
       }
-      if (await this.prisma.user.findUnique({ where: { email: dto.email } })) {
+      if (await this.prisma.user.findFirst({ where: { email: dto.email, deletedAt: null } })) {
         throw new ConflictException('This email is already registered');
       }
       await assertPlanLimit(this.prisma, tenantId, 'users');

@@ -17,6 +17,7 @@ const BASE_DIR = resolve(process.cwd(), 'storage', 'uploads', 'purchase-invoices
 const WAREHOUSE_REQUESTS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'warehouse-requests');
 const PAYMENT_PROOFS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'payment-proofs');
 const SALARY_RECEIPTS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'salary-receipts');
+const CASH_RECEIPTS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'cash-receipts');
 
 function tenantScopedStorage(baseDir: string) {
   return diskStorage({
@@ -124,5 +125,27 @@ export class UploadsController {
     if (!file) throw new BadRequestException('No file was sent');
     const tenantId = file.destination.split(/[/\\]/).pop();
     return { url: `/uploads/salary-receipts/${tenantId}/${file.filename}` };
+  }
+
+  /** Pay slip / receipt photo for a manual Income or Withdrawal cash transaction */
+  @Post('cash-receipts')
+  @RequirePermissions(PERMISSIONS.CASH_TRANSACT)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: tenantScopedStorage(CASH_RECEIPTS_DIR),
+      limits: { fileSize: MAX_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_DOCUMENT_MIME_TYPES.includes(file.mimetype)) {
+          cb(new BadRequestException('Only image or PDF files (jpg/png/webp/pdf) are allowed'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  uploadCashReceipt(@UploadedFile() file: Express.Multer.File & { destination: string }) {
+    if (!file) throw new BadRequestException('No file was sent');
+    const tenantId = file.destination.split(/[/\\]/).pop();
+    return { url: `/uploads/cash-receipts/${tenantId}/${file.filename}` };
   }
 }

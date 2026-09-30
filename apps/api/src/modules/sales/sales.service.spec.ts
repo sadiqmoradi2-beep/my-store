@@ -129,7 +129,7 @@ describe('SalesService.createFromCart', () => {
   it.each([
     ['EBT', 'EBT'],
     ['ZELLE', 'ZELLE'],
-    ['CARD', 'ZELLE'], // Card money lands in the Zelle (bank) part
+    ['CARD', 'CARD'], // Card has its own Income bucket
   ] as const)('%s payment → recorded in the %s Income part', async (method, part) => {
     await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: method });
     expect(findIncomeRegister).toHaveBeenCalledWith(tx, 't1', 'b1', part);

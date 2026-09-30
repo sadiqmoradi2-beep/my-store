@@ -90,7 +90,7 @@ describe('EmployeesService.create', () => {
       employee: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'emp-new', ...data })),
       },
-      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      user: { findFirst: jest.fn().mockResolvedValue(null) },
       subscription: {
         findUnique: jest.fn().mockResolvedValue({ plan: { limits: { maxUsers: -1 }, name: 'BUSINESS' } }),
       },
@@ -212,7 +212,7 @@ describe('EmployeesService.create', () => {
   });
 
   it('email already registered → 409 and no transaction', async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: 'existing' });
+    prisma.user.findFirst.mockResolvedValue({ id: 'existing' });
     await expect(
       service.create('t1', { fullName: 'Zahra', position: 'Seller', salary: 5000, email: 'zahra@demo.af' }),
     ).rejects.toBeInstanceOf(ConflictException);

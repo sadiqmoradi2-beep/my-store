@@ -94,6 +94,7 @@ export class CashService {
         amount: new Prisma.Decimal(dto.amount),
         category: dto.category,
         note: dto.note,
+        receiptUrl: dto.receiptUrl,
         sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
       }),
     );
@@ -206,6 +207,7 @@ interface CashTransactionInput {
   amount: Prisma.Decimal;
   category?: string;
   note?: string;
+  receiptUrl?: string;
   referenceType?: string;
   referenceId?: string;
   /** The work session whose cash box is behind this movement */
@@ -244,6 +246,7 @@ export async function recordCashTransaction(
       balanceAfter,
       category: input.category,
       note: input.note,
+      receiptUrl: input.receiptUrl,
       referenceType: input.referenceType,
       referenceId: input.referenceId,
       sessionId: input.sessionId ?? null,

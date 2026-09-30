@@ -14,27 +14,28 @@ export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
 
 export const PAYMENT_METHOD_HINTS: Record<PaymentMethod, string> = {
   CASH: 'Cash payment',
-  CARD: 'Debit / credit card payment',
+  CARD: 'Card payment — the money goes to Income → Card',
   EBT: 'Government assistance (Electronic Benefit Transfer)',
   ZELLE: 'Bank transfer payment',
   DEBIT_CARD: 'Card payment — the money goes to Income → Debit Card',
 };
 
 /** The parts of Income — every payment received lands in one of them */
-export const INCOME_PARTS = ['CASH', 'EBT', 'ZELLE', 'DEBIT_CARD'] as const;
+export const INCOME_PARTS = ['CASH', 'CARD', 'EBT', 'ZELLE', 'DEBIT_CARD'] as const;
 export type IncomePart = (typeof INCOME_PARTS)[number];
 
 export const INCOME_PART_NAMES: Record<IncomePart, string> = {
   CASH: 'Cash',
+  CARD: 'Card',
   EBT: 'EBT',
   ZELLE: 'Zelle',
   DEBIT_CARD: 'Debit Card',
 };
 
-/** Which Income part receives the money of each payment method (Card goes to the bank/Zelle part). */
+/** Which Income part receives the money of each payment method — each has its own bucket. */
 export const PAYMENT_METHOD_PART: Record<PaymentMethod, IncomePart> = {
   CASH: 'CASH',
-  CARD: 'ZELLE',
+  CARD: 'CARD',
   EBT: 'EBT',
   ZELLE: 'ZELLE',
   DEBIT_CARD: 'DEBIT_CARD',

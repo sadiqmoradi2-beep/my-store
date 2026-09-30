@@ -32,8 +32,7 @@ enum SubscriptionStatus {
 
 enum PaymentMethod {
   CASH
-  /// Legacy value — no longer offered at checkout (superseded by DEBIT_CARD, which has its own
-  /// Income tracking). Kept only so historical Sale rows using it remain valid/readable.
+  /// Card payment — own Income bucket, separate from Zelle.
   CARD
   EBT
   ZELLE
@@ -43,6 +42,7 @@ enum PaymentMethod {
 
 enum IncomePart {
   CASH
+  CARD
   EBT
   ZELLE
   DEBIT_CARD
@@ -580,6 +580,7 @@ model CashTransaction {
   balanceAfter  Decimal             @db.Decimal(18, 2)
   category      String?
   note          String?
+  receiptUrl    String? // optional pay slip / receipt photo (INCOME and WITHDRAWAL entries)
   referenceType String?
   referenceId   String?
   sessionId     String? // the work session whose cash box paid / received this

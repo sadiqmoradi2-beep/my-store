@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { HandCoins, Landmark, Plus, ReceiptText, Wallet } from 'lucide-react';
+import { CreditCard, HandCoins, Landmark, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
   type IncomeSummaryDto,
   type Locale,
 } from '@my-store/shared';
-import { api } from '@/lib/api-client';
+import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Select, Spinner, cn } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
@@ -34,6 +34,7 @@ const TX_TONES: Record<CashTransactionType, string> = {
 
 const PART_ICONS: Record<IncomePart, typeof Wallet> = {
   CASH: Wallet,
+  CARD: CreditCard,
   EBT: ReceiptText,
   ZELLE: Landmark,
   DEBIT_CARD: HandCoins,
@@ -149,7 +150,7 @@ export default function IncomePage() {
               </Card>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
               {summary.parts.map((part) => {
                 const Icon = PART_ICONS[part.part];
                 const active = selectedPart === part.part;
@@ -307,7 +308,20 @@ function RegisterTransactions({
                   </td>
                   <td className="p-3 font-bold text-ink">{formatMoney(tx.amount, locale)}</td>
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
-                  <td className="p-3 text-ink-muted">{tx.category ?? tx.note ?? '—'}</td>
+                  <td className="p-3 text-ink-muted">
+                    {tx.category ?? tx.note ?? '—'}
+                    {tx.receiptUrl && (
+                      <a
+                        href={assetUrl(tx.receiptUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ms-2 inline-flex items-center text-primary-600 hover:underline"
+                        title={t('receipt')}
+                      >
+                        <ReceiptText className="h-4 w-4" aria-hidden />
+                      </a>
+                    )}
+                  </td>
                   <td className="p-3 text-ink-muted">
                     {tx.sessionPerson ? (
                       <span title={tx.sessionCode ?? ''}>{tx.sessionPerson}</span>

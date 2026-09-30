@@ -25,6 +25,11 @@ export class CreateCashTransactionDto {
   @IsString()
   note?: string;
 
+  /** Optional pay slip / receipt photo URL (from POST /uploads/cash-receipts) */
+  @IsOptional()
+  @IsString()
+  receiptUrl?: string;
+
   /** The work session whose cash box paid / received this. Empty = the main cash box; not given = the user's own active session */
   @IsOptional()
   @IsString()
