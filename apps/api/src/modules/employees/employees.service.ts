@@ -40,7 +40,7 @@ export class EmployeesService {
       userIds.length
         ? this.prisma.user.findMany({
             where: { id: { in: userIds }, tenantId },
-            select: { id: true, roleId: true, role: { select: { name: true } } },
+            select: { id: true, roleId: true, role: { select: { name: true } }, deletedAt: true },
           })
         : Promise.resolve([]),
       userIds.length
@@ -68,22 +68,26 @@ export class EmployeesService {
     const saleByUser = new Map(saleStats.map((s) => [s.createdById, s]));
     const commissionByProfile = new Map(commissionStats.map((s) => [s.sellerProfileId, s]));
 
-    return employees.map((employee) => {
-      const user = employee.userId ? usersById.get(employee.userId) : undefined;
-      const seller = employee.userId ? sellerByUserId.get(employee.userId) : undefined;
-      return {
-        ...employee,
-        roleId: user?.roleId ?? null,
-        roleName: user?.role.name ?? null,
-        sellerProfileId: seller?.id ?? null,
-        commissionPercent: seller?.commissionPercent ?? null,
-        salesCount: seller ? (saleByUser.get(employee.userId!)?._count._all ?? 0) : null,
-        salesTotal: seller ? (saleByUser.get(employee.userId!)?._sum.total ?? new Prisma.Decimal(0)) : null,
-        commissionTotal: seller
-          ? (commissionByProfile.get(seller.id)?._sum.amount ?? new Prisma.Decimal(0))
-          : null,
-      };
-    });
+    return employees
+      // A deleted login account (soft-delete) removes the person from view here; their Employee
+      // row and all financial/work-session history are untouched, just no longer listed.
+      .filter((employee) => !employee.userId || !usersById.get(employee.userId)?.deletedAt)
+      .map((employee) => {
+        const user = employee.userId ? usersById.get(employee.userId) : undefined;
+        const seller = employee.userId ? sellerByUserId.get(employee.userId) : undefined;
+        return {
+          ...employee,
+          roleId: user?.roleId ?? null,
+          roleName: user?.role.name ?? null,
+          sellerProfileId: seller?.id ?? null,
+          commissionPercent: seller?.commissionPercent ?? null,
+          salesCount: seller ? (saleByUser.get(employee.userId!)?._count._all ?? 0) : null,
+          salesTotal: seller ? (saleByUser.get(employee.userId!)?._sum.total ?? new Prisma.Decimal(0)) : null,
+          commissionTotal: seller
+            ? (commissionByProfile.get(seller.id)?._sum.amount ?? new Prisma.Decimal(0))
+            : null,
+        };
+      });
   }
 
   /** Pay commission to an employee's linked seller profile (created when they were hired as position=Seller) */

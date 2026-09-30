@@ -347,6 +347,17 @@ describe('EmployeesService.list', () => {
     expect(noLogin.roleId).toBeNull();
     expect(noLogin.sellerProfileId).toBeNull();
   });
+
+  it('an employee whose login was deleted (deletedAt set) is excluded from the list entirely', async () => {
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'user-1', roleId: 'role-seller', role: { name: 'Seller' }, deletedAt: new Date() },
+      { id: 'user-2', roleId: 'role-worker', role: { name: 'Worker' }, deletedAt: null },
+    ]);
+    const result = await service.list('t1');
+    expect(result.find((e) => e.id === 'emp1')).toBeUndefined();
+    expect(result.find((e) => e.id === 'emp2')).toBeDefined();
+    expect(result.find((e) => e.id === 'emp3')).toBeDefined();
+  });
 });
 
 describe('EmployeesService.startShift/endShift', () => {
