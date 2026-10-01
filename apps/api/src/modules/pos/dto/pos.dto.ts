@@ -1,6 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { PAYMENT_METHODS, PaymentMethod } from '@my-store/shared';
+
+/** Sanity cap on a register transaction — guards against a typo (extra digit) */
+const MAX_CASH_AMOUNT = 10_000_000_000;
 
 export class PosSaleDto {
   @IsString()
@@ -15,6 +18,7 @@ export class PosSaleDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_CASH_AMOUNT)
   cashReceived?: number;
 
   /**

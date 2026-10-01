@@ -219,6 +219,11 @@ export async function recordCashTransaction(
   tx: Prisma.TransactionClient,
   input: CashTransactionInput,
 ) {
+  // Always positive — direction comes from type. Enforced here, not just in each caller's DTO,
+  // since a negative amount would flip direction and credit a register instead of debiting it.
+  if (!input.amount.isPositive()) {
+    throw new UnprocessableEntityException('Amount must be positive');
+  }
   const register = await tx.cashRegister.findFirst({
     where: { id: input.registerId, tenantId: input.tenantId },
     select: { balance: true, isActive: true },

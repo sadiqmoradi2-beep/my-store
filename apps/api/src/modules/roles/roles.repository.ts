@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ROLES } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -7,7 +8,9 @@ export class RolesRepository {
 
   findAllForTenant(tenantId: string) {
     return this.prisma.role.findMany({
-      where: { OR: [{ tenantId: null }, { tenantId }] },
+      // SUPER_ADMIN is a global (tenantId: null) role too — never listed to a tenant, only
+      // platform-admin tooling needs to see it
+      where: { key: { not: ROLES.SUPER_ADMIN }, OR: [{ tenantId: null }, { tenantId }] },
       include: {
         rolePermissions: { include: { permission: { select: { key: true } } } },
         _count: { select: { users: true } },

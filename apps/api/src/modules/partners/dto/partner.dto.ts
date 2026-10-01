@@ -3,6 +3,9 @@ import { IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength 
 import { PARTNER_ENTRY_TYPES, PartnerEntryType } from '@my-store/shared';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
+/** Sanity cap on a ledger amount/register transaction — guards against a typo (extra digit) */
+const MAX_LEDGER_AMOUNT = 10_000_000_000;
+
 export class CreatePartnerDto {
   @IsString()
   @MinLength(2)
@@ -58,6 +61,8 @@ export class CreateLedgerEntryDto {
 
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(MAX_LEDGER_AMOUNT)
   amount: number;
 
   /** e.g. "2026-09" — the period this distribution covers */

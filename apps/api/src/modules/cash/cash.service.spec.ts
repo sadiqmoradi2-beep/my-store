@@ -250,6 +250,22 @@ describe('recordCashTransaction', () => {
     expect(data.balanceAfter.toString()).toBe('700');
   });
 
+  it('negative amount → rejected before any write (would flip direction and credit instead of debit)', async () => {
+    const tx = buildTx({ balance: D(100), isActive: true });
+    await expect(
+      recordCashTransaction(tx as never, {
+        tenantId: 't1',
+        userId: 'u1',
+        registerId: 'reg-1',
+        type: 'WITHDRAWAL',
+        amount: D(-5000),
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(tx.cashRegister.findFirst).not.toHaveBeenCalled();
+    expect(tx.cashRegister.update).not.toHaveBeenCalled();
+    expect(tx.cashTransaction.create).not.toHaveBeenCalled();
+  });
+
   it('balance would go negative → transaction rejected with no writes at all', async () => {
     const tx = buildTx({ balance: D(100), isActive: true });
     await expect(

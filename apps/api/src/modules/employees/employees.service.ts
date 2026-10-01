@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { EMPLOYEE_POSITION_ROLE } from '@my-store/shared';
+import { EMPLOYEE_POSITION_ROLE, ROLES } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction } from '../cash/cash.service';
@@ -153,7 +153,9 @@ export class EmployeesService {
     await assertPlanLimit(this.prisma, tenantId, 'users');
     const role = dto.roleId
       ? await this.prisma.role.findFirst({
-          where: { id: dto.roleId, OR: [{ tenantId: null }, { tenantId }] },
+          // SUPER_ADMIN is a global (tenantId: null) role too — never assignable through this
+          // tenant-scoped endpoint, only through platform-admin tooling
+          where: { id: dto.roleId, key: { not: ROLES.SUPER_ADMIN }, OR: [{ tenantId: null }, { tenantId }] },
           select: { id: true },
         })
       : await this.prisma.role.findFirst({

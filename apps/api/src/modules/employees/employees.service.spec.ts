@@ -224,6 +224,24 @@ describe('EmployeesService.create', () => {
     expect(userData.roleId).toBe('role-custom-manager');
   });
 
+  it('roleId pointing at SUPER_ADMIN → excluded from the query, 404 (never assignable through this endpoint)', async () => {
+    prisma.role.findFirst.mockResolvedValue(null);
+    await expect(
+      service.create('t1', {
+        fullName: 'Karim',
+        position: 'Manager',
+        positionPreset: 'MANAGER',
+        salary: 8000,
+        email: 'karim@demo.af',
+        roleId: 'role-super-admin',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.role.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ key: { not: 'SUPER_ADMIN' } }) }),
+    );
+    expect(tx.user.create).not.toHaveBeenCalled();
+  });
+
   it('roleId not found for this tenant → 404 and no transaction', async () => {
     prisma.role.findFirst.mockResolvedValue(null);
     await expect(
