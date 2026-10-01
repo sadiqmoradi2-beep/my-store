@@ -106,6 +106,24 @@ describe('WorkSessionsService', () => {
       await expect(service.start('t1', 'admin', dto)).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it('seller lookup excludes a profile whose login was soft-deleted, even if left isActive', async () => {
+      prisma.workSession.findFirst.mockResolvedValueOnce(null).mockResolvedValue({ ...baseSession });
+      await service.start('t1', 'admin', dto);
+      expect(prisma.sellerProfile.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isActive: true, user: { deletedAt: null } }),
+        }),
+      );
+    });
+
+    it('employee lookup excludes a soft-deleted employee, even if left isActive', async () => {
+      prisma.workSession.findFirst.mockResolvedValueOnce(null).mockResolvedValue({ ...baseSession });
+      await service.start('t1', 'admin', { ...dto, role: 'EMPLOYEE', personId: 'e1' });
+      expect(prisma.employee.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ isActive: true, deletedAt: null }) }),
+      );
+    });
+
     it('works for an employee and a partner too', async () => {
       prisma.workSession.findFirst
         .mockResolvedValueOnce(null)
@@ -116,6 +134,18 @@ describe('WorkSessionsService', () => {
       expect(tx.workSession.create.mock.calls[0][0].data.employeeId).toBe('e1');
       await service.start('t1', 'admin', { ...dto, role: 'PARTNER', personId: 'p1' });
       expect(tx.workSession.create.mock.calls[1][0].data.partnerId).toBe('p1');
+    });
+  });
+
+  describe('people', () => {
+    it('excludes a seller/employee whose login was soft-deleted, even if left isActive (stale data)', async () => {
+      await service.people('t1');
+      expect(prisma.sellerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tenantId: 't1', isActive: true, user: { deletedAt: null } } }),
+      );
+      expect(prisma.employee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { tenantId: 't1', isActive: true, deletedAt: null } }),
+      );
     });
   });
 

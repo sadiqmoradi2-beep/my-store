@@ -145,11 +145,14 @@ export class WorkSessionsService {
   /** People who can hold a session, with the session they already have (to warn before a duplicate is started) */
   async people(tenantId: string) {
     const [sellers, employees, partners, active] = await Promise.all([
+      // A soft-deleted login's seller profile can be left isActive (e.g. data from before that
+      // cleanup existed) — exclude it by the login's own deletedAt too, not just isActive, so a
+      // stale profile can never show up here regardless of how it was left in that state.
       this.prisma.sellerProfile.findMany({
-        where: { tenantId, isActive: true },
+        where: { tenantId, isActive: true, user: { deletedAt: null } },
         include: { user: { select: { fullName: true } } },
       }),
-      this.prisma.employee.findMany({ where: { tenantId, isActive: true } }),
+      this.prisma.employee.findMany({ where: { tenantId, isActive: true, deletedAt: null } }),
       this.prisma.partner.findMany({ where: { tenantId, isActive: true, deletedAt: null } }),
       this.prisma.workSession.findMany({
         where: { tenantId, status: 'ACTIVE' },
@@ -593,12 +596,14 @@ export class WorkSessionsService {
   private async resolvePerson(tenantId: string, role: SessionRole, personId: string): Promise<{ name: string }> {
     if (role === 'SELLER') {
       const seller = await this.prisma.sellerProfile.findFirst({
-        where: { id: personId, tenantId, isActive: true },
+        where: { id: personId, tenantId, isActive: true, user: { deletedAt: null } },
         include: { user: { select: { fullName: true } } },
       });
       if (seller) return { name: seller.user.fullName };
     } else if (role === 'EMPLOYEE') {
-      const employee = await this.prisma.employee.findFirst({ where: { id: personId, tenantId, isActive: true } });
+      const employee = await this.prisma.employee.findFirst({
+        where: { id: personId, tenantId, isActive: true, deletedAt: null },
+      });
       if (employee) return { name: employee.fullName };
     } else {
       const partner = await this.prisma.partner.findFirst({ where: { id: personId, tenantId, isActive: true, deletedAt: null } });
