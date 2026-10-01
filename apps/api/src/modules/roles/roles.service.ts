@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PERMISSIONS } from '@my-store/shared';
+import { RolePermissionsCacheService } from '../../common/role-permissions-cache.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesRepository } from './roles.repository';
@@ -20,7 +21,10 @@ const PLATFORM_ONLY_PERMISSIONS: readonly string[] = [
 
 @Injectable()
 export class RolesService {
-  constructor(private readonly repo: RolesRepository) {}
+  constructor(
+    private readonly repo: RolesRepository,
+    private readonly permissionsCache: RolePermissionsCacheService,
+  ) {}
 
   async list(tenantId: string) {
     const roles = await this.repo.findAllForTenant(tenantId);
@@ -56,7 +60,10 @@ export class RolesService {
     const permissionIds = dto.permissionKeys
       ? await this.resolvePermissions(dto.permissionKeys)
       : undefined;
-    return this.repo.update(id, dto.name, permissionIds);
+    const updated = await this.repo.update(id, dto.name, permissionIds);
+    // A permission change must take effect immediately, not after the guard's cache TTL expires
+    this.permissionsCache.invalidate(id);
+    return updated;
   }
 
   async remove(tenantId: string, id: string) {
@@ -66,6 +73,7 @@ export class RolesService {
       throw new BadRequestException('This role is assigned to users and cannot be deleted');
     }
     await this.repo.delete(id);
+    this.permissionsCache.invalidate(id);
     return { deleted: true };
   }
 

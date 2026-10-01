@@ -164,9 +164,11 @@ export class AuthService {
     return this.me(userId);
   }
 
-  async disableTwoFactor(userId: string, code: string): Promise<AuthUser> {
+  async disableTwoFactor(userId: string, code: string, password: string): Promise<AuthUser> {
     const user = await this.repo.findUserById(userId);
     if (!user || user.deletedAt) throw new UnauthorizedException();
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) throw new UnauthorizedException('Current password is incorrect');
     if (!user.totpEnabledAt || !user.totpSecret) {
       throw new BadRequestException('2FA is not enabled');
     }

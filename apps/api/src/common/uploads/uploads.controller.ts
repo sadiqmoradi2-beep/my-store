@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { BadRequestException, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -13,6 +13,16 @@ const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 /** Invoices and payment proofs also accept scanned PDFs, in addition to images */
 const ALLOWED_DOCUMENT_MIME_TYPES = [...ALLOWED_IMAGE_MIME_TYPES, 'application/pdf'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+
+// The stored extension is derived from the validated MIME type, never from the client-supplied
+// original filename — otherwise a crafted "x.jpg" with Content-Type: image/jpeg but real .svg
+// content (or vice versa) could be stored and later served with a dangerous extension/content type.
+const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'application/pdf': '.pdf',
+};
 const BASE_DIR = resolve(process.cwd(), 'storage', 'uploads', 'purchase-invoices');
 const WAREHOUSE_REQUESTS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'warehouse-requests');
 const PAYMENT_PROOFS_DIR = resolve(process.cwd(), 'storage', 'uploads', 'payment-proofs');
@@ -31,7 +41,7 @@ function tenantScopedStorage(baseDir: string) {
       mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
-    filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
+    filename: (_req, file, cb) => cb(null, `${randomUUID()}${EXTENSION_BY_MIME_TYPE[file.mimetype] ?? ''}`),
   });
 }
 

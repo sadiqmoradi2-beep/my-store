@@ -10,6 +10,7 @@ import { QueueModule } from './queue/queue.module';
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { RolePermissionsCacheModule } from './common/role-permissions-cache.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
@@ -56,6 +57,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     PrismaModule,
     RedisModule,
     QueueModule,
+    RolePermissionsCacheModule,
     AuthModule,
     TenantsModule,
     UsersModule,

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PERMISSIONS } from '@my-store/shared';
+import { RolePermissionsCacheService } from '../../common/role-permissions-cache.service';
 import { RolesRepository } from './roles.repository';
 import { RolesService } from './roles.service';
 
@@ -15,6 +16,7 @@ describe('RolesService', () => {
     update: jest.Mock;
     delete: jest.Mock;
   };
+  let permissionsCache: { invalidate: jest.Mock };
 
   beforeEach(async () => {
     repo = {
@@ -26,9 +28,14 @@ describe('RolesService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     };
+    permissionsCache = { invalidate: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [RolesService, { provide: RolesRepository, useValue: repo }],
+      providers: [
+        RolesService,
+        { provide: RolesRepository, useValue: repo },
+        { provide: RolePermissionsCacheService, useValue: permissionsCache },
+      ],
     }).compile();
     service = moduleRef.get(RolesService);
   });
@@ -63,6 +70,16 @@ describe('RolesService', () => {
     repo.findTenantRole.mockResolvedValue({ id: 'role-1', _count: { users: 0 } });
     await service.remove('t1', 'role-1');
     expect(repo.delete).toHaveBeenCalledWith('role-1');
+  });
+
+  it('update/remove invalidate the role\'s cached permission set immediately, instead of waiting out the TTL', async () => {
+    repo.findTenantRole.mockResolvedValue({ id: 'role-1', _count: { users: 0 } });
+    await service.update('t1', 'role-1', { permissionKeys: ['orders.view'] });
+    expect(permissionsCache.invalidate).toHaveBeenCalledWith('role-1');
+
+    permissionsCache.invalidate.mockClear();
+    await service.remove('t1', 'role-1');
+    expect(permissionsCache.invalidate).toHaveBeenCalledWith('role-1');
   });
 
   it('platform-only permission key on a tenant role → 403, never reaches the repository (privilege-escalation guard)', async () => {

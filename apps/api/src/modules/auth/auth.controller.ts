@@ -22,6 +22,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { TotpCodeDto } from './dto/totp-code.dto';
+import { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
 import { UpdateUiPrefsDto } from './dto/ui-prefs.dto';
 
 const REFRESH_COOKIE = 'my_store_refresh';
@@ -135,8 +136,8 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(200)
   @Post('2fa/disable')
-  disableTwoFactor(@CurrentUser() user: RequestUser, @Body() dto: TotpCodeDto) {
-    return this.authService.disableTwoFactor(user.userId, dto.code);
+  disableTwoFactor(@CurrentUser() user: RequestUser, @Body() dto: DisableTwoFactorDto) {
+    return this.authService.disableTwoFactor(user.userId, dto.code, dto.password);
   }
 
   private withRefreshCookie(res: Response, result: AuthResult, keepTokenInBody = false) {

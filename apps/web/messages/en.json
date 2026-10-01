@@ -959,6 +959,7 @@
     "confirmEnable": "Confirm & enable",
     "cancel": "Cancel",
     "enterCodeToDisable": "Enter the current app code to disable",
+    "currentPassword": "Current password",
     "disable": "Disable 2FA"
   },
   "sessions": {

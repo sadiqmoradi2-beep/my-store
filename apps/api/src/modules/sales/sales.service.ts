@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -112,6 +113,18 @@ export class SalesService {
     const extraKept = dto.fixedAmount && cashReceived ? cashReceived.sub(total) : D(0);
 
     const sale = await this.prisma.$transaction(async (tx) => {
+      // Claim the cart first: deleting it here (instead of at the end) makes two concurrent
+      // checkouts of the same cart mutually exclusive — only the first delete can succeed, the
+      // second hits "not found" and aborts before a duplicate sale/stock deduction is ever made.
+      try {
+        await tx.cart.delete({ where: { id: cart.id } });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+          throw new ConflictException('This cart was already checked out');
+        }
+        throw err;
+      }
+
       const warehouse = await findDefaultWarehouse(tx, tenantId, branch);
       const sessionId = await findActiveSessionIdForUser(tx, tenantId, userId);
       const last = await tx.sale.findFirst({
@@ -176,7 +189,6 @@ export class SalesService {
         createdById: userId,
       });
 
-      await tx.cart.delete({ where: { id: cart.id } });
       return tx.sale.update({
         where: { id: created.id },
         data: { registerId },

@@ -1,4 +1,4 @@
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -220,8 +220,28 @@ describe('SalesService.createFromCart', () => {
     await expect(service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' })).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
+    // The whole $transaction rejects, so nothing it did (including claiming the cart) actually
+    // commits — cash is never recorded either way
     expect(recordCashTransaction).not.toHaveBeenCalled();
-    expect(tx.cart.delete).not.toHaveBeenCalled();
+  });
+
+  it('cart already claimed by a concurrent checkout → 409, nothing else runs (prevents a double-submit race)', async () => {
+    tx.cart.delete.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Record not found', { code: 'P2025', clientVersion: '6.0.0' }),
+    );
+    await expect(
+      service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.sale.create).not.toHaveBeenCalled();
+    expect(applyMovement).not.toHaveBeenCalled();
+    expect(recordCashTransaction).not.toHaveBeenCalled();
+  });
+
+  it('claims the cart (deletes it) before touching stock or cash — not after', async () => {
+    await service.createFromCart('t1', 'u1', { cartId: 'cart-1', paymentMethod: 'CASH', cashReceived: 500 });
+    const deleteOrder = tx.cart.delete.mock.invocationCallOrder[0];
+    const saleCreateOrder = tx.sale.create.mock.invocationCallOrder[0];
+    expect(deleteOrder).toBeLessThan(saleCreateOrder);
   });
 });
 

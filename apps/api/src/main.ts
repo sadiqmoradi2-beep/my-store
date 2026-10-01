@@ -4,11 +4,16 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // CSP is left off: this is a JSON API plus the Swagger docs page, which needs inline
+  // scripts/styles that a locked-down CSP would break. Every other header helmet sets
+  // (nosniff, frameguard, HSTS, etc.) stays on.
+  app.use(helmet({ contentSecurityPolicy: false }));
   app.useStaticAssets(resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
   // Behind a hosting proxy (Render/Vercel): use the real client IP for rate limiting
   app.set('trust proxy', true);

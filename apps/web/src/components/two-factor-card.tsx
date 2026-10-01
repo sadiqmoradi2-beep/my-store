@@ -18,6 +18,7 @@ export function TwoFactorCard() {
   const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
 
   useEffect(() => {
     if (!setup) {
@@ -40,10 +41,11 @@ export function TwoFactorCard() {
     },
   });
   const disable = useMutation({
-    mutationFn: () => api.post<AuthUser>('/auth/2fa/disable', { code }),
+    mutationFn: () => api.post<AuthUser>('/auth/2fa/disable', { code, password: disablePassword }),
     onSuccess: (next) => {
       setUser(next);
       setCode('');
+      setDisablePassword('');
     },
   });
 
@@ -123,6 +125,15 @@ export function TwoFactorCard() {
 
       {enabled && (
         <div className="mt-4 space-y-3">
+          <Field label={t('currentPassword')}>
+            <Input
+              type="password"
+              dir="ltr"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              className="w-60"
+            />
+          </Field>
           <Field label={t('enterCodeToDisable')}>
             <Input
               dir="ltr"
@@ -137,7 +148,7 @@ export function TwoFactorCard() {
           <Button
             variant="danger"
             loading={disable.isPending}
-            disabled={code.length !== 6}
+            disabled={code.length !== 6 || !disablePassword}
             onClick={() => disable.mutate()}
           >
             {t('disable')}

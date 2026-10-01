@@ -247,6 +247,22 @@ describe('AuthService', () => {
     });
   });
 
+  describe('disableTwoFactor', () => {
+    it('wrong current password → 401, rejected before the TOTP code is even checked', async () => {
+      const passwordHash = await bcrypt.hash('Correct@123', 4);
+      repo.findUserById.mockResolvedValue({
+        ...baseUser,
+        passwordHash,
+        totpEnabledAt: new Date(),
+        totpSecret: 'JBSWY3DPEHPK3PXP',
+      });
+      await expect(
+        service.disableTwoFactor('u1', '000000', 'wrong-password'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('changePassword', () => {
     it('correct current password → new password saved + refreshTokenHash revoked', async () => {
       const passwordHash = await bcrypt.hash('Correct@123', 4);

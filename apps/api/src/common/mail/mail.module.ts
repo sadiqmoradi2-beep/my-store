@@ -25,7 +25,11 @@ import { MailService } from './mail.service';
         if (smtp.host && smtp.user && smtp.pass) {
           return new SmtpMailProvider(smtp.host, smtp.port, smtp.user, smtp.pass, smtp.from);
         }
-        // Nothing configured (e.g. local dev) — log the email instead of sending it
+        // Nothing configured — in production this would otherwise silently log real password-reset
+        // and account-invite links in plaintext, so fail the boot loudly instead of failing open.
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('No mail provider configured: set BREVO_API_KEY+BREVO_FROM_EMAIL or SMTP_* env vars');
+        }
         return new LogMailProvider();
       },
     },
