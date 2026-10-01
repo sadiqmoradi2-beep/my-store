@@ -8,6 +8,7 @@ import { PERMISSIONS } from '@my-store/shared';
 import type {
   BranchDto,
   CashRegisterDto,
+  DebtStatus,
   Locale,
   ProductDto,
   PurchaseDto,
@@ -15,7 +16,7 @@ import type {
 } from '@my-store/shared';
 import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
-import { Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
+import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
 
 export default function SuppliersPage() {
@@ -159,6 +160,12 @@ export default function SuppliersPage() {
   );
 }
 
+const DEBT_STATUS_TONES: Record<DebtStatus, string> = {
+  OPEN: 'PENDING',
+  PARTIAL: 'SHIPPING',
+  SETTLED: 'DELIVERED',
+};
+
 function PurchaseHistory() {
   const t = useTranslations('suppliers');
   const tc = useTranslations('common');
@@ -196,7 +203,19 @@ function PurchaseHistory() {
                 <td className="p-3 text-ink">{purchase.supplierName}</td>
                 <td className="p-3 text-ink-muted">{formatNumber(purchase.items.length, locale)}</td>
                 <td className="p-3 font-bold text-ink">{formatMoney(purchase.total, locale)}</td>
-                <td className="p-3 text-ink-muted">{formatMoney(purchase.paidAmount, locale)}</td>
+                <td className="p-3 text-ink-muted">
+                  {formatMoney(
+                    (Number(purchase.paidAmount) + Number(purchase.debtPaidAmount)).toFixed(2),
+                    locale,
+                  )}
+                  {purchase.debtStatus && (
+                    <span className="ms-2">
+                      <Badge tone={DEBT_STATUS_TONES[purchase.debtStatus]}>
+                        {t(`debtStatuses.${purchase.debtStatus}`)}
+                      </Badge>
+                    </span>
+                  )}
+                </td>
                 <td className="p-3">
                   {purchase.invoiceImageUrl ? (
                     purchase.invoiceImageUrl.toLowerCase().endsWith('.pdf') ? (

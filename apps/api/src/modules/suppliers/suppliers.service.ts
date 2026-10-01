@@ -231,10 +231,28 @@ export class SuppliersService {
       }),
       this.prisma.purchase.count({ where }),
     ]);
-    const items = rows.map(({ supplier, ...purchase }) => ({
-      ...purchase,
-      supplierName: supplier.name,
-    }));
+
+    // A purchase not fully paid upfront gets a linked Debt for the remainder (referenceType:
+    // 'purchase') — later payments against that debt (via Loan & Deficit) don't touch the
+    // purchase row itself, so merge them back in here.
+    const purchaseIds = rows.map((r) => r.id);
+    const debts = purchaseIds.length
+      ? await this.prisma.debt.findMany({
+          where: { tenantId, referenceType: 'purchase', referenceId: { in: purchaseIds } },
+          select: { referenceId: true, paidAmount: true, status: true },
+        })
+      : [];
+    const debtByPurchaseId = new Map(debts.map((d) => [d.referenceId, d]));
+
+    const items = rows.map(({ supplier, ...purchase }) => {
+      const debt = debtByPurchaseId.get(purchase.id);
+      return {
+        ...purchase,
+        supplierName: supplier.name,
+        debtPaidAmount: debt?.paidAmount ?? new Prisma.Decimal(0),
+        debtStatus: debt?.status ?? null,
+      };
+    });
     return { items, meta: paginationMeta(query.page, query.limit, total) };
   }
 }

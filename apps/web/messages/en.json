@@ -624,6 +624,11 @@
     "paid": "Paid",
     "paidAmount": "Paid amount",
     "paidAmountHint": "The remainder is recorded as a payable debt",
+    "debtStatuses": {
+      "OPEN": "Balance due",
+      "PARTIAL": "Partially paid",
+      "SETTLED": "Fully paid"
+    },
     "register": "Payment register",
     "noRegister": "No cash effect",
     "submitPurchase": "Record purchase",

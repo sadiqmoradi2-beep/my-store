@@ -405,6 +405,9 @@ export interface PurchaseDto {
   branchName?: string;
   total: string;
   paidAmount: string;
+  /** Paid since, against the Debt created for the remaining balance (via Loan & Deficit) */
+  debtPaidAmount: string;
+  debtStatus: DebtStatus | null;
   invoiceImageUrl: string | null;
   notes: string | null;
   items: PurchaseItemDto[];

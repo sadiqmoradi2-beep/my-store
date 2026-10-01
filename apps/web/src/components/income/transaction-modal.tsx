@@ -76,8 +76,9 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const isPerson = type === 'EXPENSE' && category === PERSON_CATEGORY;
   const isPartnerWithdrawal = type === 'WITHDRAWAL' && category === PARTNER_CATEGORY;
   const needsPartner = isPartnerWithdrawal || (isPerson && personRole === 'PARTNER');
-  /** Plain Income / Withdrawal entries (not a partner payout) can attach a pay slip / receipt */
-  const showGenericReceipt = (type === 'INCOME' || type === 'WITHDRAWAL') && !needsPartner;
+  /** Any manual entry can attach a pay slip / receipt, except a person-payment or partner payout —
+   * those already have their own receipt flow (salary-receipts) or none yet (partner ledger). */
+  const showGenericReceipt = !isPerson && !needsPartner;
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],

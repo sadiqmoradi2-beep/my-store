@@ -180,3 +180,57 @@ describe('SuppliersService.createPurchase', () => {
     });
   });
 });
+
+describe('SuppliersService.listPurchases', () => {
+  let service: SuppliersService;
+  let prisma: Record<string, Record<string, jest.Mock>>;
+
+  beforeEach(async () => {
+    prisma = {
+      purchase: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'pur1', tenantId: 't1', total: D(500), paidAmount: D(200),
+            supplier: { name: 'تأمین‌کننده ۱' }, items: [],
+          },
+          {
+            id: 'pur2', tenantId: 't1', total: D(300), paidAmount: D(300),
+            supplier: { name: 'تأمین‌کننده ۲' }, items: [],
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(2),
+      },
+      debt: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [SuppliersService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    service = moduleRef.get(SuppliersService);
+  });
+
+  it('a purchase with a linked Debt that was later paid shows that payment merged in, with its status', async () => {
+    prisma.debt.findMany.mockResolvedValue([
+      { referenceId: 'pur1', paidAmount: D(300), status: 'SETTLED' },
+    ]);
+    const result = await service.listPurchases('t1', { page: 1, limit: 10 } as never);
+    const pur1 = result.items.find((p) => p.id === 'pur1')!;
+    expect(pur1.debtPaidAmount.toString()).toBe('300');
+    expect(pur1.debtStatus).toBe('SETTLED');
+  });
+
+  it('a purchase fully paid upfront (no linked Debt) → debtStatus null, debtPaidAmount zero', async () => {
+    const result = await service.listPurchases('t1', { page: 1, limit: 10 } as never);
+    const pur2 = result.items.find((p) => p.id === 'pur2')!;
+    expect(pur2.debtStatus).toBeNull();
+    expect(pur2.debtPaidAmount.toString()).toBe('0');
+  });
+
+  it('looks up debts scoped to this tenant and only the purchase reference type', async () => {
+    await service.listPurchases('t1', { page: 1, limit: 10 } as never);
+    expect(prisma.debt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 't1', referenceType: 'purchase', referenceId: { in: ['pur1', 'pur2'] } },
+      }),
+    );
+  });
+});
