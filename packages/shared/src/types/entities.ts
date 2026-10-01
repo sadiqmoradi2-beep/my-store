@@ -688,6 +688,7 @@ export interface PartnerLedgerEntryDto {
   period: string | null;
   method: string | null;
   note: string | null;
+  receiptUrl: string | null;
   performedByName?: string | null;
   createdAt: string;
 }

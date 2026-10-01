@@ -132,6 +132,7 @@ export class PartnersService {
           period: dto.period,
           method: dto.method,
           note: dto.note,
+          receiptUrl: dto.receiptUrl,
           performedById: userId,
         },
       });

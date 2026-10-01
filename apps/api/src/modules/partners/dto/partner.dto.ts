@@ -88,6 +88,11 @@ export class CreateLedgerEntryDto {
   @IsOptional()
   @IsString()
   sessionId?: string | null;
+
+  /** Optional pay slip / receipt photo URL (from POST /uploads/cash-receipts) */
+  @IsOptional()
+  @IsString()
+  receiptUrl?: string;
 }
 
 /** Preview/apply an even distribution of a total profit or loss figure across active partners, by sharePercent */

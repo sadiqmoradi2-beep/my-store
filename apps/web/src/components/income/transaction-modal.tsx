@@ -146,7 +146,18 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           : api.post(`/employees/${person}/salary-payments`, { ...body, status: 'PAID' });
       }
       if (needsPartner) {
-        return api.post(`/partners/${person}/entries`, { type: 'WITHDRAWAL', ...common, registerId: register.id });
+        let receiptUrl: string | undefined;
+        if (receipt) {
+          const form = new FormData();
+          form.append('file', receipt);
+          receiptUrl = (await api.upload<{ url: string }>('/uploads/cash-receipts', form)).url;
+        }
+        return api.post(`/partners/${person}/entries`, {
+          type: 'WITHDRAWAL',
+          ...common,
+          registerId: register.id,
+          receiptUrl,
+        });
       }
       let receiptUrl: string | undefined;
       if (showGenericReceipt && receipt) {
@@ -264,7 +275,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           </Select>
         </Field>
 
-        {((isPerson && personRole !== 'PARTNER') || showGenericReceipt) && (
+        {((isPerson && personRole !== 'PARTNER') || showGenericReceipt || needsPartner) && (
           <Field label={t('receipt')} hint={t('receiptHint')}>
             <input
               type="file"

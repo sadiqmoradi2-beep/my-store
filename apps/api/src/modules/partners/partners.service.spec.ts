@@ -135,6 +135,18 @@ describe('PartnersService.addLedgerEntry', () => {
     });
     expect(tx.cashTransaction.create).not.toHaveBeenCalled();
   });
+
+  it('receiptUrl is stored on the ledger entry', async () => {
+    await service.addLedgerEntry('t1', 'u1', 'p1', {
+      type: 'WITHDRAWAL',
+      amount: 200,
+      registerId: 'reg1',
+      receiptUrl: '/uploads/cash-receipts/t1/x.jpg',
+    });
+    expect(tx.partnerLedgerEntry.create.mock.calls[0][0].data.receiptUrl).toBe(
+      '/uploads/cash-receipts/t1/x.jpg',
+    );
+  });
 });
 
 describe('PartnersService.previewDistribution / distribute', () => {

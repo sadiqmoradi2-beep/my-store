@@ -1210,6 +1210,7 @@ model PartnerLedgerEntry {
   /** How this amount was calculated, e.g. "30% of net profit (2026-09): 10,000" — shown alongside the entry for transparency */
   method        String?
   note          String?
+  receiptUrl    String? // optional pay slip / receipt photo (mainly used for WITHDRAWAL)
   performedById String
   createdAt     DateTime         @default(now())
 

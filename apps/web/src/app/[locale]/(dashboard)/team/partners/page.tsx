@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PiggyBank, Plus, Trash2, Pencil } from 'lucide-react';
+import { PiggyBank, Plus, ReceiptText, Trash2, Pencil } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
   type PartnerEntryType,
   type PartnerLedgerEntryDto,
 } from '@my-store/shared';
-import { api } from '@/lib/api-client';
+import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
@@ -513,7 +513,20 @@ function LedgerHistory() {
                 </td>
                 <td className="p-3 font-bold text-ink">{formatMoney(entry.amount, locale)}</td>
                 <td className="p-3 text-ink-muted" dir="ltr">{entry.period ?? '—'}</td>
-                <td className="p-3 text-xs text-ink-faint">{entry.method ?? '—'}</td>
+                <td className="p-3 text-xs text-ink-faint">
+                  {entry.method ?? '—'}
+                  {entry.receiptUrl && (
+                    <a
+                      href={assetUrl(entry.receiptUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ms-2 inline-flex items-center text-primary-600 hover:underline"
+                      title={t('receipt')}
+                    >
+                      <ReceiptText className="h-4 w-4" aria-hidden />
+                    </a>
+                  )}
+                </td>
                 <td className="p-3 text-xs text-ink-faint">{formatDate(entry.createdAt, locale)}</td>
               </tr>
             ))}
