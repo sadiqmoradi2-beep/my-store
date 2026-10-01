@@ -524,7 +524,7 @@ describe('EmployeesService.remove', () => {
         findFirst: jest.fn().mockResolvedValue({ ...employee }),
         update: jest.fn(),
       },
-      sellerProfile: { findFirst: jest.fn().mockResolvedValue(null) },
+      sellerProfile: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() },
       workSession: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
@@ -591,5 +591,14 @@ describe('EmployeesService.remove', () => {
       }),
     );
     expect(workSessionsServiceMock.close).toHaveBeenCalledWith('t1', 'admin1', 'ws2', expect.anything());
+  });
+
+  it('employee is a seller → their seller profile is deactivated too (so they stop showing up to start a new session)', async () => {
+    prisma.sellerProfile.findFirst.mockResolvedValue({ id: 'sp1', tenantId: 't1', userId: 'user1' });
+    await service.remove('t1', 'admin1', 'emp1');
+    expect(prisma.sellerProfile.update).toHaveBeenCalledWith({
+      where: { id: 'sp1' },
+      data: { isActive: false },
+    });
   });
 });

@@ -246,6 +246,9 @@ export class EmployeesService {
       });
     }
 
+    if (seller) {
+      await this.prisma.sellerProfile.update({ where: { id: seller.id }, data: { isActive: false } });
+    }
     if (employee.userId) {
       await this.usersService.remove(tenantId, employee.userId, currentUserId);
     }
