@@ -314,7 +314,8 @@ describe('EmployeesService.payCommission', () => {
 
 describe('EmployeesService.list', () => {
   let service: EmployeesService;
-  let prisma: Record<string, Record<string, jest.Mock>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let prisma: any;
 
   beforeEach(async () => {
     prisma = {
@@ -340,6 +341,8 @@ describe('EmployeesService.list', () => {
       commissionEntry: {
         groupBy: jest.fn().mockResolvedValue([{ sellerProfileId: 'seller-1', _sum: { amount: D(90) } }]),
       },
+      workSession: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -363,6 +366,26 @@ describe('EmployeesService.list', () => {
     expect(ali.salesTotal?.toString()).toBe('900');
     expect(ali.commissionTotal?.toString()).toBe('90');
     expect(ali.roleName).toBe('Seller');
+    expect(prisma.workSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 't1', sellerProfileId: { in: ['seller-1'] } } }),
+    );
+  });
+
+  it('sessionProfit sums salesProfit across the seller\'s work sessions, not their lifetime sale total', async () => {
+    prisma.workSession.findMany.mockResolvedValue([
+      {
+        id: 'ws1', tenantId: 't1', sellerProfileId: 'seller-1', employeeId: null, partnerId: null,
+        startedAt: new Date('2026-01-01'), closedAt: new Date('2026-01-02'),
+        openingCash: D(0), harvestLimit: D(0),
+      },
+    ]);
+    // Sale rows feeding computeFigures's first $queryRaw call (sales grouped by session/method)
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ sessionId: 'ws1', method: 'CASH', total: D(500), cost: D(300), n: 2 }])
+      .mockResolvedValue([]);
+    const result = await service.list('t1');
+    const ali = result.find((e) => e.id === 'emp1')!;
+    expect(ali.sessionProfit?.toString()).toBe('200'); // 500 - 300, independent of the 900 lifetime sales total
   });
 
   it('a plain employee (no seller profile) gets nulls for every commission field', async () => {

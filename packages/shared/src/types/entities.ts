@@ -330,6 +330,8 @@ export interface EmployeeDto {
   commissionPercent: string | null;
   salesCount: number | null;
   salesTotal: string | null;
+  /** Profit made across all of this seller's work sessions (not their lifetime sale total) */
+  sessionProfit: string | null;
   commissionTotal: string | null;
 }
 

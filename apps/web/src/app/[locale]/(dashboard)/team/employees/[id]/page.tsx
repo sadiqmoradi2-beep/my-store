@@ -93,8 +93,8 @@ export default function EmployeeAccountPage({ params }: { params: Promise<{ id: 
               </p>
             </div>
             <div>
-              <p className="text-xs text-ink-faint">{t('salesTotal')}</p>
-              <p className="mt-1 font-bold text-ink">{formatMoney(employee.salesTotal ?? 0, locale)}</p>
+              <p className="text-xs text-ink-faint">{t('sessionProfit')}</p>
+              <p className="mt-1 font-bold text-ink">{formatMoney(employee.sessionProfit ?? 0, locale)}</p>
             </div>
             <div>
               <p className="text-xs text-ink-faint">{t('commissionTotal')}</p>

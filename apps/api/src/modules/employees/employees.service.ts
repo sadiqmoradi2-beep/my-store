@@ -77,6 +77,18 @@ export class EmployeesService {
     const saleByUser = new Map(saleStats.map((s) => [s.createdById, s]));
     const commissionByProfile = new Map(commissionStats.map((s) => [s.sellerProfileId, s]));
 
+    // Profit made across all of a seller's work sessions (not their lifetime sale total)
+    const sessions = sellerProfileIds.length
+      ? await this.prisma.workSession.findMany({ where: { tenantId, sellerProfileId: { in: sellerProfileIds } } })
+      : [];
+    const figuresBySession = await computeFigures(this.prisma, tenantId, sessions);
+    const profitByProfile = new Map<string, Prisma.Decimal>();
+    for (const session of sessions) {
+      const profile = session.sellerProfileId!;
+      const profit = figuresBySession.get(session.id)?.salesProfit ?? new Prisma.Decimal(0);
+      profitByProfile.set(profile, (profitByProfile.get(profile) ?? new Prisma.Decimal(0)).add(profit));
+    }
+
     return employees
       // A deleted login account (soft-delete) removes the person from view here; their Employee
       // row and all financial/work-session history are untouched, just no longer listed.
@@ -92,6 +104,7 @@ export class EmployeesService {
           commissionPercent: seller?.commissionPercent ?? null,
           salesCount: seller ? (saleByUser.get(employee.userId!)?._count._all ?? 0) : null,
           salesTotal: seller ? (saleByUser.get(employee.userId!)?._sum.total ?? new Prisma.Decimal(0)) : null,
+          sessionProfit: seller ? (profitByProfile.get(seller.id) ?? new Prisma.Decimal(0)) : null,
           commissionTotal: seller
             ? (commissionByProfile.get(seller.id)?._sum.amount ?? new Prisma.Decimal(0))
             : null,
