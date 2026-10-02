@@ -1,14 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Eraser } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { PERMISSIONS } from '@my-store/shared';
 import type { ActivityLogDto, Locale } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatNumber } from '@/lib/format';
-import { Badge, Card, ErrorText, Input, Spinner, Button } from '@/components/ui';
+import { Badge, Card, ErrorText, Field, Input, Modal, Spinner, Button, cn } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
 const METHOD_TONES: Record<string, string> = {
@@ -28,6 +29,8 @@ export default function ActivityLogPage() {
 
   const user = useAuthStore((s) => s.user);
   const allowed = !!user?.permissions?.includes(PERMISSIONS.ACTIVITY_READ);
+  const canClean = !!user?.permissions?.includes(PERMISSIONS.TENANTS_UPDATE);
+  const [cleaning, setCleaning] = useState(false);
 
   useEffect(() => {
     if (user && !allowed) router.replace(`/${locale}/dashboard`);
@@ -48,7 +51,15 @@ export default function ActivityLogPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-black text-ink">{t('title')}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-black text-ink">{t('title')}</h1>
+        {canClean && (
+          <Button variant="outline" onClick={() => setCleaning(true)}>
+            <Eraser className="h-4 w-4" aria-hidden />
+            {t('clean.button')}
+          </Button>
+        )}
+      </div>
 
       <Input
         placeholder={t('searchHint')}
@@ -136,6 +147,81 @@ export default function ActivityLogPage() {
           </Button>
         </div>
       )}
+      {cleaning && <CleanLogModal onClose={() => setCleaning(false)} />}
     </div>
+  );
+}
+
+type CleanMode = 'all' | 'date' | 'day' | 'week' | 'month';
+const OLDER_THAN_DAYS: Record<'day' | 'week' | 'month', number> = { day: 1, week: 7, month: 30 };
+
+function CleanLogModal({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('activityLog');
+  const tc = useTranslations('common');
+  const queryClient = useQueryClient();
+  const [mode, setMode] = useState<CleanMode>('month');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [result, setResult] = useState<number | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      let query: string;
+      if (mode === 'all') query = 'all=true';
+      else if (mode === 'date') {
+        // The chosen calendar day in the viewer's own time zone
+        const from = new Date(`${date}T00:00:00`);
+        const to = new Date(from.getTime());
+        to.setDate(to.getDate() + 1);
+        query = `from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+      } else query = `olderThanDays=${OLDER_THAN_DAYS[mode]}`;
+      return api.delete<{ deleted: number }>(`/sys-log-audit/cleanup?${query}`);
+    },
+    onSuccess: (res) => {
+      setResult(res.deleted);
+      queryClient.invalidateQueries({ queryKey: ['activity-log'] });
+    },
+  });
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (confirm(t(`clean.confirm.${mode}`, { date }))) mutation.mutate();
+  }
+
+  return (
+    <Modal open title={t('clean.title')} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="space-y-2">
+          {(['day', 'week', 'month', 'date', 'all'] as const).map((m) => (
+            <label
+              key={m}
+              className={cn(
+                'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors',
+                mode === m ? 'border-primary-600 bg-primary-50 dark:bg-primary-800/20' : 'border-line hover:bg-surface-3',
+              )}
+            >
+              <input type="radio" name="clean-mode" checked={mode === m} onChange={() => setMode(m)} />
+              <span className="text-ink">{t(`clean.modes.${m}`)}</span>
+            </label>
+          ))}
+        </div>
+        {mode === 'date' && (
+          <Field label={t('clean.date')}>
+            <Input required type="date" dir="ltr" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        )}
+        {result !== null && (
+          <p className="rounded-lg bg-surface-3 p-3 text-sm text-ink">{t('clean.done', { count: result })}</p>
+        )}
+        <ErrorText error={mutation.error} />
+        <div className="flex gap-2">
+          <Button type="submit" loading={mutation.isPending} className="bg-red-600 hover:bg-red-700">
+            {t('clean.submit')}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            {result !== null ? tc('close') : tc('cancel')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

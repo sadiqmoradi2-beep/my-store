@@ -17,7 +17,7 @@ export const RESET_SCOPES = [
 export type ResetScope = (typeof RESET_SCOPES)[number];
 
 export const RESET_SCOPE_NAMES: Record<ResetScope, string> = {
-  ALL: 'Deletes everything: products, categories, inventory and warehouses, sales, suppliers, purchases, debts, the whole team (employees, sellers, partners) and their logins, work sessions, all branches with their Cash / EBT / Zelle boxes, income and history. Only roles and admin logins stay; a fresh "Main Branch" is created and everything new starts from zero.',
+  ALL: 'Everything',
   PRODUCTS: 'Products & catalog',
   SALES: 'Sales & carts',
   CASH: 'Income & cash transactions',
@@ -32,7 +32,7 @@ export const RESET_SCOPE_NAMES: Record<ResetScope, string> = {
 };
 
 export const RESET_SCOPE_DESCRIPTIONS: Record<ResetScope, string> = {
-  ALL: 'Deletes everything you entered: products, categories, inventory and warehouses, sales, suppliers, purchases, debts, the whole team (employees, sellers, partners) and their login accounts, work sessions, income and history. Your own login, other admins, roles and branches stay; the Cash / EBT / Zelle balances go back to zero.',
+  ALL: 'Deletes everything of this store: products, categories, inventory and warehouses, sales, suppliers, purchases, loans & deficits, the whole team, work sessions, all branches with their Cash / EBT / Zelle boxes, income and history — and every login account except yours. Only the roles stay; a fresh "Main Branch" is created and everything starts from zero.',
   PRODUCTS:
     'Deletes your entire catalog: products, categories and stock. Because sales, carts and purchases reference products, this also deletes all sales, carts, purchases and purchase returns.',
   SALES: 'Deletes all sales and carts. Products are kept.',

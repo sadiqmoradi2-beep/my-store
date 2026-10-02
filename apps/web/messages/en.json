@@ -733,7 +733,28 @@
     "action": "Action",
     "method": "Method",
     "path": "Path",
-    "status": "Status"
+    "status": "Status",
+    "clean": {
+      "button": "Clean log",
+      "title": "Clean activity log",
+      "modes": {
+        "day": "Older than 1 day",
+        "week": "Older than 1 week",
+        "month": "Older than 1 month",
+        "date": "One specific date",
+        "all": "Everything"
+      },
+      "date": "Date",
+      "submit": "Delete",
+      "done": "{count, plural, =0 {Nothing to delete} one {# entry deleted} other {# entries deleted}}",
+      "confirm": {
+        "day": "Delete all activity log entries older than 1 day?",
+        "week": "Delete all activity log entries older than 1 week?",
+        "month": "Delete all activity log entries older than 1 month?",
+        "date": "Delete all activity log entries from {date}?",
+        "all": "Delete the WHOLE activity log? This cannot be undone."
+      }
+    }
   },
   "notifications": {
     "title": "Notifications",

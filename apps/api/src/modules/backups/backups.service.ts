@@ -155,16 +155,16 @@ export class BackupsService {
 
     await this.prisma.$transaction(
       async (tx) => {
-        // A full wipe removes every non-admin login outright — not just ones still traceable through an
-        // Employee/SellerProfile row, so a login orphaned by an earlier (buggy) reset can't survive forever.
-        // A TEAM reset only removes logins still linked to a seller/employee being deleted right now.
+        // A full wipe removes every login of the store except the person running it (admins included),
+        // so nothing of the old store — and no email address — is left behind.
+        // A TEAM reset only removes non-admin logins still linked to a seller/employee being deleted right now.
         let staffUserIds: string[] = [];
         if (isFullWipe) {
-          const nonAdmins = await tx.user.findMany({
-            where: { tenantId, id: { not: currentUserId }, role: { key: { not: 'ADMIN' } } },
+          const others = await tx.user.findMany({
+            where: { tenantId, id: { not: currentUserId } },
             select: { id: true },
           });
-          staffUserIds = nonAdmins.map((u) => u.id);
+          staffUserIds = others.map((u) => u.id);
         } else if (scope === 'TEAM') {
           const [sellerRows, employeeRows] = await Promise.all([
             tx.sellerProfile.findMany({ where: { tenantId }, select: { userId: true } }),
@@ -181,7 +181,11 @@ export class BackupsService {
         for (const model of orderedModels) {
           await this.delegate(tx, model.key).deleteMany({ where: model.where(tenantId) });
         }
-        if (staffUserIds.length > 0) {
+        if (staffUserIds.length > 0 && isFullWipe) {
+          // Feedback sent by those logins would otherwise block deleting them
+          await tx.platformFeedback.deleteMany({ where: { tenantId, submittedByUserId: { in: staffUserIds } } });
+          await tx.user.deleteMany({ where: { id: { in: staffUserIds }, tenantId } });
+        } else if (staffUserIds.length > 0) {
           await tx.user.deleteMany({
             where: { id: { in: staffUserIds }, tenantId, role: { key: { not: 'ADMIN' } } },
           });

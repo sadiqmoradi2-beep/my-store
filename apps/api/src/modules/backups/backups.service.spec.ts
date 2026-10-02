@@ -157,7 +157,7 @@ describe('BackupsService', () => {
       readFileMock.mockResolvedValue(JSON.stringify(buildPayload()));
     });
 
-    it('full wipe deletes every non-admin login directly — even one orphaned by an earlier reset (never the current user or admins)', async () => {
+    it('full wipe deletes every other login of the store, admins included — never the current user', async () => {
       txCache.user = {
         deleteMany: jest.fn().mockImplementation(() => {
           callOrder.push('delete:user');
@@ -171,11 +171,14 @@ describe('BackupsService', () => {
       };
       await service.wipeData('t1', 'u1');
       expect(txCache.user.findMany).toHaveBeenCalledWith({
-        where: { tenantId: 't1', id: { not: 'u1' }, role: { key: { not: 'ADMIN' } } },
+        where: { tenantId: 't1', id: { not: 'u1' } },
         select: { id: true },
       });
+      expect(txCache.platformFeedback.deleteMany).toHaveBeenCalledWith({
+        where: { tenantId: 't1', submittedByUserId: { in: ['su1', 'eu1', 'orphan1'] } },
+      });
       expect(txCache.user.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['su1', 'eu1', 'orphan1'] }, tenantId: 't1', role: { key: { not: 'ADMIN' } } },
+        where: { id: { in: ['su1', 'eu1', 'orphan1'] }, tenantId: 't1' },
       });
     });
 

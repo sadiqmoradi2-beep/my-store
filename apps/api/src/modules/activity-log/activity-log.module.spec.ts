@@ -117,6 +117,21 @@ describe('ActivityLogService.cleanup', () => {
     expect(where.createdAt.lt).toBe(before);
   });
 
+  it('all → every entry of this store is deleted', async () => {
+    await service.cleanup('t1', { all: true });
+    expect(prisma.activityLog.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+  });
+
+  it('from/to → only that window is deleted; a reversed window → 400', async () => {
+    const from = new Date('2026-10-01T00:00:00Z');
+    const to = new Date('2026-10-02T00:00:00Z');
+    await service.cleanup('t1', { from, to });
+    expect(prisma.activityLog.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: 't1', createdAt: { gte: from, lt: to } },
+    });
+    await expect(service.cleanup('t1', { from: to, to: from })).rejects.toThrow('from');
+  });
+
   it('بدون before/olderThanDays → بدون حذف', async () => {
     const result = await service.cleanup('t1', {});
     expect(result).toEqual({ deleted: 0 });
