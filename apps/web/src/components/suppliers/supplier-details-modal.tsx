@@ -120,7 +120,9 @@ export function SupplierDetailsModal({
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="font-bold text-ink">
                       #{formatNumber(purchase.purchaseNumber, locale)}{' '}
-                      <span className="font-normal text-ink-muted">· {formatDate(purchase.createdAt, locale)}</span>
+                      <span className="font-normal text-ink-muted">
+                        · {t('received')}: {formatDate(purchase.receivedAt, locale)}
+                      </span>
                     </span>
                     <span className="flex items-center gap-3">
                       <span className="text-ink-muted">

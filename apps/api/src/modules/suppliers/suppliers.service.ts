@@ -83,6 +83,11 @@ export class SuppliersService {
    * register expense for the amount paid + debt document for the remainder.
    */
   async createPurchase(tenantId: string, userId: string, dto: CreatePurchaseDto) {
+    const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
+    // A typo'd year shouldn't slip through: allow up to one day ahead for time-zone differences
+    if (receivedAt.getTime() > Date.now() + 86_400_000) {
+      throw new BadRequestException('The received date cannot be in the future');
+    }
     const supplier = await this.get(tenantId, dto.supplierId);
     const branch = await this.prisma.branch.findFirst({
       where: { id: dto.branchId, tenantId, isActive: true },
@@ -135,6 +140,7 @@ export class SuppliersService {
           paidAmount,
           invoiceImageUrl: dto.invoiceImageUrl,
           notes: dto.notes,
+          receivedAt,
           createdById: userId,
           items: { create: items },
         },
@@ -212,8 +218,8 @@ export class SuppliersService {
     // ponytail: aggregated in memory; move to a SQL GROUP BY if a supplier reaches tens of thousands of lines
     const items = await this.prisma.purchaseItem.findMany({
       where: { purchase: { tenantId, supplierId } },
-      select: { productId: true, productName: true, quantity: true, total: true, purchase: { select: { createdAt: true } } },
-      orderBy: { purchase: { createdAt: 'desc' } },
+      select: { productId: true, productName: true, quantity: true, total: true, purchase: { select: { receivedAt: true } } },
+      orderBy: { purchase: { receivedAt: 'desc' } },
     });
     const byProduct = new Map<
       string,
@@ -232,7 +238,7 @@ export class SuppliersService {
           quantity: item.quantity,
           total: item.total,
           purchases: 1,
-          lastPurchasedAt: item.purchase.createdAt,
+          lastPurchasedAt: item.purchase.receivedAt,
         });
       }
     }
@@ -244,7 +250,7 @@ export class SuppliersService {
       tenantId,
       ...(query.supplierId && { supplierId: query.supplierId }),
       ...((query.from || query.to) && {
-        createdAt: {
+        receivedAt: {
           ...(query.from && { gte: new Date(query.from) }),
           ...(query.to && { lte: endOfDay(new Date(query.to)) }),
         },
@@ -260,7 +266,7 @@ export class SuppliersService {
           supplier: { select: { name: true } },
           items: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
       }),
       this.prisma.purchase.count({ where }),
     ]);

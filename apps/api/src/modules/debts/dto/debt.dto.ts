@@ -97,6 +97,12 @@ export class PayDebtDto {
   note?: string;
 }
 
+export class PaymentSlipDto {
+  /** Pay slip photo / PDF URL (from POST /uploads/payment-proofs) */
+  @IsString()
+  proofImageUrl: string;
+}
+
 export class DebtListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(DEBT_DIRECTIONS)

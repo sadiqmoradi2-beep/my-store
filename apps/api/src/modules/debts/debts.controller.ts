@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@my-store/shared';
 import { CurrentUser, RequestUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
-import { CreateDebtDto, DebtListQueryDto, PayDebtDto } from './dto/debt.dto';
+import { CreateDebtDto, DebtListQueryDto, PayDebtDto, PaymentSlipDto } from './dto/debt.dto';
 import { DebtsService } from './debts.service';
 import { RequireModule } from '../../common/decorators/require-module.decorator';
 
@@ -64,6 +64,17 @@ export class DebtsController {
     @Body() dto: PayDebtDto,
   ) {
     return this.debtsService.pay(tenantId, user.userId, id, dto);
+  }
+
+  @Patch(':id/payments/:paymentId/slip')
+  @RequirePermissions(PERMISSIONS.DEBTS_MANAGE)
+  attachSlip(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+    @Param('paymentId') paymentId: string,
+    @Body() dto: PaymentSlipDto,
+  ) {
+    return this.debtsService.attachSlip(tenantId, id, paymentId, dto.proofImageUrl);
   }
 
   @Delete(':id')

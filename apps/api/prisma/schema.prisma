@@ -892,6 +892,7 @@ model Purchase {
   paidAmount      Decimal  @default(0) @db.Decimal(18, 2)
   invoiceImageUrl String?
   notes           String?
+  receivedAt      DateTime @default(now()) // the day the goods arrived (may be earlier than when it was recorded)
   createdById     String
   createdAt       DateTime @default(now())
 

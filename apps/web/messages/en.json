@@ -497,8 +497,8 @@
     "register": "Income part",
     "registerHintIn": "The money enters this Income part",
     "registerHintOut": "The money leaves this Income part",
-    "proof": "Payment proof",
-    "proofHint": "Optional — a photo or scan of the cheque or payment receipt (jpg/png/webp/pdf, up to 5MB)",
+    "proof": "Pay slip",
+    "proofHint": "Optional — photo or scan of the pay slip / receipt for this payment (jpg/png/webp/pdf, up to 5MB). You can also add it later from the details.",
     "viewDownload": "View / download",
     "deleteConfirm": "Delete this record?",
     "currency": "Currency",
@@ -535,7 +535,9 @@
     "receipt": "Receipt",
     "receiptHint": "Optional — photo or scan of the loan / deficit receipt or agreement (jpg/png/webp/pdf, up to 5MB)",
     "paymentsTitle": "Payments",
-    "noPayments": "No payments yet"
+    "noPayments": "No payments yet",
+    "addSlip": "Add pay slip",
+    "replaceSlip": "Replace"
   },
   "partners": {
     "title": "Partners",
@@ -657,7 +659,10 @@
     "newCategory": "+ New category",
     "newCategoryName": "New category name",
     "salePrice": "Sale price",
-    "createAndAdd": "Create and add"
+    "createAndAdd": "Create and add",
+    "receivedDate": "Received date",
+    "receivedDateHint": "The day the goods arrived",
+    "received": "Received"
   },
   "purchaseReport": {
     "title": "Purchase report",

@@ -218,7 +218,9 @@ function PurchaseHistory() {
               <tr key={purchase.id} className="border-b border-line/60 last:border-0">
                 <td className="p-3">
                   <p className="font-bold text-ink">#{formatNumber(purchase.purchaseNumber, locale)}</p>
-                  <p className="text-xs text-ink-faint">{formatDate(purchase.createdAt, locale)}</p>
+                  <p className="text-xs text-ink-faint">
+                    {t('received')}: {formatDate(purchase.receivedAt, locale)}
+                  </p>
                 </td>
                 <td className="p-3 text-ink">{purchase.supplierName}</td>
                 <td className="p-3 text-ink-muted">{formatNumber(purchase.items.length, locale)}</td>
@@ -392,6 +394,10 @@ function PurchaseModal({
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [search, setSearch] = useState('');
   const [addingNew, setAddingNew] = useState(false);
+  const [receivedDate, setReceivedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<unknown>(null);
   const [uploading, setUploading] = useState(false);
@@ -444,6 +450,8 @@ function PurchaseModal({
         paidAmount: paidAmount === '' ? undefined : Number(paidAmount),
         registerId: registerId || undefined,
         invoiceImageUrl,
+        // Midday local time keeps the chosen day the same in every time zone
+        receivedAt: new Date(`${receivedDate}T12:00:00`).toISOString(),
         items: lines.map((line) => ({
           productId: line.productId,
           quantity: Number(line.quantity),
@@ -514,6 +522,16 @@ function PurchaseModal({
             </Select>
           </Field>
         </div>
+        <Field label={t('receivedDate')} hint={t('receivedDateHint')}>
+          <Input
+            required
+            type="date"
+            dir="ltr"
+            max={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)}
+            value={receivedDate}
+            onChange={(e) => setReceivedDate(e.target.value)}
+          />
+        </Field>
 
         <div className="flex items-end gap-2">
           <div className="flex-1">

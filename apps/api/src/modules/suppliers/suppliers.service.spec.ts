@@ -165,6 +165,15 @@ describe('SuppliersService.createPurchase', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('received date: stored when given, a future date → 400', async () => {
+    await service.createPurchase('t1', 'u1', { ...baseDto, receivedAt: '2026-09-15T12:00:00.000Z' });
+    expect(tx.purchase.create.mock.calls[0][0].data.receivedAt).toEqual(new Date('2026-09-15T12:00:00.000Z'));
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    await expect(service.createPurchase('t1', 'u1', { ...baseDto, receivedAt: future })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
   it('branch not found → 404', async () => {
     prisma.branch.findFirst.mockResolvedValue(null);
     await expect(service.createPurchase('t1', 'u1', baseDto)).rejects.toBeInstanceOf(
@@ -243,9 +252,9 @@ describe('SuppliersService.productSummary', () => {
       supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'sup1', tenantId: 't1', name: 'S', deletedAt: null }) },
       purchaseItem: {
         findMany: jest.fn().mockResolvedValue([
-          { productId: 'p1', productName: 'Soda', quantity: 10, total: D(35), purchase: { createdAt: newer } },
-          { productId: 'p2', productName: 'Chips', quantity: 4, total: D(8), purchase: { createdAt: newer } },
-          { productId: 'p1', productName: 'Soda', quantity: 5, total: D(16), purchase: { createdAt: older } },
+          { productId: 'p1', productName: 'Soda', quantity: 10, total: D(35), purchase: { receivedAt: newer } },
+          { productId: 'p2', productName: 'Chips', quantity: 4, total: D(8), purchase: { receivedAt: newer } },
+          { productId: 'p1', productName: 'Soda', quantity: 5, total: D(16), purchase: { receivedAt: older } },
         ]),
       },
     };

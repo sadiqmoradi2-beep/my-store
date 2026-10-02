@@ -421,6 +421,7 @@ export interface PurchaseDto {
   invoiceImageUrl: string | null;
   notes: string | null;
   items: PurchaseItemDto[];
+  receivedAt: string;
   createdAt: string;
 }
 

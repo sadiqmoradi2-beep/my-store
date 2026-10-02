@@ -88,6 +88,11 @@ export class CreatePurchaseDto {
   @IsString()
   invoiceImageUrl?: string;
 
+  /** The day the goods were received — defaults to now */
+  @IsOptional()
+  @IsDateString()
+  receivedAt?: string;
+
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })

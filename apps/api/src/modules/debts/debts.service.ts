@@ -184,6 +184,13 @@ export class DebtsService {
   }
 
   /** Payment/collection: RECEIVABLE → money into an Income part; PAYABLE → money out of it */
+  /** Attach (or replace) the pay slip of a payment that was already recorded */
+  async attachSlip(tenantId: string, debtId: string, paymentId: string, proofImageUrl: string) {
+    const payment = await this.prisma.debtPayment.findFirst({ where: { id: paymentId, debtId, tenantId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+    return this.prisma.debtPayment.update({ where: { id: payment.id }, data: { proofImageUrl } });
+  }
+
   async pay(tenantId: string, userId: string, id: string, dto: PayDebtDto) {
     const debt = await this.get(tenantId, id);
     const amount = new Prisma.Decimal(dto.amount);

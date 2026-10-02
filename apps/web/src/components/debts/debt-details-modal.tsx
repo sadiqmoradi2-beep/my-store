@@ -1,18 +1,35 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Paperclip } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { DebtDto, DebtPaymentDto, Locale } from '@my-store/shared';
+import { PERMISSIONS, type DebtDto, type DebtPaymentDto, type Locale } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney } from '@/lib/format';
 import { Badge, ErrorText, Modal, Spinner } from '@/components/ui';
 import { ReceiptLink } from '@/components/receipt-link';
+import { useAuthStore } from '@/stores/auth-store';
 
 /** One Loan / Deficit: its own receipt and every payment with the payment receipt */
 export function DebtDetailsModal({ debtId, onClose }: { debtId: string; onClose: () => void }) {
   const t = useTranslations('debts');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
+  const queryClient = useQueryClient();
+  const canManage = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.DEBTS_MANAGE));
+
+  const attachSlip = useMutation({
+    mutationFn: async ({ paymentId, file }: { paymentId: string; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { url } = await api.upload<{ url: string }>('/uploads/payment-proofs', form);
+      return api.patch(`/debts/${debtId}/payments/${paymentId}/slip`, { proofImageUrl: url });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['debt', debtId] });
+      queryClient.invalidateQueries({ queryKey: ['debt-ledger'] });
+    },
+  });
 
   const { data: debt, isPending, error } = useQuery({
     queryKey: ['debt', debtId],
@@ -67,6 +84,7 @@ export function DebtDetailsModal({ debtId, onClose }: { debtId: string; onClose:
 
           <div>
             <h3 className="mb-2 text-sm font-bold text-ink">{t('paymentsTitle')}</h3>
+            <ErrorText error={attachSlip.error} />
             {debt.payments.length === 0 ? (
               <p className="text-sm text-ink-faint">{t('noPayments')}</p>
             ) : (
@@ -89,7 +107,32 @@ export function DebtDetailsModal({ debtId, onClose }: { debtId: string; onClose:
                         <td className="p-2 text-ink-muted">{p.performedByName ?? '—'}</td>
                         <td className="p-2 text-ink-faint">{p.note ?? '—'}</td>
                         <td className="p-2">
-                          <ReceiptLink url={p.proofImageUrl} label={t('viewDownload')} />
+                          <span className="flex items-center gap-2">
+                            <ReceiptLink url={p.proofImageUrl} label={t('viewDownload')} />
+                            {canManage && (
+                              <label
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-medium text-primary-700 hover:bg-surface-3 dark:text-primary-300"
+                                title={p.proofImageUrl ? t('replaceSlip') : t('addSlip')}
+                              >
+                                <Paperclip className="h-3.5 w-3.5" aria-hidden />
+                                {attachSlip.isPending && attachSlip.variables?.paymentId === p.id
+                                  ? '…'
+                                  : p.proofImageUrl
+                                    ? t('replaceSlip')
+                                    : t('addSlip')}
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) attachSlip.mutate({ paymentId: p.id, file });
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </span>
                         </td>
                       </tr>
                     ))}

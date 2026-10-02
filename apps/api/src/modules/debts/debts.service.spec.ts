@@ -304,3 +304,22 @@ describe('DebtsService.create — Loan & Deficit', () => {
     expect(tx.cashTransaction.create).not.toHaveBeenCalled();
   });
 });
+
+describe('DebtsService.attachSlip', () => {
+  it('attaches a pay slip to a payment of this debt; unknown payment → 404', async () => {
+    const prisma = {
+      debtPayment: {
+        findFirst: jest.fn().mockResolvedValueOnce({ id: 'pay1' }).mockResolvedValueOnce(null),
+        update: jest.fn().mockResolvedValue({ id: 'pay1', proofImageUrl: '/s.png' }),
+      },
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [DebtsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    const service = moduleRef.get(DebtsService);
+    await service.attachSlip('t1', 'd1', 'pay1', '/s.png');
+    expect(prisma.debtPayment.findFirst).toHaveBeenCalledWith({ where: { id: 'pay1', debtId: 'd1', tenantId: 't1' } });
+    expect(prisma.debtPayment.update).toHaveBeenCalledWith({ where: { id: 'pay1' }, data: { proofImageUrl: '/s.png' } });
+    await expect(service.attachSlip('t1', 'd1', 'other', '/s.png')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
