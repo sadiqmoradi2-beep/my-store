@@ -199,7 +199,7 @@ export default function SessionsPage() {
           />
           <Select value={filters.role} onChange={(e) => setFilter({ role: e.target.value as SessionRole | '', personId: '' })}>
             <option value="">{t('allRoles')}</option>
-            {SESSION_ROLES.map((r) => (
+            {SESSION_ROLES.filter((r) => r !== 'SELLER').map((r) => (
               <option key={r} value={r}>
                 {t(`roles.${r}`)}
               </option>

@@ -138,11 +138,9 @@ describe('WorkSessionsService', () => {
   });
 
   describe('people', () => {
-    it('excludes a seller/employee whose login was soft-deleted, even if left isActive (stale data)', async () => {
+    it('lists only active employees and partners — no sellers', async () => {
       await service.people('t1');
-      expect(prisma.sellerProfile.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: 't1', isActive: true, user: { deletedAt: null } } }),
-      );
+      expect(prisma.sellerProfile.findMany).not.toHaveBeenCalled();
       expect(prisma.employee.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { tenantId: 't1', isActive: true, deletedAt: null } }),
       );

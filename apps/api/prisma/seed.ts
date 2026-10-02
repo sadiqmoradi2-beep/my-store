@@ -286,16 +286,16 @@ async function seedDemoTenant() {
     { method: 'CASH', createdAt: daysAgo(4), items: [{ productIndex: 5, qty: 2 }] },
   ];
 
-  // A demo work session for the seller: every demo sale belongs to it
-  const sellerProfile = await prisma.sellerProfile.create({
-    data: { tenantId: tid, userId: seller.id, payType: 'COMMISSION', commissionPercent: D(2) },
+  // A demo work session for the seller (an employee with a login): every demo sale belongs to it
+  const sellerEmployee = await prisma.employee.create({
+    data: { tenantId: tid, userId: seller.id, fullName: seller.fullName, position: 'Seller', salary: D(0) },
   });
   const demoSession = await prisma.workSession.create({
     data: {
       tenantId: tid,
       code: `SES-${now.getUTCFullYear()}-0001`,
-      role: 'SELLER',
-      sellerProfileId: sellerProfile.id,
+      role: 'EMPLOYEE',
+      employeeId: sellerEmployee.id,
       personName: seller.fullName,
       startedAt: daysAgo(6),
       openingCash: D(200),

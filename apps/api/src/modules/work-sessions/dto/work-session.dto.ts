@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -24,7 +25,8 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 const MAX_AMOUNT = 10_000_000_000;
 
 export class StartSessionDto {
-  @IsEnum(SESSION_ROLES)
+  // Sellers are managed as employees now — new sessions are for employees and partners only
+  @IsIn(['EMPLOYEE', 'PARTNER'])
   role: SessionRole;
 
   /** The seller profile / employee / partner id, depending on the role */

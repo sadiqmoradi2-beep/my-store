@@ -144,14 +144,7 @@ export class WorkSessionsService {
 
   /** People who can hold a session, with the session they already have (to warn before a duplicate is started) */
   async people(tenantId: string) {
-    const [sellers, employees, partners, active] = await Promise.all([
-      // A soft-deleted login's seller profile can be left isActive (e.g. data from before that
-      // cleanup existed) — exclude it by the login's own deletedAt too, not just isActive, so a
-      // stale profile can never show up here regardless of how it was left in that state.
-      this.prisma.sellerProfile.findMany({
-        where: { tenantId, isActive: true, user: { deletedAt: null } },
-        include: { user: { select: { fullName: true } } },
-      }),
+    const [employees, partners, active] = await Promise.all([
       this.prisma.employee.findMany({ where: { tenantId, isActive: true, deletedAt: null } }),
       this.prisma.partner.findMany({ where: { tenantId, isActive: true, deletedAt: null } }),
       this.prisma.workSession.findMany({
@@ -168,7 +161,6 @@ export class WorkSessionsService {
       activeSessionCode: activeOf.get(id)?.code ?? null,
     });
     return [
-      ...sellers.map((s) => row('SELLER', s.id, s.user.fullName)),
       ...employees.map((e) => row('EMPLOYEE', e.id, e.fullName)),
       ...partners.map((p) => row('PARTNER', p.id, p.name)),
     ];
