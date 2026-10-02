@@ -224,7 +224,6 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
               }}
             >
               <option value="EMPLOYEE">{ts('roles.EMPLOYEE')}</option>
-              <option value="SELLER">{ts('roles.SELLER')}</option>
               <option value="PARTNER">{ts('roles.PARTNER')}</option>
             </Select>
           </Field>

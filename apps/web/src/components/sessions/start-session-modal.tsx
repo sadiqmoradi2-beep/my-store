@@ -37,7 +37,7 @@ export function StartSessionModal({
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
-    role: 'SELLER' as SessionRole,
+    role: 'EMPLOYEE' as SessionRole,
     personId: '',
     date: todayDate(),
     time: nowTime(),
@@ -82,7 +82,7 @@ export function StartSessionModal({
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('role')}>
             <Select value={form.role} onChange={(e) => set({ role: e.target.value as SessionRole, personId: '' })}>
-              {SESSION_ROLES.map((r) => (
+              {SESSION_ROLES.filter((r) => r !== 'SELLER').map((r) => (
                 <option key={r} value={r}>
                   {t(`roles.${r}`)}
                 </option>
