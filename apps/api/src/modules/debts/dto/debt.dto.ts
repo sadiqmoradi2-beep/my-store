@@ -65,6 +65,11 @@ export class CreateDebtDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** Optional receipt / contract photo or PDF (from POST /uploads/payment-proofs) */
+  @IsOptional()
+  @IsString()
+  receiptUrl?: string;
 }
 
 export class PayDebtDto {

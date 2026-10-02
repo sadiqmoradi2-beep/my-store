@@ -396,6 +396,16 @@ export interface PurchaseItemDto {
   total: string;
 }
 
+/** What was bought from one supplier, summed per product */
+export interface SupplierProductSummaryDto {
+  productId: string;
+  productName: string;
+  quantity: number;
+  total: string;
+  purchases: number;
+  lastPurchasedAt: string;
+}
+
 export interface PurchaseDto {
   id: string;
   purchaseNumber: number;
@@ -429,6 +439,7 @@ export interface DebtDto {
   referenceType: string | null;
   referenceId: string | null;
   notes: string | null;
+  receiptUrl: string | null;
   createdAt: string;
 }
 

@@ -933,6 +933,7 @@ model Debt {
   referenceType  String?
   referenceId    String?
   notes          String?
+  receiptUrl     String? // receipt / contract photo or PDF for the loan or deficit itself
   createdById    String
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

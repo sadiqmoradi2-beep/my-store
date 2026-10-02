@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, Plus, Trash2, UserRound } from 'lucide-react';
+import { Banknote, Eye, Plus, Trash2, UserRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
@@ -23,6 +23,8 @@ import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner, cn } from '@/components/ui';
 import { ExportButtons } from '@/components/export-buttons';
 import { useRequirePermission } from '@/hooks/use-require-permission';
+import { DebtDetailsModal } from '@/components/debts/debt-details-modal';
+import { ReceiptInput } from '@/components/receipt-link';
 
 const STATUS_TONES: Record<DebtStatus, string> = {
   OPEN: 'PENDING',
@@ -41,6 +43,7 @@ export default function LoansPage() {
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [paying, setPaying] = useState<DebtDto | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: summary } = useQuery({
@@ -181,7 +184,13 @@ export default function LoansPage() {
                           {debt.partyName}
                         </Link>
                       ) : (
-                        <p className="font-bold text-ink">{debt.partyName}</p>
+                        <button
+                          type="button"
+                          onClick={() => setViewing(debt.id)}
+                          className="cursor-pointer font-bold text-primary-700 hover:underline dark:text-primary-300"
+                        >
+                          {debt.partyName}
+                        </button>
                       )}
                       {debt.notes && <p className="text-xs text-ink-faint">{debt.notes}</p>}
                     </td>
@@ -206,6 +215,14 @@ export default function LoansPage() {
                     </td>
                     <td className="p-3">
                       <div className="flex gap-1">
+                        <button
+                          onClick={() => setViewing(debt.id)}
+                          aria-label={t('details')}
+                          title={t('details')}
+                          className="cursor-pointer rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-primary-100 hover:text-primary-800 dark:hover:bg-primary-800/40"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
                         {debt.status !== 'SETTLED' && (
                           <button
                             onClick={() => setPaying(debt)}
@@ -260,6 +277,7 @@ export default function LoansPage() {
 
       {creating && <DebtModal onClose={() => setCreating(false)} />}
       {paying && <PayDebtModal debt={paying} onClose={() => setPaying(null)} />}
+      {viewing && <DebtDetailsModal debtId={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -281,10 +299,17 @@ function DebtModal({ onClose }: { onClose: () => void }) {
     notes: '',
   });
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () =>
-      api.post('/debts', {
+    mutationFn: async () => {
+      let receiptUrl: string | undefined;
+      if (receiptFile) {
+        const upload = new FormData();
+        upload.append('file', receiptFile);
+        receiptUrl = (await api.upload<{ url: string }>('/uploads/payment-proofs', upload)).url;
+      }
+      return api.post('/debts', {
         direction: form.direction,
         kind: form.kind,
         ...(form.receivedRegisterId && { receivedRegisterId: form.receivedRegisterId }),
@@ -293,7 +318,9 @@ function DebtModal({ onClose }: { onClose: () => void }) {
         currency: form.currency,
         dueDate: form.dueDate || undefined,
         notes: form.notes || undefined,
-      }),
+        receiptUrl,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['debts-summary'] });
@@ -414,6 +441,9 @@ function DebtModal({ onClose }: { onClose: () => void }) {
         </Field>
         <Field label={t('notes')}>
           <Input value={form.notes} onChange={(e) => set({ notes: e.target.value })} />
+        </Field>
+        <Field label={t('receipt')} hint={t('receiptHint')}>
+          <ReceiptInput onChange={setReceiptFile} />
         </Field>
         <ErrorText error={mutation.error} />
         <div className="flex gap-2">
@@ -549,6 +579,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
       queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['debts-summary'] });
       queryClient.invalidateQueries({ queryKey: ['debt-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['debt'] });
       queryClient.invalidateQueries({ queryKey: ['cash-registers'] });
       queryClient.invalidateQueries({ queryKey: ['income-summary'] });
       onClose();
@@ -595,12 +626,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
           <Input value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
         <Field label={t('proof')} hint={t('proofHint')}>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-ink-muted file:me-3 file:rounded-lg file:border-0 file:bg-surface-3 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
-          />
+          <ReceiptInput onChange={setProofFile} />
         </Field>
         <ErrorText error={uploadError} />
         <ErrorText error={mutation.error} />

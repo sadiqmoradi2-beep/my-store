@@ -152,11 +152,13 @@ export function Modal({
   title,
   onClose,
   children,
+  wide = false,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -176,7 +178,10 @@ export function Modal({
       <div
         role="dialog"
         aria-modal
-        className="relative w-full max-w-md rounded-2xl border border-line bg-surface-2 p-6 shadow-xl"
+        className={cn(
+          'relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface-2 p-6 shadow-xl',
+          wide ? 'max-w-3xl' : 'max-w-md',
+        )}
       >
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="text-base font-bold text-ink">{title}</h2>

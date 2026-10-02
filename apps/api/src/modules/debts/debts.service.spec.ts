@@ -173,6 +173,10 @@ describe('DebtsService.create', () => {
     expect(data.direction).toBe('PAYABLE');
     expect(data.employeeId).toBe('emp1');
   });
+  it('stores the optional receipt with the debt', async () => {
+    await service.create('t1', 'u1', { direction: 'PAYABLE', partyName: 'Bank', amount: 500, receiptUrl: '/uploads/payment-proofs/t1/r.png' });
+    expect(prisma.debt.create.mock.calls[0][0].data.receiptUrl).toBe('/uploads/payment-proofs/t1/r.png');
+  });
 });
 
 describe('DebtsService.byEmployee', () => {

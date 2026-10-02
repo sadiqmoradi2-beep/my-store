@@ -159,6 +159,7 @@ export class DebtsService {
       currency: dto.currency ?? 'USDT',
       dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
       notes: dto.notes,
+      receiptUrl: dto.receiptUrl,
       createdById: userId,
     };
     if (!dto.receivedRegisterId) return this.prisma.debt.create({ data });

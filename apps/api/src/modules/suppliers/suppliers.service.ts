@@ -206,6 +206,39 @@ export class SuppliersService {
     });
   }
 
+  /** Every product bought from a supplier: total quantity and cost, number of purchases, last purchase date */
+  async productSummary(tenantId: string, supplierId: string) {
+    await this.get(tenantId, supplierId);
+    // ponytail: aggregated in memory; move to a SQL GROUP BY if a supplier reaches tens of thousands of lines
+    const items = await this.prisma.purchaseItem.findMany({
+      where: { purchase: { tenantId, supplierId } },
+      select: { productId: true, productName: true, quantity: true, total: true, purchase: { select: { createdAt: true } } },
+      orderBy: { purchase: { createdAt: 'desc' } },
+    });
+    const byProduct = new Map<
+      string,
+      { productId: string; productName: string; quantity: number; total: Prisma.Decimal; purchases: number; lastPurchasedAt: Date }
+    >();
+    for (const item of items) {
+      const row = byProduct.get(item.productId);
+      if (row) {
+        row.quantity += item.quantity;
+        row.total = row.total.add(item.total);
+        row.purchases += 1;
+      } else {
+        byProduct.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          total: item.total,
+          purchases: 1,
+          lastPurchasedAt: item.purchase.createdAt,
+        });
+      }
+    }
+    return [...byProduct.values()];
+  }
+
   async listPurchases(tenantId: string, query: PurchaseListQueryDto) {
     const where = {
       tenantId,

@@ -32,6 +32,12 @@ export class SuppliersController {
     return this.suppliersService.listPurchases(tenantId, query);
   }
 
+  @Get(':id/products')
+  @RequirePermissions(PERMISSIONS.PURCHASES_READ)
+  productSummary(@TenantId() tenantId: string, @Param('id') id: string) {
+    return this.suppliersService.productSummary(tenantId, id);
+  }
+
   @Post()
   @RequirePermissions(PERMISSIONS.SUPPLIERS_MANAGE)
   create(@TenantId() tenantId: string, @Body() dto: CreateSupplierDto) {

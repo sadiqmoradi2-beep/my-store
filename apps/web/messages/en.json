@@ -530,7 +530,12 @@
     "allKinds": "All types",
     "receivedInto": "Received into",
     "receivedIntoHint": "Choose the Income part that received the borrowed money",
-    "notReceivedYet": "Not received yet"
+    "notReceivedYet": "Not received yet",
+    "details": "Details & receipts",
+    "receipt": "Receipt",
+    "receiptHint": "Optional — photo or scan of the loan / deficit receipt or agreement (jpg/png/webp/pdf, up to 5MB)",
+    "paymentsTitle": "Payments",
+    "noPayments": "No payments yet"
   },
   "partners": {
     "title": "Partners",
@@ -636,7 +641,23 @@
     "quickPurchase": "Purchase from this supplier",
     "invoiceImage": "Invoice",
     "invoiceImageHint": "Optional — a photo or scanned copy of the purchase invoice (jpg/png/webp/pdf, up to 5MB)",
-    "viewDownload": "View / download"
+    "viewDownload": "View / download",
+    "viewDetails": "View what was bought from this supplier",
+    "productsBought": "Products bought",
+    "productsCount": "Products",
+    "totalQuantity": "Total quantity",
+    "product": "Product",
+    "lastPurchase": "Last purchase",
+    "searchExisting": "Search existing items…",
+    "newItem": "New item",
+    "newItemHint": "Create a new item; it is added to this purchase and its stock comes in with the purchase.",
+    "itemName": "Item name",
+    "barcode": "Barcode",
+    "category": "Category",
+    "newCategory": "+ New category",
+    "newCategoryName": "New category name",
+    "salePrice": "Sale price",
+    "createAndAdd": "Create and add"
   },
   "purchaseReport": {
     "title": "Purchase report",

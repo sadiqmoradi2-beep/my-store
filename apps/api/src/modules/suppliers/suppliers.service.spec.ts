@@ -234,3 +234,33 @@ describe('SuppliersService.listPurchases', () => {
     );
   });
 });
+
+describe('SuppliersService.productSummary', () => {
+  it('sums quantity and cost per product across purchases, keeping the latest date first', async () => {
+    const newer = new Date('2026-10-02T10:00:00Z');
+    const older = new Date('2026-09-20T10:00:00Z');
+    const prisma = {
+      supplier: { findFirst: jest.fn().mockResolvedValue({ id: 'sup1', tenantId: 't1', name: 'S', deletedAt: null }) },
+      purchaseItem: {
+        findMany: jest.fn().mockResolvedValue([
+          { productId: 'p1', productName: 'Soda', quantity: 10, total: D(35), purchase: { createdAt: newer } },
+          { productId: 'p2', productName: 'Chips', quantity: 4, total: D(8), purchase: { createdAt: newer } },
+          { productId: 'p1', productName: 'Soda', quantity: 5, total: D(16), purchase: { createdAt: older } },
+        ]),
+      },
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [SuppliersService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    const rows = await moduleRef.get(SuppliersService).productSummary('t1', 'sup1');
+    expect(rows).toHaveLength(2);
+    const soda = rows.find((r) => r.productId === 'p1')!;
+    expect(soda.quantity).toBe(15);
+    expect(soda.total.toString()).toBe('51');
+    expect(soda.purchases).toBe(2);
+    expect(soda.lastPurchasedAt).toBe(newer);
+    expect(prisma.purchaseItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { purchase: { tenantId: 't1', supplierId: 'sup1' } } }),
+    );
+  });
+});

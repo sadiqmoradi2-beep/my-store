@@ -18,6 +18,8 @@ import { api, assetUrl } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
+import { NewProductForm } from '@/components/suppliers/new-product-form';
+import { SupplierDetailsModal } from '@/components/suppliers/supplier-details-modal';
 
 export default function SuppliersPage() {
   const t = useTranslations('suppliers');
@@ -29,6 +31,7 @@ export default function SuppliersPage() {
   const [editing, setEditing] = useState<SupplierDto | null | 'new'>(null);
   /** false = closed; '' = open with no preselected supplier; non-empty string = ID of the preselected supplier */
   const [purchasing, setPurchasing] = useState<string | false>(false);
+  const [viewing, setViewing] = useState<SupplierDto | null>(null);
 
   const { data: suppliers, isPending, error } = useQuery({
     queryKey: ['suppliers'],
@@ -92,7 +95,14 @@ export default function SuppliersPage() {
                   className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-3/50"
                 >
                   <td className="p-3">
-                    <p className="font-bold text-ink">{supplier.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => setViewing(supplier)}
+                      title={t('viewDetails')}
+                      className="cursor-pointer text-start font-bold text-primary-700 hover:underline dark:text-primary-300"
+                    >
+                      {supplier.name}
+                    </button>
                     {supplier.address && <p className="text-xs text-ink-faint">{supplier.address}</p>}
                   </td>
                   <td className="p-3 text-ink-muted" dir="ltr">
@@ -151,6 +161,16 @@ export default function SuppliersPage() {
         <SupplierModal
           supplier={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {viewing && (
+        <SupplierDetailsModal
+          supplier={viewing}
+          onClose={() => setViewing(null)}
+          onPurchase={() => {
+            setPurchasing(viewing.id);
+            setViewing(null);
+          }}
         />
       )}
       {purchasing !== false && (
@@ -371,6 +391,7 @@ function PurchaseModal({
   const [registerId, setRegisterId] = useState('');
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [search, setSearch] = useState('');
+  const [addingNew, setAddingNew] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<unknown>(null);
   const [uploading, setUploading] = useState(false);
@@ -433,6 +454,7 @@ function PurchaseModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stocks'] });
       queryClient.invalidateQueries({ queryKey: ['debts'] });
@@ -493,13 +515,32 @@ function PurchaseModal({
           </Field>
         </div>
 
-        <Field label={t('addProduct')}>
-          <Input
-            placeholder={tc('search')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label={t('addProduct')}>
+              <Input
+                placeholder={t('searchExisting')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </Field>
+          </div>
+          {!addingNew && (
+            <Button type="button" variant="outline" onClick={() => setAddingNew(true)}>
+              <Plus className="h-4 w-4" aria-hidden />
+              {t('newItem')}
+            </Button>
+          )}
+        </div>
+        {addingNew && (
+          <NewProductForm
+            onCancel={() => setAddingNew(false)}
+            onCreated={(product) => {
+              addLine(product);
+              setAddingNew(false);
+            }}
           />
-        </Field>
+        )}
         {search && products && (
           <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-line p-1">
             {products.items.map((product) => (
