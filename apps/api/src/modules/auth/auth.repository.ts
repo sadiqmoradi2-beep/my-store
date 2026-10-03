@@ -10,7 +10,7 @@ export class AuthRepository {
       where: { email },
       include: {
         role: { include: { rolePermissions: { include: { permission: true } } } },
-        tenant: { select: { isActive: true } },
+        tenant: { select: { isActive: true, subscription: { select: { status: true } } } },
       },
     });
   }
@@ -20,7 +20,7 @@ export class AuthRepository {
       where: { id },
       include: {
         role: { include: { rolePermissions: { include: { permission: true } } } },
-        tenant: { select: { isActive: true } },
+        tenant: { select: { isActive: true, subscription: { select: { status: true } } } },
       },
     });
   }

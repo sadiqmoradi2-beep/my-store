@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BackupsService } from '../backups/backups.service';
 import { TenantsRepository } from './tenants.repository';
 import { TenantsService } from './tenants.service';
+import { ModuleAccessService } from '../tenant-modules/module-access.service';
 
 describe('TenantsService', () => {
   let service: TenantsService;
@@ -54,6 +55,7 @@ describe('TenantsService', () => {
         { provide: TenantsRepository, useValue: repo },
         { provide: PrismaService, useValue: prisma },
         { provide: BackupsService, useValue: backups },
+        { provide: ModuleAccessService, useValue: { invalidate: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(TenantsService);
@@ -157,10 +159,10 @@ describe('TenantsService', () => {
       expect(backups.wipeData).not.toHaveBeenCalled();
     });
 
-    it('incorrect password → 401 and wipeData is not called', async () => {
+    it('incorrect password → 400 and wipeData is not called', async () => {
       await expect(
         service.wipeData('t1', 'u1', { password: 'wrong-pass', confirm: 'DELETE ALL' }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(backups.wipeData).not.toHaveBeenCalled();
     });
 
@@ -199,7 +201,12 @@ describe('TenantsService — platform admin actions', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
-      user: { updateMany: jest.fn(), deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([{ id: 'admin1' }]) },
+      user: {
+        updateMany: jest.fn(),
+        deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([{ id: 'admin1' }]),
+        findUnique: jest.fn().mockImplementation(async () => ({ passwordHash: await bcrypt.hash('sa-pass', 4) })),
+      },
       subscription: { findUnique: jest.fn().mockResolvedValue(sub), update: jest.fn() },
       subscriptionHistory: { create: jest.fn() },
       plan: { findUnique: jest.fn().mockResolvedValue({ id: 'plan-starter', code: 'STARTER' }) },
@@ -222,6 +229,7 @@ describe('TenantsService — platform admin actions', () => {
         { provide: TenantsRepository, useValue: { findByIdForAdmin: jest.fn().mockResolvedValue(null) } },
         { provide: PrismaService, useValue: prisma },
         { provide: BackupsService, useValue: backups },
+        { provide: ModuleAccessService, useValue: { invalidate: jest.fn() } },
       ],
     }).compile();
     service = moduleRef.get(TenantsService);
@@ -239,10 +247,11 @@ describe('TenantsService — platform admin actions', () => {
     expect(prisma.user.updateMany).not.toHaveBeenCalled();
   });
 
-  it('delete: wrong slug → 400 and nothing deleted; right slug → wipe + store row deleted', async () => {
-    await expect(service.deleteTenant('t1', 'sa', 'other')).rejects.toBeInstanceOf(BadRequestException);
+  it('delete: wrong slug → 400, wrong password → 400 (never 401: that would log the admin out), both right → wipe + store row deleted', async () => {
+    await expect(service.deleteTenant('t1', 'sa', 'other', 'sa-pass')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.deleteTenant('t1', 'sa', 'my-shop', 'wrong')).rejects.toBeInstanceOf(BadRequestException);
     expect(backups.wipeData).not.toHaveBeenCalled();
-    await service.deleteTenant('t1', 'sa', 'my-shop');
+    await service.deleteTenant('t1', 'sa', 'my-shop', 'sa-pass');
     expect(backups.wipeData).toHaveBeenCalledWith('t1', 'sa');
     expect(prisma.tenant.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
     expect(prisma.licenseKey.updateMany).toHaveBeenCalledWith({ where: { usedByTenantId: 't1' }, data: { usedByTenantId: null } });

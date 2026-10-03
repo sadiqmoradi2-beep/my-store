@@ -36,7 +36,8 @@
     "copied": "Copied",
     "close": "Close",
     "status": "Status",
-    "date": "Date"
+    "date": "Date",
+    "planStoppedBanner": "Your plan has been stopped by the platform — the store is read-only. Contact support to resume it."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -809,7 +810,7 @@
       "TRIAL": "Trial",
       "ACTIVE": "Active",
       "PAST_DUE": "Past due",
-      "CANCELLED": "Cancelled",
+      "CANCELLED": "Stopped",
       "EXPIRED": "Expired"
     },
     "since": "Since",
@@ -920,9 +921,9 @@
       "planSection": "Plan",
       "stop": "Stop plan",
       "resume": "Resume plan",
-      "stopHint": "Stopping keeps the store working but limits it to the Free plan (1 branch, 1 warehouse, 30 products) until resumed.",
-      "resumeHint": "The plan is stopped — the store is limited to Free-plan limits. Resume to give back its plan.",
-      "stopConfirm": "Stop the plan of \"{name}\"? It will be limited to Free-plan limits until resumed.",
+      "stopHint": "Stopping makes the store read-only: its users can still log in and look at their data, but cannot add, change or delete anything (no sales, products, payments…) until you resume the plan.",
+      "resumeHint": "The plan is stopped — the store is read-only. Resume to let it work again.",
+      "stopConfirm": "Stop the plan of \"{name}\"? The store becomes read-only until you resume it.",
       "changePlan": "Change plan",
       "changePlanHint": "The new plan starts today, without payment. Any pending plan request is cleared.",
       "plan": "Plan",
@@ -935,7 +936,11 @@
       "deleteWarning": "This deletes the store, all of its products, sales, income, team, logins and files forever. It cannot be undone.",
       "deleteAlternative": "To only take away access and keep the data, close this and use \"Suspend access\" instead.",
       "typeSlug": "Type the store slug \"{slug}\" to confirm",
-      "deleteForever": "Delete forever"
+      "deleteForever": "Delete forever",
+      "stepOf": "Step {step} of 2",
+      "next": "Next",
+      "back": "Back",
+      "enterPassword": "Enter YOUR super admin password to delete the store forever"
     },
     "activity": {
       "title": "Activity log",

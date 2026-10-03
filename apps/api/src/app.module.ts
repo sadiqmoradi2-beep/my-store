@@ -46,6 +46,7 @@ import { PaymentGatewayModule } from './modules/payment-gateway/payment-gateway.
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { MailModule } from './common/mail/mail.module';
 import { ModuleGuard } from './common/guards/module.guard';
+import { PlanStatusGuard } from './common/guards/plan-status.guard';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { ActivityLogInterceptor } from './common/interceptors/activity-log.interceptor';
 
@@ -97,6 +98,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ModuleGuard },
+    { provide: APP_GUARD, useClass: PlanStatusGuard },
     { provide: APP_FILTER, useClass: PrismaExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },

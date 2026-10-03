@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { addCycle, getUsage, toPlanDto } from '../subscriptions/subscriptions.service';
 import { ChangeTenantPlanDto, TenantActivityQueryDto } from './dto/platform-tenant.dto';
 import { BackupsService } from '../backups/backups.service';
+import { ModuleAccessService } from '../tenant-modules/module-access.service';
 import { TenantsRepository } from './tenants.repository';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { WipeDataDto } from './dto/wipe-data.dto';
@@ -20,6 +21,7 @@ export class TenantsService {
     private readonly repo: TenantsRepository,
     private readonly prisma: PrismaService,
     private readonly backups: BackupsService,
+    private readonly moduleAccess: ModuleAccessService,
   ) {}
 
   async getCurrent(tenantId: string) {
@@ -56,7 +58,7 @@ export class TenantsService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Current password is incorrect');
+    if (!valid) throw new BadRequestException('Current password is incorrect');
     return this.backups.wipeData(tenantId, userId, dto.scope);
   }
 
@@ -130,10 +132,15 @@ export class TenantsService {
    * Permanently delete a store with all of its data, logins and files. The platform admin types the
    * store's slug to confirm.
    */
-  async deleteTenant(id: string, adminUserId: string, confirm: string) {
+  async deleteTenant(id: string, adminUserId: string, confirm: string, password: string) {
     const tenant = await this.findTenant(id);
     if (confirm.trim() !== tenant.slug) {
       throw new BadRequestException(`Type the store's slug "${tenant.slug}" to confirm`);
+    }
+    // Second step: the platform admin re-enters their own password
+    const admin = await this.prisma.user.findUnique({ where: { id: adminUserId }, select: { passwordHash: true } });
+    if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) {
+      throw new BadRequestException('Your password is incorrect');
     }
     // Same order-aware business-data delete as a full reset (it also removes every login of the store)
     await this.backups.wipeData(id, adminUserId);
@@ -154,7 +161,7 @@ export class TenantsService {
     return { deleted: true };
   }
 
-  /** Stop a store's plan: it keeps working with Free-plan limits until resumed */
+  /** Stop a store's plan: the store becomes read-only (log in and view, no changes) until resumed */
   async stopPlan(id: string) {
     const subscription = await this.findSubscription(id);
     if (subscription.status === 'CANCELLED') throw new BadRequestException('The plan is already stopped');
@@ -172,6 +179,7 @@ export class TenantsService {
         },
       }),
     ]);
+    this.moduleAccess.invalidate(id);
     return this.detail(id);
   }
 
@@ -192,6 +200,7 @@ export class TenantsService {
         },
       }),
     ]);
+    this.moduleAccess.invalidate(id);
     return this.detail(id);
   }
 
@@ -229,6 +238,7 @@ export class TenantsService {
         },
       }),
     ]);
+    this.moduleAccess.invalidate(id);
     return this.detail(id);
   }
 

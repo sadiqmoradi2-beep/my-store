@@ -259,6 +259,7 @@ export class AuthService {
       uiPrefs: (user.uiPrefs as AuthUser['uiPrefs']) ?? null,
       twoFactorEnabled: user.totpEnabledAt !== null,
       permissions: user.role.rolePermissions.map((rp) => rp.permission.key),
+      planStopped: user.tenant?.subscription?.status === 'CANCELLED',
     };
   }
 

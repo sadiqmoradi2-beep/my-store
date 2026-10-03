@@ -1,6 +1,6 @@
 'use client';
 
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { tryRefresh } from '@/lib/api-client';
@@ -15,6 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const { accessToken, user, bootstrapped, setBootstrapped } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = useTranslations('common');
 
   useEffect(() => {
     if (accessToken) return;
@@ -41,6 +42,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setMenuOpen(true)} />
+        {user?.planStopped && (
+          <p role="alert" className="bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white">
+            {t('planStoppedBanner')}
+          </p>
+        )}
         <main className="mx-auto w-full max-w-6xl flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>

@@ -35,6 +35,8 @@ export interface AuthUser {
   uiPrefs: UiPrefs | null;
   twoFactorEnabled: boolean;
   permissions: string[];
+  /** The platform admin stopped this store's plan — the store is read-only */
+  planStopped?: boolean;
 }
 
 export interface LoginResponse {

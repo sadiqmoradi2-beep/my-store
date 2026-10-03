@@ -214,7 +214,7 @@ function CleanLogModal({ onClose }: { onClose: () => void }) {
         )}
         <ErrorText error={mutation.error} />
         <div className="flex gap-2">
-          <Button type="submit" loading={mutation.isPending} className="bg-red-600 hover:bg-red-700">
+          <Button type="submit" loading={mutation.isPending} variant="danger">
             {t('clean.submit')}
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>

@@ -171,9 +171,11 @@ function DeleteTenantModal({ tenant, onClose }: { tenant: TenantDetailDto; onClo
   const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<1 | 2>(1);
   const [confirmText, setConfirmText] = useState('');
+  const [password, setPassword] = useState('');
   const mutation = useMutation({
-    mutationFn: () => api.delete(`/tenants/${tenant.id}`, { confirm: confirmText }),
+    mutationFn: () => api.delete(`/tenants/${tenant.id}`, { confirm: confirmText, password }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-admin', 'tenants'] });
       router.replace(`/${locale}/platform-admin/tenants`);
@@ -182,29 +184,51 @@ function DeleteTenantModal({ tenant, onClose }: { tenant: TenantDetailDto; onClo
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    mutation.mutate();
+    if (step === 1) setStep(2);
+    else mutation.mutate();
   }
 
   return (
     <Modal open title={`${t('delete')}: ${tenant.name}`} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
+        <p className="text-xs font-semibold text-ink-faint">{t('stepOf', { step })}</p>
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
           {t('deleteWarning')}
         </p>
-        <p className="text-xs text-ink-muted">{t('deleteAlternative')}</p>
-        <Field label={t('typeSlug', { slug: tenant.slug })}>
-          <Input dir="ltr" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
-        </Field>
+        {step === 1 ? (
+          <>
+            <p className="text-xs text-ink-muted">{t('deleteAlternative')}</p>
+            <Field label={t('typeSlug', { slug: tenant.slug })}>
+              <Input autoFocus dir="ltr" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+            </Field>
+          </>
+        ) : (
+          <Field label={t('enterPassword')}>
+            <Input
+              autoFocus
+              required
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+        )}
         <ErrorText error={mutation.error} />
         <div className="flex gap-2">
           <Button
             type="submit"
             loading={mutation.isPending}
-            disabled={confirmText.trim() !== tenant.slug}
-            className="bg-red-600 hover:bg-red-700"
+            disabled={step === 1 ? confirmText.trim() !== tenant.slug : !password}
+            variant="danger"
           >
-            {t('deleteForever')}
+            {step === 1 ? t('next') : t('deleteForever')}
           </Button>
+          {step === 2 && (
+            <Button type="button" variant="ghost" onClick={() => setStep(1)}>
+              {t('back')}
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={onClose}>
             {tc('cancel')}
           </Button>

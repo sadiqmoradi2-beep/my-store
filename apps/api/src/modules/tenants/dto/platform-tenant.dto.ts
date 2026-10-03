@@ -12,6 +12,11 @@ export class DeleteTenantDto {
   @IsString()
   @MinLength(1)
   confirm: string;
+
+  /** The platform admin's own password — second confirmation step */
+  @IsString()
+  @MinLength(1)
+  password: string;
 }
 
 export class ChangeTenantPlanDto {

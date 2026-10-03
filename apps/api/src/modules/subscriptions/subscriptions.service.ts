@@ -287,12 +287,7 @@ export async function assertPlanLimit(
     where: { tenantId },
     include: { plan: { select: { limits: true, name: true } } },
   });
-  // A plan stopped by the platform admin (CANCELLED) falls back to the Free plan's limits until it is resumed
-  const limits = (
-    subscription?.status === 'CANCELLED'
-      ? PLANS.find((p) => p.code === 'FREE')!.limits
-      : (subscription?.plan.limits ?? {})
-  ) as Partial<PlanLimits>;
+  const limits = (subscription?.plan.limits ?? {}) as Partial<PlanLimits>;
   const max = {
     branches: limits.maxBranches,
     warehouses: limits.maxWarehouses,

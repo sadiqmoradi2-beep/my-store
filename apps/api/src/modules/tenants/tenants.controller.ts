@@ -90,10 +90,10 @@ export class TenantsController {
     return this.tenantsService.changePlan(id, dto);
   }
 
-  /** Permanently delete a store and everything in it — body: { confirm: "<store slug>" } */
+  /** Permanently delete a store and everything in it — body: { confirm: "<store slug>", password } */
   @Delete(':id')
   @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
   remove(@Param('id') id: string, @CurrentUser() user: RequestUser, @Body() dto: DeleteTenantDto) {
-    return this.tenantsService.deleteTenant(id, user.userId, dto.confirm);
+    return this.tenantsService.deleteTenant(id, user.userId, dto.confirm, dto.password);
   }
 }

@@ -6,6 +6,8 @@ const CACHE_TTL_MS = 60_000;
 
 export interface TenantModuleState {
   planRank: number;
+  /** The platform admin stopped this store's plan — the store becomes read-only */
+  planStopped: boolean;
   /** Keys of modules that have been explicitly disabled */
   disabledKeys: Set<string>;
 }
@@ -40,6 +42,7 @@ export class ModuleAccessService {
     ]);
     const state: CacheEntry = {
       planRank: PLAN_RANK[(subscription?.plan.code ?? 'FREE') as PlanCode],
+      planStopped: subscription?.status === 'CANCELLED',
       disabledKeys: new Set(rows.map((r) => r.module.key)),
       expiresAt: Date.now() + CACHE_TTL_MS,
     };

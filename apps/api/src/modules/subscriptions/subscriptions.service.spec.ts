@@ -378,14 +378,14 @@ describe('assertPlanLimit', () => {
 });
 
 describe('assertPlanLimit — warehouses and a stopped plan', () => {
-  it('Free plan allows one warehouse; a stopped paid plan falls back to the Free limits', async () => {
+  it('Free plan allows one warehouse; products follow the plan limit', async () => {
     const prisma = {
       subscription: { findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE', plan: { limits: { maxWarehouses: 1 } } }) },
       warehouse: { count: jest.fn().mockResolvedValue(1) },
       product: { count: jest.fn().mockResolvedValue(30) },
     };
     await expect(assertPlanLimit(prisma as never, 't1', 'warehouses')).rejects.toBeInstanceOf(BadRequestException);
-    prisma.subscription.findUnique.mockResolvedValue({ status: 'CANCELLED', plan: { limits: { maxProducts: 1000 } } });
+    prisma.subscription.findUnique.mockResolvedValue({ status: 'ACTIVE', plan: { limits: { maxProducts: 30 } } });
     await expect(assertPlanLimit(prisma as never, 't1', 'products')).rejects.toBeInstanceOf(BadRequestException);
     prisma.subscription.findUnique.mockResolvedValue({ status: 'ACTIVE', plan: { limits: { maxProducts: 1000 } } });
     await expect(assertPlanLimit(prisma as never, 't1', 'products')).resolves.toBeUndefined();
