@@ -118,6 +118,13 @@ describe('AuthService', () => {
     );
   });
 
+  it('user of a suspended store → 401 even with the right password', async () => {
+    const passwordHash = await bcrypt.hash('Correct@123', 4);
+    repo.findUserByEmail.mockResolvedValue({ ...baseUser, passwordHash, tenant: { isActive: false } });
+    await expect(service.login({ email: 'a@b.af', password: 'Correct@123' })).rejects.toThrow('suspended');
+    expect(repo.updateRefreshTokenHash).not.toHaveBeenCalled();
+  });
+
   it('inactive user → 401', async () => {
     repo.findUserByEmail.mockResolvedValue({ ...baseUser, status: 'SUSPENDED', passwordHash: 'x' });
     await expect(service.login({ email: 'a@b.af', password: 'x' })).rejects.toBeInstanceOf(

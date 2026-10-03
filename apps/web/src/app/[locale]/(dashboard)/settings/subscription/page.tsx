@@ -151,6 +151,7 @@ export default function SubscriptionPage() {
             <Card className="space-y-3 p-5">
               <p className="text-sm font-semibold text-ink">{t('usage')}</p>
               {usageRow(t('branches'), sub.usage.branches, sub.plan.limits.maxBranches)}
+              {usageRow(t('warehouses'), sub.usage.warehouses, sub.plan.limits.maxWarehouses ?? -1)}
               {usageRow(t('users'), sub.usage.users, sub.plan.limits.maxUsers)}
               {usageRow(t('products'), sub.usage.products, sub.plan.limits.maxProducts)}
             </Card>
@@ -181,8 +182,12 @@ export default function SubscriptionPage() {
                     </p>
                   )}
                   <ul className="mt-3 flex-1 space-y-1.5 text-sm text-ink-muted">
+                    <li className="font-semibold text-ink">{t('allFeatures')}</li>
                     <li>
                       {t('branches')}: {limitLabel(plan.limits.maxBranches)}
+                    </li>
+                    <li>
+                      {t('warehouses')}: {limitLabel(plan.limits.maxWarehouses ?? -1)}
                     </li>
                     <li>
                       {t('users')}: {limitLabel(plan.limits.maxUsers)}

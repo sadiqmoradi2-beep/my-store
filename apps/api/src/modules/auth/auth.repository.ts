@@ -8,14 +8,20 @@ export class AuthRepository {
   findUserByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        tenant: { select: { isActive: true } },
+      },
     });
   }
 
   findUserById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        tenant: { select: { isActive: true } },
+      },
     });
   }
 

@@ -132,6 +132,9 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException('Incorrect email or password');
     }
+    if (user.tenant && !user.tenant.isActive) {
+      throw new UnauthorizedException('This store has been suspended — please contact support');
+    }
     if (user.totpEnabledAt && user.totpSecret) {
       if (!dto.totpCode) return { requires2fa: true };
       if (!verifyTotp(user.totpSecret, dto.totpCode)) {
@@ -185,7 +188,7 @@ export class AuthService {
   async refresh(refreshToken: string): Promise<AuthResult> {
     const payload = await this.verifyRefreshToken(refreshToken);
     const user = await this.repo.findUserById(payload.sub);
-    if (!user || user.deletedAt || user.status !== 'ACTIVE' || !user.refreshTokenHash) {
+    if (!user || user.deletedAt || user.status !== 'ACTIVE' || !user.refreshTokenHash || user.tenant?.isActive === false) {
       throw new UnauthorizedException('Invalid session');
     }
     const matches = await bcrypt.compare(refreshToken, user.refreshTokenHash);

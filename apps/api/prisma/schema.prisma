@@ -1117,6 +1117,8 @@ enum SubscriptionHistoryEvent {
   PLAN_CHANGED
   RENEWED
   EXPIRED_DOWNGRADE
+  PLAN_STOPPED
+  PLAN_RESUMED
 }
 
 /** Read-only — plan codes are snapshotted (not a relation), same pattern as Debt.partyName */

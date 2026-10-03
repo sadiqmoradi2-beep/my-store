@@ -8,6 +8,8 @@ import type { Locale, TenantDetailDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { formatDate, formatNumber } from '@/lib/format';
 import { BackLink, Badge, Card, cn, ErrorText, Spinner } from '@/components/ui';
+import { TenantActions } from '@/components/platform/tenant-actions';
+import { TenantActivity } from '@/components/platform/tenant-activity';
 
 export default function PlatformTenantDetailPage() {
   const t = useTranslations('platformAdmin');
@@ -55,7 +57,7 @@ export default function PlatformTenantDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-black text-ink">{tenant.name}</h1>
               <Badge tone={tenant.isActive ? 'DELIVERED' : 'danger'}>
-                {tenant.isActive ? tc('active') : tc('inactive')}
+                {tenant.isActive ? tc('active') : t('suspended')}
               </Badge>
             </div>
             <p className="mt-1 text-xs text-ink-faint" dir="ltr">
@@ -82,6 +84,8 @@ export default function PlatformTenantDetailPage() {
               )}
             </div>
           </Card>
+
+          <TenantActions tenant={tenant} />
 
           <Card className="p-5">
             <p className="text-sm font-semibold text-ink">{t('subscriptionSection')}</p>
@@ -127,6 +131,7 @@ export default function PlatformTenantDetailPage() {
             <Card className="space-y-3 p-5">
               <p className="text-sm font-semibold text-ink">{t('usageSection')}</p>
               {usageRow(tSub('branches'), tenant.usage.branches, tenant.subscription.plan.limits.maxBranches)}
+              {usageRow(tSub('warehouses'), tenant.usage.warehouses, tenant.subscription.plan.limits.maxWarehouses ?? -1)}
               {usageRow(tSub('users'), tenant.usage.users, tenant.subscription.plan.limits.maxUsers)}
               {usageRow(tSub('products'), tenant.usage.products, tenant.subscription.plan.limits.maxProducts)}
             </Card>
@@ -171,6 +176,8 @@ export default function PlatformTenantDetailPage() {
               </div>
             )}
           </Card>
+
+          <TenantActivity tenantId={tenant.id} />
         </>
       )}
     </div>

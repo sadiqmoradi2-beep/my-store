@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@my-store/shared';
 import { CurrentUser, RequestUser } from '../../common/decorators/current-user.decorator';
@@ -8,6 +8,12 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { TenantsService } from './tenants.service';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { WipeDataDto } from './dto/wipe-data.dto';
+import {
+  ChangeTenantPlanDto,
+  DeleteTenantDto,
+  SetTenantAccessDto,
+  TenantActivityQueryDto,
+} from './dto/platform-tenant.dto';
 
 @ApiTags('tenants')
 @ApiBearerAuth()
@@ -52,5 +58,42 @@ export class TenantsController {
   @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
   detail(@Param('id') id: string) {
     return this.tenantsService.detail(id);
+  }
+
+  @Get(':id/activity')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  activity(@Param('id') id: string, @Query() query: TenantActivityQueryDto) {
+    return this.tenantsService.activity(id, query);
+  }
+
+  @Patch(':id/access')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  setAccess(@Param('id') id: string, @Body() dto: SetTenantAccessDto) {
+    return this.tenantsService.setAccess(id, dto.active);
+  }
+
+  @Post(':id/plan/stop')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  stopPlan(@Param('id') id: string) {
+    return this.tenantsService.stopPlan(id);
+  }
+
+  @Post(':id/plan/resume')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  resumePlan(@Param('id') id: string) {
+    return this.tenantsService.resumePlan(id);
+  }
+
+  @Post(':id/plan/change')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  changePlan(@Param('id') id: string, @Body() dto: ChangeTenantPlanDto) {
+    return this.tenantsService.changePlan(id, dto);
+  }
+
+  /** Permanently delete a store and everything in it — body: { confirm: "<store slug>" } */
+  @Delete(':id')
+  @RequirePermissions(PERMISSIONS.TENANTS_MANAGE_ALL)
+  remove(@Param('id') id: string, @CurrentUser() user: RequestUser, @Body() dto: DeleteTenantDto) {
+    return this.tenantsService.deleteTenant(id, user.userId, dto.confirm);
   }
 }

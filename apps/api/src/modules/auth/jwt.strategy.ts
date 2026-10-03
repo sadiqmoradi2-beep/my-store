@@ -47,9 +47,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { deletedAt: true, status: true },
+      select: { deletedAt: true, status: true, tenant: { select: { isActive: true } } },
     });
-    const active = !!user && !user.deletedAt && user.status === 'ACTIVE';
+    // A suspended store (Tenant.isActive=false) cuts off all its users the same way
+    const active = !!user && !user.deletedAt && user.status === 'ACTIVE' && user.tenant?.isActive !== false;
     this.cache.set(userId, { active, expiresAt: Date.now() + CACHE_TTL_MS });
     return active;
   }

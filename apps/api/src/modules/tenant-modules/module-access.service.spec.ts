@@ -43,10 +43,11 @@ describe('ModuleAccessService', () => {
       expect(enabled).toBe(true);
     });
 
-    it('پلن فعلی سقف ماژول را پوشش نمی‌دهد → غیرفعال', async () => {
+    it('every module is available on the Free plan (plans differ only by limits)', async () => {
       prisma.subscription.findUnique.mockResolvedValue({ plan: { code: 'FREE' } });
-      const enabled = await service.isEnabled('t1', 'suppliers'); // minPlan: BUSINESS
-      expect(enabled).toBe(false);
+      for (const key of ['suppliers', 'partners', 'activity-log', 'backups', 'work-sessions', 'reports']) {
+        expect(await service.isEnabled('t1', key)).toBe(true);
+      }
     });
   });
 

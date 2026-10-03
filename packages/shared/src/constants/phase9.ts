@@ -8,13 +8,21 @@ export const BILLING_CYCLE_NAMES: Record<BillingCycle, string> = {
   YEARLY: 'Yearly',
 };
 
-export const SUBSCRIPTION_HISTORY_EVENTS = ['PLAN_CHANGED', 'RENEWED', 'EXPIRED_DOWNGRADE'] as const;
+export const SUBSCRIPTION_HISTORY_EVENTS = [
+  'PLAN_CHANGED',
+  'RENEWED',
+  'EXPIRED_DOWNGRADE',
+  'PLAN_STOPPED',
+  'PLAN_RESUMED',
+] as const;
 export type SubscriptionHistoryEvent = (typeof SUBSCRIPTION_HISTORY_EVENTS)[number];
 
 export const SUBSCRIPTION_HISTORY_EVENT_NAMES: Record<SubscriptionHistoryEvent, string> = {
   PLAN_CHANGED: 'Plan changed',
   RENEWED: 'Renewed',
   EXPIRED_DOWNGRADE: 'Expired — downgraded to Free',
+  PLAN_STOPPED: 'Plan stopped by the platform admin',
+  PLAN_RESUMED: 'Plan resumed by the platform admin',
 };
 
 export const PLATFORM_FEEDBACK_TYPES = ['SUGGESTION', 'COMPLAINT', 'BUG', 'FEATURE_REQUEST'] as const;

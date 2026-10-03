@@ -48,6 +48,7 @@ export class BranchesService {
   /** Create an additional warehouse for a branch — a branch can have multiple warehouses */
   async createWarehouse(tenantId: string, branchId: string, dto: CreateWarehouseDto) {
     await this.get(tenantId, branchId);
+    await assertPlanLimit(this.prisma, tenantId, 'warehouses');
     return this.repo.createWarehouse({
       tenantId,
       branchId,

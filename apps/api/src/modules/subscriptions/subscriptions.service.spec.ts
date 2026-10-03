@@ -47,6 +47,7 @@ describe('SubscriptionsService.changePlan', () => {
       },
       subscriptionHistory: { create: jest.fn() },
       branch: { count: jest.fn().mockResolvedValue(2) },
+      warehouse: { count: jest.fn().mockResolvedValue(1) },
       user: { count: jest.fn().mockResolvedValue(10) },
       product: { count: jest.fn().mockResolvedValue(50) },
       gatewayIntent: { findFirst: jest.fn() },
@@ -198,6 +199,7 @@ describe('SubscriptionsService.approvePending/rejectPending', () => {
       subscriptionHistory: { create: jest.fn() },
       plan: {},
       branch: { count: jest.fn().mockResolvedValue(0) },
+      warehouse: { count: jest.fn().mockResolvedValue(0) },
       user: { count: jest.fn().mockResolvedValue(0) },
       product: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
@@ -312,6 +314,7 @@ describe('assertPlanLimit', () => {
     prisma = {
       subscription: { findUnique: jest.fn() },
       branch: { count: jest.fn() },
+      warehouse: { count: jest.fn().mockResolvedValue(0) },
       user: { count: jest.fn() },
       product: { count: jest.fn() },
     };
@@ -371,5 +374,20 @@ describe('assertPlanLimit', () => {
     prisma.subscription.findUnique.mockResolvedValue(null);
     await assertPlanLimit(prisma as never, 't1', 'products');
     expect(prisma.product.count).not.toHaveBeenCalled();
+  });
+});
+
+describe('assertPlanLimit — warehouses and a stopped plan', () => {
+  it('Free plan allows one warehouse; a stopped paid plan falls back to the Free limits', async () => {
+    const prisma = {
+      subscription: { findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE', plan: { limits: { maxWarehouses: 1 } } }) },
+      warehouse: { count: jest.fn().mockResolvedValue(1) },
+      product: { count: jest.fn().mockResolvedValue(30) },
+    };
+    await expect(assertPlanLimit(prisma as never, 't1', 'warehouses')).rejects.toBeInstanceOf(BadRequestException);
+    prisma.subscription.findUnique.mockResolvedValue({ status: 'CANCELLED', plan: { limits: { maxProducts: 1000 } } });
+    await expect(assertPlanLimit(prisma as never, 't1', 'products')).rejects.toBeInstanceOf(BadRequestException);
+    prisma.subscription.findUnique.mockResolvedValue({ status: 'ACTIVE', plan: { limits: { maxProducts: 1000 } } });
+    await expect(assertPlanLimit(prisma as never, 't1', 'products')).resolves.toBeUndefined();
   });
 });

@@ -36,6 +36,16 @@ describe('JwtStrategy', () => {
     await expect(strategy.validate({ sub: 'u1' } as never)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('user of a suspended store → 401 (existing sessions are cut off)', async () => {
+    prisma.user.findUnique.mockResolvedValue({ deletedAt: null, status: 'ACTIVE', tenant: { isActive: false } });
+    await expect(strategy.validate({ sub: 'u1' } as never)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('platform super admin (no store) → allowed', async () => {
+    prisma.user.findUnique.mockResolvedValue({ deletedAt: null, status: 'ACTIVE', tenant: null });
+    await expect(strategy.validate({ sub: 'sa', roleKey: 'SUPER_ADMIN' } as never)).resolves.toBeTruthy();
+  });
+
   it('user no longer exists → 401', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
     await expect(strategy.validate({ sub: 'u1' } as never)).rejects.toBeInstanceOf(UnauthorizedException);

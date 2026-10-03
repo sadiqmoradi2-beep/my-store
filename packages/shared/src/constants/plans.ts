@@ -6,7 +6,8 @@ export interface PlanDefinition {
   priceMonthly: number;
   /** Yearly price — optional since the free plan has no separate yearly price to display */
   priceYearly?: number;
-  limits: { maxBranches: number; maxUsers: number; maxProducts: number };
+  /** -1 = unlimited. Every plan has every module — plans differ only by these limits (and price) */
+  limits: { maxBranches: number; maxWarehouses: number; maxUsers: number; maxProducts: number };
 }
 
 /**
@@ -20,27 +21,27 @@ export const PLANS: PlanDefinition[] = [
     code: 'FREE',
     name: 'Free',
     priceMonthly: 0,
-    limits: { maxBranches: 1, maxUsers: 3, maxProducts: 100 },
+    limits: { maxBranches: 1, maxWarehouses: 1, maxUsers: 3, maxProducts: 30 },
   },
   {
     code: 'STARTER',
     name: 'Basic',
     priceMonthly: 5,
     priceYearly: 50,
-    limits: { maxBranches: 1, maxUsers: 10, maxProducts: 300 },
+    limits: { maxBranches: 1, maxWarehouses: -1, maxUsers: 10, maxProducts: 300 },
   },
   {
     code: 'BUSINESS',
     name: 'Business',
     priceMonthly: 10,
     priceYearly: 100,
-    limits: { maxBranches: 3, maxUsers: 30, maxProducts: 1000 },
+    limits: { maxBranches: 3, maxWarehouses: -1, maxUsers: 30, maxProducts: 1000 },
   },
   {
     code: 'ENTERPRISE',
     name: 'Enterprise',
     priceMonthly: 30,
     priceYearly: 300,
-    limits: { maxBranches: -1, maxUsers: -1, maxProducts: -1 },
+    limits: { maxBranches: -1, maxWarehouses: -1, maxUsers: -1, maxProducts: -1 },
   },
 ];

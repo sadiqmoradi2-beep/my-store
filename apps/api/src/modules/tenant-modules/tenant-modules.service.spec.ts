@@ -59,12 +59,10 @@ describe('TenantModulesService.setEnabled', () => {
     expect(prisma.tenantModule.upsert).not.toHaveBeenCalled();
   });
 
-  it('enabling a module above the current plan → error', async () => {
+  it('enabling a module on the Free plan is allowed (no plan-locked modules)', async () => {
     moduleAccess.stateOf.mockResolvedValue({ planRank: 0, disabledKeys: new Set<string>() }); // FREE
-    await expect(service.setEnabled('t1', 'suppliers', true)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(prisma.tenantModule.upsert).not.toHaveBeenCalled();
+    await service.setEnabled('t1', 'suppliers', true);
+    expect(prisma.tenantModule.upsert).toHaveBeenCalled();
   });
 
   it('successful enable: dependencies enabled and plan sufficient → upsert + invalidate', async () => {

@@ -85,7 +85,10 @@ export const api = {
     ),
   patch: <T>(path: string, data: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => r.data),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }).then((r) => r.data),
+  delete: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: 'DELETE', body: data === undefined ? undefined : JSON.stringify(data) }).then(
+      (r) => r.data,
+    ),
   upload: <T>(path: string, formData: FormData) =>
     request<T>(path, { method: 'POST', body: formData }).then((r) => r.data),
 };

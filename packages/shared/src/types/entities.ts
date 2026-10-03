@@ -558,7 +558,7 @@ export interface PlanDto {
   priceMonthly: number;
   priceYearly: number | null;
   requiresApproval: boolean;
-  limits: { maxBranches: number; maxUsers: number; maxProducts: number };
+  limits: { maxBranches: number; maxWarehouses?: number; maxUsers: number; maxProducts: number };
 }
 
 export interface SubscriptionDto {
@@ -570,7 +570,7 @@ export interface SubscriptionDto {
   pendingPlan: PlanDto | null;
   pendingRequestedAt: string | null;
   pendingBillingCycle: 'MONTHLY' | 'YEARLY' | null;
-  usage: { branches: number; users: number; products: number };
+  usage: { branches: number; warehouses: number; users: number; products: number };
 }
 
 /** Pending plan-change request awaiting approval — for the platform admin panel (SUPER_ADMIN) */
@@ -587,7 +587,7 @@ export interface PendingSubscriptionDto {
 /** A row in the subscription change/renewal/expiration history — read-only, for the platform admin console */
 export interface SubscriptionHistoryDto {
   id: string;
-  event: 'PLAN_CHANGED' | 'RENEWED' | 'EXPIRED_DOWNGRADE';
+  event: 'PLAN_CHANGED' | 'RENEWED' | 'EXPIRED_DOWNGRADE' | 'PLAN_STOPPED' | 'PLAN_RESUMED';
   fromPlanCode: PlanDto['code'] | null;
   toPlanCode: PlanDto['code'];
   billingCycle: 'MONTHLY' | 'YEARLY' | null;
@@ -628,9 +628,24 @@ export interface TenantDetailDto {
     pendingBillingCycle: 'MONTHLY' | 'YEARLY' | null;
     pendingRequestedAt: string | null;
   } | null;
-  usage: { branches: number; users: number; products: number };
+  usage: { branches: number; warehouses: number; users: number; products: number };
   history: SubscriptionHistoryDto[];
   behavior: { lastAdminLoginAt: string | null; totalSales: number };
+}
+
+/** One activity-log entry of a store, as the platform admin sees it */
+export interface TenantActivityDto {
+  id: string;
+  createdAt: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  roleKey: string | null;
+  action: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  ip?: string | null;
 }
 
 /** Store owner's suggestion/complaint about the platform — submitted from the store panel, reviewed in the platform admin panel */

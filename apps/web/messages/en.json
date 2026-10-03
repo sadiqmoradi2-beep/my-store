@@ -846,7 +846,9 @@
     "yearly": "Yearly",
     "chooseBillingCycle": "Choose a billing cycle:",
     "renew": "Renew plan",
-    "endsAt": "Plan ends on"
+    "endsAt": "Plan ends on",
+    "warehouses": "Warehouses (inventory)",
+    "allFeatures": "All features included"
   },
   "platformAdmin": {
     "title": "Platform Admin",
@@ -905,7 +907,50 @@
     "noFeedback": "No feedback found.",
     "saveNote": "Save",
     "noteSaved": "Saved",
-    "totalSales": "Total sales"
+    "totalSales": "Total sales",
+    "suspended": "Suspended",
+    "actions": {
+      "title": "Store controls",
+      "accessSection": "Access",
+      "suspend": "Suspend access",
+      "restore": "Restore access",
+      "suspendHint": "Blocks every login of this store (owner and staff). Sessions end within about 30 seconds. All data is kept.",
+      "restoreHint": "This store is suspended — nobody can log in. Restore to let them back in.",
+      "suspendConfirm": "Suspend access to \"{name}\"? Nobody in the store will be able to log in until you restore it.",
+      "planSection": "Plan",
+      "stop": "Stop plan",
+      "resume": "Resume plan",
+      "stopHint": "Stopping keeps the store working but limits it to the Free plan (1 branch, 1 warehouse, 30 products) until resumed.",
+      "resumeHint": "The plan is stopped — the store is limited to Free-plan limits. Resume to give back its plan.",
+      "stopConfirm": "Stop the plan of \"{name}\"? It will be limited to Free-plan limits until resumed.",
+      "changePlan": "Change plan",
+      "changePlanHint": "The new plan starts today, without payment. Any pending plan request is cleared.",
+      "plan": "Plan",
+      "cycle": "Billing cycle",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "dangerSection": "Danger zone",
+      "delete": "Delete store",
+      "deleteHint": "Permanently delete the store with all of its data, files and logins.",
+      "deleteWarning": "This deletes the store, all of its products, sales, income, team, logins and files forever. It cannot be undone.",
+      "deleteAlternative": "To only take away access and keep the data, close this and use \"Suspend access\" instead.",
+      "typeSlug": "Type the store slug \"{slug}\" to confirm",
+      "deleteForever": "Delete forever"
+    },
+    "activity": {
+      "title": "Activity log",
+      "who": {
+        "all": "Everyone",
+        "admins": "Store admins",
+        "staff": "Other users"
+      },
+      "search": "Search action or path…",
+      "when": "When",
+      "user": "User",
+      "action": "Action",
+      "path": "Path",
+      "status": "Result"
+    }
   },
   "settings": {
     "title": "Panel personalization",

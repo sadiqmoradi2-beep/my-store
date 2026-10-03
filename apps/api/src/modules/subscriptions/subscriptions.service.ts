@@ -13,6 +13,7 @@ export interface ChangePlanOptions {
 
 interface PlanLimits {
   maxBranches: number;
+  maxWarehouses?: number;
   maxUsers: number;
   maxProducts: number;
 }
@@ -237,12 +238,13 @@ export class SubscriptionsService {
 
 /** Current tenant usage totals — exported so the platform tenants console (admin section) can also use it without new DI */
 export async function getUsage(prisma: PrismaService, tenantId: string) {
-  const [branches, users, products] = await Promise.all([
+  const [branches, warehouses, users, products] = await Promise.all([
     prisma.branch.count({ where: { tenantId, isActive: true } }),
+    prisma.warehouse.count({ where: { tenantId, isActive: true } }),
     prisma.user.count({ where: { tenantId, deletedAt: null } }),
     prisma.product.count({ where: { tenantId, deletedAt: null } }),
   ]);
-  return { branches, users, products };
+  return { branches, warehouses, users, products };
 }
 
 export function toPlanDto(plan: {
@@ -279,23 +281,34 @@ export function addCycle(date: Date, cycle: BillingCycle): Date {
 export async function assertPlanLimit(
   prisma: PrismaService,
   tenantId: string,
-  kind: 'branches' | 'users' | 'products',
+  kind: 'branches' | 'warehouses' | 'users' | 'products',
 ): Promise<void> {
   const subscription = await prisma.subscription.findUnique({
     where: { tenantId },
     include: { plan: { select: { limits: true, name: true } } },
   });
-  const limits = (subscription?.plan.limits ?? {}) as Partial<PlanLimits>;
-  const max =
-    kind === 'branches' ? limits.maxBranches : kind === 'users' ? limits.maxUsers : limits.maxProducts;
+  // A plan stopped by the platform admin (CANCELLED) falls back to the Free plan's limits until it is resumed
+  const limits = (
+    subscription?.status === 'CANCELLED'
+      ? PLANS.find((p) => p.code === 'FREE')!.limits
+      : (subscription?.plan.limits ?? {})
+  ) as Partial<PlanLimits>;
+  const max = {
+    branches: limits.maxBranches,
+    warehouses: limits.maxWarehouses,
+    users: limits.maxUsers,
+    products: limits.maxProducts,
+  }[kind];
   if (max === undefined || max === -1) return;
 
   const count =
     kind === 'branches'
       ? await prisma.branch.count({ where: { tenantId, isActive: true } })
-      : kind === 'users'
-        ? await prisma.user.count({ where: { tenantId, deletedAt: null } })
-        : await prisma.product.count({ where: { tenantId, deletedAt: null } });
+      : kind === 'warehouses'
+        ? await prisma.warehouse.count({ where: { tenantId, isActive: true } })
+        : kind === 'users'
+          ? await prisma.user.count({ where: { tenantId, deletedAt: null } })
+          : await prisma.product.count({ where: { tenantId, deletedAt: null } });
   if (count >= max) {
     throw new BadRequestException(
       `You have reached the limit of your current plan (${max}) — upgrade your plan to add more`,
