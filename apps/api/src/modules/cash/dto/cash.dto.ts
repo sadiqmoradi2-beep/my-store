@@ -34,6 +34,11 @@ export class CreateCashTransactionDto {
   @IsOptional()
   @IsString()
   sessionId?: string | null;
+
+  /** When it happened — leave empty for now; a past date back-fills an old transaction (no future dates) */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
 export class CashTransactionListQueryDto extends PaginationQueryDto {

@@ -304,7 +304,8 @@
     "paidByHint": "The main cash box, or the cash box of a person with an open work session — a session's expenses reduce its cash box",
     "mainBox": "Main cash box",
     "paidByColumn": "Paid by",
-    "sessionsTitle": "Work sessions (seller / employee / partner cash boxes)"
+    "sessionsTitle": "Work sessions (seller / employee / partner cash boxes)",
+    "pastDateHint": "Recorded on this past date — it shows in reports for that day"
   },
   "pos": {
     "title": "My Store",

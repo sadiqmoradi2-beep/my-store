@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { CashTransactionType, IncomePart, PaymentMethod, Prisma } from '@prisma/client';
 import {
   CASH_TRANSACTION_DIRECTION,
@@ -96,6 +96,7 @@ export class CashService {
         note: dto.note,
         receiptUrl: dto.receiptUrl,
         sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
+        createdAt: transactionDate(dto.date),
       }),
     );
   }
@@ -212,6 +213,21 @@ interface CashTransactionInput {
   referenceId?: string;
   /** The work session whose cash box is behind this movement */
   sessionId?: string | null;
+  /** When it happened — defaults to now (a back-filled old transaction passes its own date) */
+  createdAt?: Date;
+}
+
+/**
+ * The date of a manually entered transaction: now when not given, otherwise the given day.
+ * A date more than a day ahead is refused (a typo'd year must not land in the future).
+ */
+export function transactionDate(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (date.getTime() > Date.now() + 86_400_000) {
+    throw new BadRequestException('The transaction date cannot be in the future');
+  }
+  return date;
 }
 
 /** Record a register transaction inside a database transaction: updates the balance + rejects if it would go negative */
@@ -256,6 +272,7 @@ export async function recordCashTransaction(
       referenceId: input.referenceId,
       sessionId: input.sessionId ?? null,
       performedById: input.userId,
+      ...(input.createdAt && { createdAt: input.createdAt }),
     },
   });
 }

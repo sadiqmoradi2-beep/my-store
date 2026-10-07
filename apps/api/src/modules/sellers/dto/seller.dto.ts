@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsNumber,
@@ -111,4 +112,9 @@ export class PaySellerSalaryDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /** When it happened — leave empty for now; a past date back-fills an old transaction (no future dates) */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }

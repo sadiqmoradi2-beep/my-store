@@ -12,7 +12,7 @@ import { randomBytes } from 'crypto';
 import { computeCommission } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta, PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { recordCashTransaction } from '../cash/cash.service';
+import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
@@ -159,6 +159,7 @@ export class SellersService {
   async paySalary(tenantId: string, userId: string, id: string, dto: PaySellerSalaryDto) {
     await this.get(tenantId, id);
     const amount = new Prisma.Decimal(dto.amount);
+    const at = transactionDate(dto.date);
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.sellerSalaryPayment.create({
         data: {
@@ -170,6 +171,7 @@ export class SellersService {
           note: dto.note,
           receiptImageUrl: dto.receiptImageUrl,
           performedById: userId,
+          ...(at && { createdAt: at }),
         },
       });
       if (dto.registerId) {
@@ -184,6 +186,7 @@ export class SellersService {
           referenceType: 'seller_salary',
           referenceId: payment.id,
           sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
+          createdAt: at,
         });
       }
       return payment;

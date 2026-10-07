@@ -55,6 +55,11 @@ function currentPeriod() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function todayDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function TransactionModal({ register, onClose }: { register: CashRegisterDto; onClose: () => void }) {
   const t = useTranslations('cash');
   const tc = useTranslations('common');
@@ -65,6 +70,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const [type, setType] = useState<'INCOME' | 'EXPENSE' | 'WITHDRAWAL'>('EXPENSE');
   const [category, setCategory] = useState(CATEGORIES.EXPENSE[0].value);
   const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(todayDate);
   const [note, setNote] = useState('');
   const [personRole, setPersonRole] = useState<PersonRole>('EMPLOYEE');
   const [person, setPerson] = useState('');
@@ -106,7 +112,9 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
     queryFn: () => api.get<WorkSessionDto | null>('/work-sessions/mine'),
     retry: false,
   });
-  const paidBy = paidByChoice ?? mine?.id ?? '';
+  const isToday = date === todayDate();
+  // An old (back-filled) transaction defaults to the main box, not today's open work session
+  const paidBy = paidByChoice ?? (isToday ? mine?.id : undefined) ?? '';
 
   const people: { key: string; name: string; payType?: string; salary?: string }[] =
     personRole === 'EMPLOYEE'
@@ -132,7 +140,9 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const mutation = useMutation({
     mutationFn: async () => {
       const sessionId = paidBy === '' ? null : paidBy;
-      const common = { amount: Number(amount), note: note || undefined, sessionId };
+      // Today → the exact time now; another day → midday of that day, so it stays on that date in every time zone
+      const when = isToday ? undefined : new Date(`${date}T12:00:00`).toISOString();
+      const common = { amount: Number(amount), note: note || undefined, sessionId, date: when };
       if (isPerson && personRole !== 'PARTNER') {
         let receiptImageUrl: string | undefined;
         if (receipt) {
@@ -259,9 +269,14 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           </>
         )}
 
-        <Field label={t('amount')}>
-          <Input required type="number" min={0.01} step="0.01" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t('amount')}>
+            <Input required type="number" min={0.01} step="0.01" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </Field>
+          <Field label={t('date')} hint={isToday ? undefined : t('pastDateHint')}>
+            <Input required type="date" dir="ltr" max={todayDate()} value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        </div>
 
         <Field label={type === 'INCOME' ? t('receivedBy') : t('paidBy')} hint={t('paidByHint')}>
           <Select value={paidBy} onChange={(e) => setPaidByChoice(e.target.value)}>

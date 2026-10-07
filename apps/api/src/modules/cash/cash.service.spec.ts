@@ -1,4 +1,4 @@
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -68,6 +68,17 @@ describe('CashService', () => {
       expect(data.performedById).toBe('u1');
       expect(data.tenantId).toBe('t1');
       expect(data.registerId).toBe('reg-1');
+      expect(data.createdAt).toBeUndefined(); // no date → now (database default)
+    });
+
+    it('a past date back-fills the transaction on that day; a future date → 400', async () => {
+      tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
+      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: '2025-03-15T12:00:00.000Z' });
+      expect(tx.cashTransaction.create.mock.calls[0][0].data.createdAt).toEqual(new Date('2025-03-15T12:00:00.000Z'));
+      const future = new Date(Date.now() + 3 * 86_400_000).toISOString();
+      await expect(
+        service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: future }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

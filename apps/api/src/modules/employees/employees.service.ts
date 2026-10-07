@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 import { EMPLOYEE_POSITION_ROLE, ROLES } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
-import { recordCashTransaction } from '../cash/cash.service';
+import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
@@ -279,6 +279,7 @@ export class EmployeesService {
     const deduction = new Prisma.Decimal(dto.deduction ?? 0);
     const status = dto.status ?? 'PAID';
     const netAmount = amount.plus(bonus).minus(deduction);
+    const at = transactionDate(dto.date);
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.salaryPayment.create({
         data: {
@@ -293,7 +294,8 @@ export class EmployeesService {
           note: dto.note,
           receiptImageUrl: dto.receiptImageUrl,
           performedById: userId,
-          paidAt: status === 'PAID' ? new Date() : undefined,
+          paidAt: status === 'PAID' ? (at ?? new Date()) : undefined,
+          ...(at && { createdAt: at }),
         },
       });
       if (dto.registerId && status === 'PAID') {
@@ -308,6 +310,7 @@ export class EmployeesService {
           referenceType: 'salary',
           referenceId: payment.id,
           sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
+          createdAt: at,
         });
       }
       return payment;

@@ -175,6 +175,11 @@ export class PaySalaryDto {
   @IsEnum(SALARY_PAYMENT_STATUSES)
   status?: SalaryPaymentStatus;
 
+  /** When it happened — leave empty for now; a past date back-fills an old transaction (no future dates) */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
   @IsOptional()
   @IsString()
   note?: string;

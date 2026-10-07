@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { PARTNER_ENTRY_TYPES, PartnerEntryType } from '@my-store/shared';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
@@ -93,6 +93,11 @@ export class CreateLedgerEntryDto {
   @IsOptional()
   @IsString()
   receiptUrl?: string;
+
+  /** When it happened — leave empty for now; a past date back-fills an old transaction (no future dates) */
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
 
 /** Preview/apply an even distribution of a total profit or loss figure across active partners, by sharePercent */

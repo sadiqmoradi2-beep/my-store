@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PartnerEntryType } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
-import { recordCashTransaction } from '../cash/cash.service';
+import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
 import {
   CreateLedgerEntryDto,
@@ -122,6 +122,7 @@ export class PartnersService {
   async addLedgerEntry(tenantId: string, userId: string, partnerId: string, dto: CreateLedgerEntryDto) {
     const partner = await this.get(tenantId, partnerId);
     const amount = new Prisma.Decimal(dto.amount);
+    const at = transactionDate(dto.date);
     return this.prisma.$transaction(async (tx) => {
       const entry = await tx.partnerLedgerEntry.create({
         data: {
@@ -134,6 +135,7 @@ export class PartnersService {
           note: dto.note,
           receiptUrl: dto.receiptUrl,
           performedById: userId,
+          ...(at && { createdAt: at }),
         },
       });
       if (dto.type === 'WITHDRAWAL' && dto.registerId) {
@@ -148,6 +150,7 @@ export class PartnersService {
           referenceType: 'partner',
           referenceId: entry.id,
           sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
+          createdAt: at,
         });
       }
       return entry;
