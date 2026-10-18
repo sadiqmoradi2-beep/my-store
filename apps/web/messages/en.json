@@ -264,7 +264,11 @@
       "taxes": "Taxes & fees",
       "partner": "Partner withdrawal",
       "owner": "Owner withdrawal",
-      "person": "Payment to a person"
+      "person": "Payment to a person",
+      "admissionFee": "Admission fee",
+      "checkOut": "Check out",
+      "dailyExpense": "Daily expense",
+      "electronic": "Electronic"
     },
     "totalIncome": "Total income",
     "totalIncomeHint": "Cash + EBT + Zelle money in",

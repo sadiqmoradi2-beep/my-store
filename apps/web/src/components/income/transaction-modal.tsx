@@ -39,6 +39,10 @@ const CATEGORIES: Record<'INCOME' | 'EXPENSE' | 'WITHDRAWAL', { value: string; k
     { value: 'Maintenance', key: 'maintenance' },
     { value: 'Marketing', key: 'marketing' },
     { value: 'Taxes & fees', key: 'taxes' },
+    { value: 'Admission fee', key: 'admissionFee' },
+    { value: 'Check out', key: 'checkOut' },
+    { value: 'Daily expense', key: 'dailyExpense' },
+    { value: 'Electronic', key: 'electronic' },
     { value: 'Other', key: 'other' },
   ],
   WITHDRAWAL: [

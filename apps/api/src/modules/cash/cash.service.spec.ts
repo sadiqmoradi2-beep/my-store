@@ -171,17 +171,16 @@ describe('findIncomeRegister', () => {
     );
   });
 
-  it('creates the register on first use, named after the part', async () => {
+  it('creates the register on first use with an insert that cannot duplicate it (ON CONFLICT … DO NOTHING)', async () => {
     const db = {
-      cashRegister: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation(({ data }) => ({ id: 'new', ...data })),
-      },
+      cashRegister: { findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'new', part: 'ZELLE' }) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
-    await findIncomeRegister(db as never, 't1', 'b1', 'ZELLE');
-    expect(db.cashRegister.create).toHaveBeenCalledWith({
-      data: { tenantId: 't1', branchId: 'b1', part: 'ZELLE', name: 'Zelle', isDefault: true },
-    });
+    const result = await findIncomeRegister(db as never, 't1', 'b1', 'ZELLE');
+    expect(result.id).toBe('new');
+    const sql = (db.$executeRaw.mock.calls[0][0] as string[]).join('?');
+    expect(sql).toContain('ON CONFLICT ("tenantId", "branchId", "part") WHERE "isDefault" = true AND "isActive" = true DO NOTHING');
+    expect(db.$executeRaw.mock.calls[0]).toEqual(expect.arrayContaining(['t1', 'b1', 'Zelle', 'ZELLE']));
   });
 });
 

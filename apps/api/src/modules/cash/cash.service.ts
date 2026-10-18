@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { CashTransactionType, IncomePart, PaymentMethod, Prisma } from '@prisma/client';
 import {
@@ -279,7 +280,7 @@ export async function recordCashTransaction(
 
 /**
  * The branch's register for an Income part (Cash / EBT / Zelle) — created on first use, so every branch
- * always has all three. When several exist for a part, the default (then oldest) one wins.
+ * always has one per part. When several exist for a part, the default (then oldest) one wins.
  */
 export async function findIncomeRegister(
   db: Prisma.TransactionClient | PrismaService,
@@ -287,12 +288,19 @@ export async function findIncomeRegister(
   branchId: string,
   part: IncomePart,
 ) {
-  const existing = await db.cashRegister.findFirst({
-    where: { tenantId, branchId, part, isActive: true },
-    orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-  });
+  const find = () =>
+    db.cashRegister.findFirst({
+      where: { tenantId, branchId, part, isActive: true },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+  const existing = await find();
   if (existing) return existing;
-  return db.cashRegister.create({
-    data: { tenantId, branchId, part, name: INCOME_PART_NAMES[part], isDefault: true },
-  });
+  // Two requests can set up a branch at the same moment (the Income page loads the list and the totals
+  // together). ON CONFLICT against the one-default-per-part unique index makes the second insert a no-op
+  // instead of a duplicate account; both then read the single row.
+  await db.$executeRaw`
+    INSERT INTO "CashRegister" ("id", "tenantId", "branchId", "name", "isDefault", "isActive", "part", "openingBalance", "balance", "createdAt", "updatedAt")
+    VALUES (${randomUUID()}, ${tenantId}, ${branchId}, ${INCOME_PART_NAMES[part]}, true, true, ${part}::"IncomePart", 0, 0, now(), now())
+    ON CONFLICT ("tenantId", "branchId", "part") WHERE "isDefault" = true AND "isActive" = true DO NOTHING`;
+  return (await find())!;
 }
