@@ -3,12 +3,17 @@
 -- transactions, then largest balance, then oldest). Nothing is deleted:
 --   * a duplicate with no transactions, zero balance and no references is hidden (isActive = false);
 --   * a duplicate that holds data stays visible, it only stops being the default.
+-- Prisma runs this file in one transaction. The lock stops the running app from creating a new
+-- account between the clean-up and the index (reads and balance updates simply wait a moment).
+LOCK TABLE "CashRegister" IN SHARE ROW EXCLUSIVE MODE;
+
 WITH ranked AS (
   SELECT r.id,
          ROW_NUMBER() OVER (
            PARTITION BY r."tenantId", r."branchId", r."part"
            ORDER BY (SELECT count(*) FROM "CashTransaction" t WHERE t."registerId" = r.id) DESC,
                     abs(r."balance") DESC,
+                    abs(r."openingBalance") DESC,
                     r."createdAt" ASC,
                     r.id ASC
          ) AS rn
@@ -34,6 +39,6 @@ FROM ranked
 WHERE r.id = ranked.id AND ranked.rn > 1;
 
 -- From now on the database itself allows only one active default account per store + branch + part
-CREATE UNIQUE INDEX "CashRegister_one_default_per_part"
+CREATE UNIQUE INDEX IF NOT EXISTS "CashRegister_one_default_per_part"
   ON "CashRegister" ("tenantId", "branchId", "part")
   WHERE "isDefault" = true AND "isActive" = true;
