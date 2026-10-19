@@ -310,6 +310,12 @@ function RegisterTransactions({
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
                   <td className="p-3 text-ink-muted">
                     {tx.category ?? tx.note ?? '—'}
+                    {(tx.paidByName || tx.receivedByName) && (
+                      <span className="block text-xs text-ink-faint">
+                        {t('paidByPerson')}: <span className="text-ink">{tx.paidByName ?? '—'}</span> → {t('whoIsPaid')}:{' '}
+                        <span className="text-ink">{tx.receivedByName ?? '—'}</span>
+                      </span>
+                    )}
                     {tx.receiptUrl && (
                       <a
                         href={assetUrl(tx.receiptUrl)}

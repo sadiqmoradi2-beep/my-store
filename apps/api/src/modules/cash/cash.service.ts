@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { resolveSessionId } from '../work-sessions/session-link';
+import { PersonRef, personColumns, resolvePerson } from './person-ref';
 import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 
 const DAY_MS = 86_400_000;
@@ -85,7 +86,14 @@ export class CashService {
     registerId: string,
     dto: CreateCashTransactionDto,
   ) {
-    await this.getRegister(tenantId, registerId);
+    const register = await this.getRegister(tenantId, registerId);
+    // Paid By and Who Is Paid: both required on the Cash account, and only there
+    if (register.part === 'CASH') {
+      if (!dto.paidBy) throw new BadRequestException('Paid By is required for a Cash transaction');
+      if (!dto.receivedBy) throw new BadRequestException('Who Is Paid is required for a Cash transaction');
+    } else if (dto.paidBy || dto.receivedBy) {
+      throw new BadRequestException('Paid By / Who Is Paid are only recorded on the Cash account');
+    }
     return this.prisma.$transaction(async (tx) =>
       recordCashTransaction(tx, {
         tenantId,
@@ -98,6 +106,8 @@ export class CashService {
         receiptUrl: dto.receiptUrl,
         sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
         createdAt: transactionDate(dto.date),
+        paidBy: dto.paidBy && (await resolvePerson(tx, tenantId, dto.paidBy, 'Paid By')),
+        receivedBy: dto.receivedBy && (await resolvePerson(tx, tenantId, dto.receivedBy, 'Who Is Paid')),
       }),
     );
   }
@@ -216,6 +226,9 @@ interface CashTransactionInput {
   sessionId?: string | null;
   /** When it happened — defaults to now (a back-filled old transaction passes its own date) */
   createdAt?: Date;
+  /** Paid By / Who Is Paid — attribution only, never moves money */
+  paidBy?: PersonRef;
+  receivedBy?: PersonRef;
 }
 
 /**
@@ -274,6 +287,8 @@ export async function recordCashTransaction(
       sessionId: input.sessionId ?? null,
       performedById: input.userId,
       ...(input.createdAt && { createdAt: input.createdAt }),
+      ...personColumns('paidBy', input.paidBy),
+      ...personColumns('receivedBy', input.receivedBy),
     },
   });
 }

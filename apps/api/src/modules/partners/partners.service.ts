@@ -151,6 +151,8 @@ export class PartnersService {
           referenceId: entry.id,
           sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
           createdAt: at,
+          // the partner is the recipient — Paid By is not recorded by this workflow
+          receivedBy: { kind: 'PARTNER', id: partner.id, name: partner.name },
         });
       }
       return entry;

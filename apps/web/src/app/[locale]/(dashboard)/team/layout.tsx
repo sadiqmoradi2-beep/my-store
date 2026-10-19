@@ -11,16 +11,18 @@ import { useAuthStore } from '@/stores/auth-store';
 
 // 'sellers' intentionally excluded from the Team tab bar — the page/API/data still exist,
 // just no longer surfaced as a Team nav tab.
-const TAB_KEYS = ['employees', 'partners'] as const;
+const TAB_KEYS = ['employees', 'partners', 'people'] as const;
 
 const TAB_MODULE: Record<(typeof TAB_KEYS)[number], string> = {
   employees: 'employees',
   partners: 'partners',
+  people: 'employees',
 };
 
 const TAB_PERMISSION: Record<(typeof TAB_KEYS)[number], string> = {
   employees: PERMISSIONS.EMPLOYEES_READ,
   partners: PERMISSIONS.PARTNERS_READ,
+  people: PERMISSIONS.EMPLOYEES_READ,
 };
 
 export default function TeamLayout({ children }: { children: React.ReactNode }) {

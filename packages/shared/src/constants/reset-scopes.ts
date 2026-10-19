@@ -88,6 +88,7 @@ export const RESET_SCOPE_MODEL_KEYS: Record<Exclude<ResetScope, 'ALL'>, string[]
     'employee',
     'partnerLedgerEntry',
     'partner',
+    'teamPerson',
   ],
   NOTIFICATIONS: ['notification'],
 };

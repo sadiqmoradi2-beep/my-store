@@ -6,6 +6,7 @@ import { FormEvent, useState } from 'react';
 import type {
   CashRegisterDto,
   CashTransactionType,
+  DirectoryPersonDto,
   EmployeeDto,
   Locale,
   PartnerDto,
@@ -81,7 +82,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const [period, setPeriod] = useState(currentPeriod);
   const [receipt, setReceipt] = useState<File | null>(null);
   /** '' = the main cash box; otherwise the id of an active work session */
-  const [paidByChoice, setPaidByChoice] = useState<string | null>(null);
+  const [cashBoxChoice, setCashBoxChoice] = useState<string | null>(null);
 
   const isPerson = type === 'EXPENSE' && category === PERSON_CATEGORY;
   const isPartnerWithdrawal = type === 'WITHDRAWAL' && category === PARTNER_CATEGORY;
@@ -89,6 +90,18 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   /** Any manual entry can attach a pay slip / receipt, except a person-payment or partner payout —
    * those already have their own receipt flow (salary-receipts) or none yet (partner ledger). */
   const showGenericReceipt = !isPerson && !needsPartner;
+  // Paid By / Who Is Paid: required on manual Cash entries. A person payment / partner payout already
+  // names its recipient (Who Is Paid is taken from it) and records no payer.
+  const isCash = register.part === 'CASH';
+  const isLinked = isPerson || needsPartner;
+  const needsPeople = isCash && !isLinked;
+  const [payer, setPayer] = useState('');
+  const [payee, setPayee] = useState('');
+  const { data: directory } = useQuery({
+    queryKey: ['people-directory'],
+    queryFn: () => api.get<DirectoryPersonDto[]>('/team-people/directory'),
+    enabled: needsPeople,
+  });
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -118,7 +131,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   });
   const isToday = date === todayDate();
   // An old (back-filled) transaction defaults to the main box, not today's open work session
-  const paidBy = paidByChoice ?? (isToday ? mine?.id : undefined) ?? '';
+  const cashBox = cashBoxChoice ?? (isToday ? mine?.id : undefined) ?? '';
 
   const people: { key: string; name: string; payType?: string; salary?: string }[] =
     personRole === 'EMPLOYEE'
@@ -143,7 +156,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const sessionId = paidBy === '' ? null : paidBy;
+      const sessionId = cashBox === '' ? null : cashBox;
       // Today → the exact time now; another day → midday of that day, so it stays on that date in every time zone
       const when = isToday ? undefined : new Date(`${date}T12:00:00`).toISOString();
       const common = { amount: Number(amount), note: note || undefined, sessionId, date: when };
@@ -179,7 +192,13 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
         form.append('file', receipt);
         receiptUrl = (await api.upload<{ url: string }>('/uploads/cash-receipts', form)).url;
       }
-      return api.post(`/cash-registers/${register.id}/transactions`, { type, ...common, category, receiptUrl });
+      return api.post(`/cash-registers/${register.id}/transactions`, {
+        type,
+        ...common,
+        category,
+        receiptUrl,
+        ...(needsPeople && { paidBy: toRef(payer), receivedBy: toRef(payee) }),
+      });
     },
     onSuccess: () => {
       for (const key of [
@@ -282,8 +301,25 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           </Field>
         </div>
 
-        <Field label={type === 'INCOME' ? t('receivedBy') : t('paidBy')} hint={t('paidByHint')}>
-          <Select value={paidBy} onChange={(e) => setPaidByChoice(e.target.value)}>
+        {needsPeople && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('paidByPerson')} hint={t('paidByPersonHint')}>
+              <PersonSelect value={payer} onChange={setPayer} directory={directory} />
+            </Field>
+            <Field label={t('whoIsPaid')} hint={t('whoIsPaidHint')}>
+              <PersonSelect value={payee} onChange={setPayee} directory={directory} />
+            </Field>
+          </div>
+        )}
+        {needsPeople && directory?.length === 0 && <p className="text-xs text-red-600 dark:text-red-400">{t('noPeople')}</p>}
+        {isCash && isLinked && selectedPerson && (
+          <p className="rounded-lg bg-surface-3 p-2 text-xs text-ink-muted">
+            {t('whoIsPaid')}: <span className="font-semibold text-ink">{selectedPerson.name}</span> — {t('whoIsPaidAuto')}
+          </p>
+        )}
+
+        <Field label={t('cashBox')} hint={t('cashBoxHint')}>
+          <Select value={cashBox} onChange={(e) => setCashBoxChoice(e.target.value)}>
             <option value="">{t('mainBox')}</option>
             {(sessions ?? []).map((s) => (
               <option key={s.id} value={s.id}>
@@ -318,5 +354,49 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** "KIND:id" ↔ { kind, id } — the kind keeps ids from different tables apart */
+function toRef(value: string) {
+  const [kind, id] = value.split(':');
+  return { kind, id };
+}
+
+function PersonSelect({
+  value,
+  onChange,
+  directory,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  directory: DirectoryPersonDto[] | undefined;
+}) {
+  const t = useTranslations('cash');
+  const groups: { kind: DirectoryPersonDto['kind']; label: string }[] = [
+    { kind: 'EMPLOYEE', label: t('peopleGroups.EMPLOYEE') },
+    { kind: 'PARTNER', label: t('peopleGroups.PARTNER') },
+    { kind: 'PERSON', label: t('peopleGroups.PERSON') },
+  ];
+  return (
+    <Select required value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="" disabled>
+        {t('selectPerson')}
+      </option>
+      {groups.map((g) => {
+        const list = (directory ?? []).filter((p) => p.kind === g.kind);
+        if (list.length === 0) return null;
+        return (
+          <optgroup key={g.kind} label={g.label}>
+            {list.map((p) => (
+              <option key={`${p.kind}:${p.id}`} value={`${p.kind}:${p.id}`}>
+                {p.name}
+                {p.detail ? ` — ${p.detail}` : ''}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
+    </Select>
   );
 }

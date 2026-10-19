@@ -229,6 +229,30 @@ export interface CashTransactionDto {
   sessionCode?: string | null;
   sessionPerson?: string | null;
   performedByName?: string;
+  /** Paid By / Who Is Paid — name snapshots stay readable after renames or deactivation */
+  paidByKind?: PersonKind | null;
+  paidByName?: string | null;
+  receivedByKind?: PersonKind | null;
+  receivedByName?: string | null;
+  createdAt: string;
+}
+
+export type PersonKind = 'EMPLOYEE' | 'PARTNER' | 'PERSON';
+
+/** One selectable person for Paid By / Who Is Paid — kind says which table the id belongs to */
+export interface DirectoryPersonDto {
+  kind: PersonKind;
+  id: string;
+  name: string;
+  detail: string | null;
+}
+
+/** Team → People: a registered person who is neither an employee nor a partner */
+export interface TeamPersonDto {
+  id: string;
+  displayName: string;
+  notes: string | null;
+  isActive: boolean;
   createdAt: string;
 }
 

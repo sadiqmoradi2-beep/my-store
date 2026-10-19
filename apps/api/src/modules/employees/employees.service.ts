@@ -335,6 +335,7 @@ export class EmployeesService {
           note: `Salary for ${employee.fullName} — ${payment.period}`,
           referenceType: 'salary',
           referenceId: payment.id,
+          receivedBy: { kind: 'EMPLOYEE', id: employee.id, name: employee.fullName },
         });
       }
       return updated;

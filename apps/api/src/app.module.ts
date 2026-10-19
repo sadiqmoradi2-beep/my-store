@@ -34,6 +34,7 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { PartnersModule } from './modules/partners/partners.module';
+import { TeamPeopleModule } from './modules/team-people/team-people.module';
 import { LicenseKeysModule } from './modules/license-keys/license-keys.module';
 import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -80,6 +81,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     ReturnsModule,
     ReportsModule,
     PartnersModule,
+    TeamPeopleModule,
     LicenseKeysModule,
     ActivityLogModule,
     NotificationsModule,

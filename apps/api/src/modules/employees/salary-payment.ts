@@ -59,6 +59,8 @@ export async function createSalaryPayment(
       referenceId: payment.id,
       sessionId: await resolveSessionId(tx, input.tenantId, input.userId, input.sessionId),
       createdAt: input.at,
+      // the salary's recipient — Paid By is not recorded by this workflow
+      receivedBy: { kind: 'EMPLOYEE', id: input.employee.id, name: input.employee.fullName },
     });
   }
   return payment;

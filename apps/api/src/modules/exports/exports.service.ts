@@ -151,6 +151,8 @@ export class ExportsService {
         { key: 'balanceAfter', header: 'Balance' },
         { key: 'category', header: 'Category', width: 16 },
         { key: 'note', header: 'Note', width: 28 },
+        { key: 'paidBy', header: 'Paid by', width: 20 },
+        { key: 'receivedBy', header: 'Who is paid', width: 20 },
         { key: 'performedBy', header: 'User', width: 20 },
       ],
       rows: transactions.map((t) => ({
@@ -161,6 +163,8 @@ export class ExportsService {
         balanceAfter: t.balanceAfter.toNumber(),
         category: t.category,
         note: t.note,
+        paidBy: t.paidByName,
+        receivedBy: t.receivedByName,
         performedBy: t.performedBy.fullName,
       })),
     };

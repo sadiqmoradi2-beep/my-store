@@ -586,14 +586,53 @@ model CashTransaction {
   sessionId     String? // the work session whose cash box paid / received this
   performedById String
   createdAt     DateTime            @default(now())
+  // Paid By / Who Is Paid — at most one person per side (DB check); kind + name are snapshots kept for history
+  paidByEmployeeId     String?
+  paidByPartnerId      String?
+  paidByPersonId       String?
+  paidByKind           String? // EMPLOYEE | PARTNER | PERSON
+  paidByName           String?
+  receivedByEmployeeId String?
+  receivedByPartnerId  String?
+  receivedByPersonId   String?
+  receivedByKind       String?
+  receivedByName       String?
 
   register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
   performedBy User         @relation(fields: [performedById], references: [id])
   session     WorkSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  paidByEmployee     Employee?   @relation("CashTxPaidByEmployee", fields: [paidByEmployeeId], references: [id], onDelete: SetNull)
+  paidByPartner      Partner?    @relation("CashTxPaidByPartner", fields: [paidByPartnerId], references: [id], onDelete: SetNull)
+  paidByPerson       TeamPerson? @relation("CashTxPaidByPerson", fields: [paidByPersonId], references: [id], onDelete: SetNull)
+  receivedByEmployee Employee?   @relation("CashTxReceivedByEmployee", fields: [receivedByEmployeeId], references: [id], onDelete: SetNull)
+  receivedByPartner  Partner?    @relation("CashTxReceivedByPartner", fields: [receivedByPartnerId], references: [id], onDelete: SetNull)
+  receivedByPerson   TeamPerson? @relation("CashTxReceivedByPerson", fields: [receivedByPersonId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([registerId, createdAt])
   @@index([sessionId])
+  @@index([paidByEmployeeId])
+  @@index([paidByPartnerId])
+  @@index([paidByPersonId])
+  @@index([receivedByEmployeeId])
+  @@index([receivedByPartnerId])
+  @@index([receivedByPersonId])
+}
+
+/// A registered person who is neither an employee nor a partner (Team → People). No payroll, no login.
+model TeamPerson {
+  id          String   @id @default(cuid())
+  tenantId    String
+  displayName String
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  paidTransactions     CashTransaction[] @relation("CashTxPaidByPerson")
+  receivedTransactions CashTransaction[] @relation("CashTxReceivedByPerson")
+
+  @@index([tenantId, isActive])
 }
 
 // ─────────────── Phase 3 — HR / Debts / Returns / Suppliers ───────────────
@@ -692,6 +731,8 @@ model Employee {
   shifts         EmployeeShift[]
   attendance     EmployeeAttendance[]
   workIntervals  EmployeeWorkInterval[]
+  cashPaid       CashTransaction[] @relation("CashTxPaidByEmployee")
+  cashReceived   CashTransaction[] @relation("CashTxReceivedByEmployee")
 
   @@index([tenantId])
 }
@@ -1267,6 +1308,8 @@ model Partner {
   workSessions WorkSession[]
 
   @@index([tenantId])
+  cashPaid     CashTransaction[] @relation("CashTxPaidByPartner")
+  cashReceived CashTransaction[] @relation("CashTxReceivedByPartner")
 }
 
 model PartnerLedgerEntry {

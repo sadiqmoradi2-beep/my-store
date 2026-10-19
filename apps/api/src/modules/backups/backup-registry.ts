@@ -28,6 +28,7 @@ export const BACKUP_MODELS: BackupModel[] = [
   { key: 'sellerProfile', where: t },
   { key: 'employee', where: t },
   { key: 'partner', where: t },
+  { key: 'teamPerson', where: t },
   { key: 'workSession', where: t },
   { key: 'cashHarvest', where: t },
   { key: 'sessionAdjustment', where: t },

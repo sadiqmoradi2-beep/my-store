@@ -5,6 +5,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CashService, findIncomeRegister, recordCashTransaction } from './cash.service';
 
 const D = (v: number) => new Prisma.Decimal(v);
+const PEOPLE = {
+  paidBy: { kind: 'EMPLOYEE' as const, id: 'emp1' },
+  receivedBy: { kind: 'PERSON' as const, id: 'tp1' },
+};
 
 describe('CashService', () => {
   let service: CashService;
@@ -19,6 +23,9 @@ describe('CashService', () => {
       },
       cashTransaction: { create: jest.fn() },
       workSession: { findFirst: jest.fn().mockResolvedValue(null) },
+      employee: { findFirst: jest.fn().mockResolvedValue({ fullName: 'Ahmad' }) },
+      partner: { findFirst: jest.fn().mockResolvedValue({ name: 'Partner P' }) },
+      teamPerson: { findFirst: jest.fn().mockResolvedValue({ displayName: 'Mohammad' }) },
     };
     prisma = {
       branch: { findMany: jest.fn().mockResolvedValue([{ id: 'b1' }]) },
@@ -60,6 +67,7 @@ describe('CashService', () => {
         type: 'EXPENSE',
         amount: 100,
         category: 'Rent',
+        ...PEOPLE,
       });
       const data = tx.cashTransaction.create.mock.calls[0][0].data;
       expect(data.type).toBe('EXPENSE');
@@ -71,13 +79,51 @@ describe('CashService', () => {
       expect(data.createdAt).toBeUndefined(); // no date → now (database default)
     });
 
+    it('Cash account: Paid By and Who Is Paid are required; stored as one FK per side + name snapshots', async () => {
+      tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
+      await expect(service.createTransaction('t1', 'u1', 'reg-1', { type: 'EXPENSE', amount: 5, receivedBy: PEOPLE.receivedBy })).rejects.toThrow('Paid By');
+      await expect(service.createTransaction('t1', 'u1', 'reg-1', { type: 'EXPENSE', amount: 5, paidBy: PEOPLE.paidBy })).rejects.toThrow('Who Is Paid');
+      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'EXPENSE', amount: 5, ...PEOPLE });
+      const data = tx.cashTransaction.create.mock.calls[0][0].data;
+      expect(data).toMatchObject({
+        paidByEmployeeId: 'emp1', paidByPartnerId: null, paidByPersonId: null, paidByKind: 'EMPLOYEE', paidByName: 'Ahmad',
+        receivedByEmployeeId: null, receivedByPartnerId: null, receivedByPersonId: 'tp1', receivedByKind: 'PERSON', receivedByName: 'Mohammad',
+      });
+      expect(tx.employee.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'emp1', tenantId: 't1', deletedAt: null, isActive: true } }));
+    });
+
+    it('the same person may be on both sides', async () => {
+      tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
+      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 5, paidBy: PEOPLE.paidBy, receivedBy: PEOPLE.paidBy });
+      const data = tx.cashTransaction.create.mock.calls[0][0].data;
+      expect(data.paidByEmployeeId).toBe('emp1');
+      expect(data.receivedByEmployeeId).toBe('emp1');
+    });
+
+    it('inactive / other-store / unknown person → 400, nothing recorded', async () => {
+      tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
+      tx.partner.findFirst.mockResolvedValue(null);
+      await expect(
+        service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 5, paidBy: { kind: 'PARTNER', id: 'other-store' }, receivedBy: PEOPLE.receivedBy }),
+      ).rejects.toThrow('Paid By: choose an active person of this store');
+      expect(tx.cashTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('EBT / Zelle / cards: people are not required and are refused if sent', async () => {
+      prisma.cashRegister.findFirst.mockResolvedValue({ id: 'reg-2', tenantId: 't1', branchId: 'b1', part: 'EBT' });
+      tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
+      await service.createTransaction('t1', 'u1', 'reg-2', { type: 'INCOME', amount: 5 });
+      expect(tx.cashTransaction.create.mock.calls[0][0].data.paidByKind).toBeUndefined();
+      await expect(service.createTransaction('t1', 'u1', 'reg-2', { type: 'INCOME', amount: 5, ...PEOPLE })).rejects.toThrow('only recorded on the Cash account');
+    });
+
     it('a past date back-fills the transaction on that day; a future date → 400', async () => {
       tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
-      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: '2025-03-15T12:00:00.000Z' });
+      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: '2025-03-15T12:00:00.000Z', ...PEOPLE });
       expect(tx.cashTransaction.create.mock.calls[0][0].data.createdAt).toEqual(new Date('2025-03-15T12:00:00.000Z'));
       const future = new Date(Date.now() + 3 * 86_400_000).toISOString();
       await expect(
-        service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: future }),
+        service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 50, date: future, ...PEOPLE }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

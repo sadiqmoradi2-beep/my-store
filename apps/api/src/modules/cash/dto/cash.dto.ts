@@ -1,9 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 /** Sanity cap on a register transaction/balance — guards against a typo (extra digit) */
 const MAX_CASH_AMOUNT = 10_000_000_000;
+
+/** A person picked in Paid By / Who Is Paid: which table (kind) + the id in that table */
+export class PersonSelectionDto {
+  @IsIn(['EMPLOYEE', 'PARTNER', 'PERSON'])
+  kind: 'EMPLOYEE' | 'PARTNER' | 'PERSON';
+
+  @IsString()
+  @MaxLength(64)
+  id: string;
+}
 
 /** Manual entry of income/expense/withdrawal — SALE and REFUND are only recorded by the system */
 export class CreateCashTransactionDto {
@@ -39,6 +49,18 @@ export class CreateCashTransactionDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  /** The person who pays — required on the Cash account */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PersonSelectionDto)
+  paidBy?: PersonSelectionDto;
+
+  /** The person who receives the money — required on the Cash account */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PersonSelectionDto)
+  receivedBy?: PersonSelectionDto;
 }
 
 export class CashTransactionListQueryDto extends PaginationQueryDto {

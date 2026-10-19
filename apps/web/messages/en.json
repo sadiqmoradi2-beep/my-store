@@ -60,7 +60,8 @@
     "feedback": "Feedback",
     "income": "Income",
     "loans": "Loan & Deficit",
-    "sessions": "Work Sessions"
+    "sessions": "Work Sessions",
+    "people": "People"
   },
   "auth": {
     "loginTitle": "Sign in to MY STORE",
@@ -309,7 +310,20 @@
     "mainBox": "Main cash box",
     "paidByColumn": "Paid by",
     "sessionsTitle": "Work sessions (seller / employee / partner cash boxes)",
-    "pastDateHint": "Recorded on this past date — it shows in reports for that day"
+    "pastDateHint": "Recorded on this past date — it shows in reports for that day",
+    "cashBox": "Cash Box",
+    "cashBoxHint": "Where the money is recorded: the main cash box or the cash drawer of a person with an open work session",
+    "paidByPerson": "Paid By",
+    "paidByPersonHint": "The person who pays the money",
+    "whoIsPaid": "Who Is Paid",
+    "whoIsPaidHint": "The person who receives the money",
+    "whoIsPaidAuto": "taken from this payment automatically",
+    "noPeople": "No active people yet — add employees, partners or people in Team first.",
+    "peopleGroups": {
+      "EMPLOYEE": "Employees",
+      "PARTNER": "Partners",
+      "PERSON": "Other people"
+    }
   },
   "pos": {
     "title": "My Store",
@@ -1277,5 +1291,19 @@
     "pay": "Pay these hours",
     "confirmPay": "Pay {amount} USDT for {time}? These hours become locked.",
     "paidDone": "Paid {amount} USDT. The hours are now locked."
+  },
+  "teamPeople": {
+    "title": "People",
+    "hint": "People who are neither employees nor partners (for example a landlord or a supplier’s driver), so they can be chosen as Paid By / Who Is Paid. They get no payroll and no login.",
+    "add": "Add person",
+    "edit": "Edit person",
+    "name": "Name",
+    "notes": "Notes (optional)",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deactivate": "Deactivate",
+    "activate": "Activate",
+    "empty": "No people registered yet.",
+    "deactivateHint": "Deactivated people can no longer be chosen, but old transactions keep their name."
   }
 }
