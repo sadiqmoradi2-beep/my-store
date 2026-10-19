@@ -25,3 +25,18 @@ export const CORRECTION_REFERENCE_TYPE = 'correction';
 
 /** An exception grant (after re-entering the password) is valid this long, once */
 export const EDIT_GRANT_TTL_MS = 10 * 60_000;
+
+/**
+ * Financial Personnel attribution on manual transactions of non-Cash accounts (Cash uses Paid By / Who Is Paid).
+ * PAYMENT = who paid / handed over the money, RECEIVE = who received it, TRANSFER = who sent / moved it.
+ * Attribution only: it never moves money. Transfer only where the account is an actual transfer channel.
+ */
+export const FINANCIAL_OPERATIONS = ['PAYMENT', 'RECEIVE', 'TRANSFER'] as const;
+export type FinancialOperation = (typeof FINANCIAL_OPERATIONS)[number];
+export const FINANCIAL_OPERATIONS_BY_PART: Record<'CASH' | 'CARD' | 'EBT' | 'ZELLE' | 'DEBIT_CARD', readonly FinancialOperation[]> = {
+  CASH: [],
+  CARD: ['PAYMENT', 'RECEIVE'],
+  EBT: ['PAYMENT', 'RECEIVE'],
+  ZELLE: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
+  DEBIT_CARD: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
+};

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
+import { FINANCIAL_OPERATIONS_BY_PART, type FinancialOperation } from '@my-store/shared';
 import type {
   CashRegisterDto,
   CashTransactionType,
@@ -97,11 +98,17 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const needsPeople = isCash && !isLinked;
   const [payer, setPayer] = useState('');
   const [payee, setPayee] = useState('');
+  // Other accounts: optionally the Financial Personnel member who paid / received / transferred it
+  const operations = FINANCIAL_OPERATIONS_BY_PART[register.part];
+  const showPersonnel = !isCash && !isLinked && operations.length > 0;
+  const [operation, setOperation] = useState<FinancialOperation | ''>('');
+  const [personnelId, setPersonnelId] = useState('');
   const { data: directory } = useQuery({
     queryKey: ['people-directory'],
     queryFn: () => api.get<DirectoryPersonDto[]>('/team-people/directory'),
-    enabled: needsPeople,
+    enabled: needsPeople || showPersonnel,
   });
+  const personnel = (directory ?? []).filter((p) => p.kind === 'PERSON');
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -198,6 +205,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
         category,
         receiptUrl,
         ...(needsPeople && { paidBy: toRef(payer), receivedBy: toRef(payee) }),
+        ...(showPersonnel && operation && personnelId && { personnel: { operation, personId: personnelId } }),
       });
     },
     onSuccess: () => {
@@ -312,6 +320,38 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           </div>
         )}
         {needsPeople && directory?.length === 0 && <p className="text-xs text-red-600 dark:text-red-400">{t('noPeople')}</p>}
+        {showPersonnel && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('financialOperation')} hint={t('financialOperationHint')}>
+              <Select
+                value={operation}
+                onChange={(e) => {
+                  setOperation(e.target.value as FinancialOperation | '');
+                  if (!e.target.value) setPersonnelId('');
+                }}
+              >
+                <option value="">{t('noOperation')}</option>
+                {operations.map((op) => (
+                  <option key={op} value={op}>
+                    {t(`operations.${op}`)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t('financialPersonnel')} hint={personnel.length === 0 ? t('noPersonnel') : undefined}>
+              <Select required={!!operation} disabled={!operation} value={personnelId} onChange={(e) => setPersonnelId(e.target.value)}>
+                <option value="" disabled>
+                  {t('selectPerson')}
+                </option>
+                {personnel.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        )}
         {isCash && isLinked && selectedPerson && (
           <p className="rounded-lg bg-surface-3 p-2 text-xs text-ink-muted">
             {t('whoIsPaid')}: <span className="font-semibold text-ink">{selectedPerson.name}</span> — {t('whoIsPaidAuto')}

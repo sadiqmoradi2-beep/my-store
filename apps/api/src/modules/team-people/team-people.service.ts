@@ -6,7 +6,7 @@ import { CreateTeamPersonDto, UpdateTeamPersonDto } from './dto/team-person.dto'
 const clean = (name: string) => name.trim().replace(/\s+/g, ' ');
 
 /**
- * Team → People: people who are neither employees nor partners (no payroll, no login). They are never
+ * Team → Financial Personnel: people who are neither employees nor partners (no payroll, no login). They are never
  * deleted while transactions point at them — only deactivated.
  */
 @Injectable()

@@ -61,7 +61,7 @@
     "income": "Income",
     "loans": "Loan & Deficit",
     "sessions": "Work Sessions",
-    "people": "People"
+    "people": "Financial Personnel"
   },
   "auth": {
     "loginTitle": "Sign in to MY STORE",
@@ -318,11 +318,11 @@
     "whoIsPaid": "Who Is Paid",
     "whoIsPaidHint": "The person who receives the money",
     "whoIsPaidAuto": "taken from this payment automatically",
-    "noPeople": "No active people yet — add employees, partners or people in Team first.",
+    "noPeople": "No active people yet — add employees, partners or Financial Personnel in Team first.",
     "peopleGroups": {
       "EMPLOYEE": "Employees",
       "PARTNER": "Partners",
-      "PERSON": "Other people"
+      "PERSON": "Financial Personnel"
     },
     "edit": {
       "title": "Correct transaction",
@@ -369,7 +369,17 @@
         "RESET": "Data reset"
       },
       "backupOf": "backup of {date}"
-    }
+    },
+    "financialOperation": "Financial operation",
+    "financialOperationHint": "Optional: what the person did. It never moves money by itself.",
+    "noOperation": "Not recorded",
+    "operations": {
+      "PAYMENT": "Paid by",
+      "RECEIVE": "Received by",
+      "TRANSFER": "Transferred by"
+    },
+    "financialPersonnel": "Financial Personnel",
+    "noPersonnel": "No active Financial Personnel — add them in Team → Financial Personnel."
   },
   "pos": {
     "title": "My Store",
@@ -1361,8 +1371,8 @@
     "paidDone": "Paid {amount} USDT. The hours are now locked."
   },
   "teamPeople": {
-    "title": "People",
-    "hint": "People who are neither employees nor partners (for example a landlord or a supplier’s driver), so they can be chosen as Paid By / Who Is Paid. They get no payroll and no login.",
+    "title": "Financial Personnel",
+    "hint": "People responsible for paying, receiving or transferring money who are neither employees nor partners (for example a cashier helper or a courier). They can be chosen on Income transactions. They get no payroll and no login.",
     "add": "Add person",
     "edit": "Edit person",
     "name": "Name",
@@ -1371,7 +1381,7 @@
     "inactive": "Inactive",
     "deactivate": "Deactivate",
     "activate": "Activate",
-    "empty": "No people registered yet.",
-    "deactivateHint": "Deactivated people can no longer be chosen, but old transactions keep their name."
+    "empty": "No Financial Personnel registered yet.",
+    "deactivateHint": "Deactivated Financial Personnel can no longer be chosen, but old transactions keep their name."
   }
 }

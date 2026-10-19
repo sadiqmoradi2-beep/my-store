@@ -234,6 +234,8 @@ export interface CashTransactionDto {
   paidByName?: string | null;
   receivedByKind?: PersonKind | null;
   receivedByName?: string | null;
+  /** Transfer: the Financial Personnel member who sent / moved the money */
+  transferredByName?: string | null;
   createdAt: string;
   /** The actual recording moment; null = unknown (recorded before transaction editing existed) */
   recordedAt?: string | null;

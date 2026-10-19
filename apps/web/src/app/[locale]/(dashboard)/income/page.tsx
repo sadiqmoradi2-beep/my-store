@@ -345,6 +345,11 @@ function RegisterTransactions({
                         <span className="text-ink">{tx.receivedByName ?? '—'}</span>
                       </span>
                     )}
+                    {tx.transferredByName && (
+                      <span className="block text-xs text-ink-faint">
+                        {t('operations.TRANSFER')}: <span className="text-ink">{tx.transferredByName}</span>
+                      </span>
+                    )}
                     {tx.receiptUrl && (
                       <a
                         href={assetUrl(tx.receiptUrl)}

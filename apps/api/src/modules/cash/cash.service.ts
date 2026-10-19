@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, NotFoundException, UnprocessableEntity
 import { CashTransactionType, IncomePart, PaymentMethod, Prisma } from '@prisma/client';
 import {
   CASH_TRANSACTION_DIRECTION,
+  FINANCIAL_OPERATIONS_BY_PART,
   INCOME_PARTS,
   INCOME_PART_NAMES,
   storeMonthStartUtc,
@@ -118,8 +119,11 @@ export class CashService {
     if (register.part === 'CASH') {
       if (!dto.paidBy) throw new BadRequestException('Paid By is required for a Cash transaction');
       if (!dto.receivedBy) throw new BadRequestException('Who Is Paid is required for a Cash transaction');
+      if (dto.personnel) throw new BadRequestException('On the Cash account use Paid By / Who Is Paid');
     } else if (dto.paidBy || dto.receivedBy) {
       throw new BadRequestException('Paid By / Who Is Paid are only recorded on the Cash account');
+    } else if (dto.personnel && !FINANCIAL_OPERATIONS_BY_PART[register.part].includes(dto.personnel.operation)) {
+      throw new BadRequestException(`${dto.personnel.operation.toLowerCase()} is not an operation of the ${INCOME_PART_NAMES[register.part]} account`);
     }
     return this.prisma.$transaction(async (tx) =>
       recordCashTransaction(tx, {
@@ -135,6 +139,7 @@ export class CashService {
         createdAt: transactionDate(dto.date),
         paidBy: dto.paidBy && (await resolvePerson(tx, tenantId, dto.paidBy, 'Paid By')),
         receivedBy: dto.receivedBy && (await resolvePerson(tx, tenantId, dto.receivedBy, 'Who Is Paid')),
+        ...(dto.personnel && (await personnelSides(tx, tenantId, dto.personnel))),
       }),
     );
   }
@@ -253,6 +258,18 @@ interface CashTransactionInput {
   /** Paid By / Who Is Paid — attribution only, never moves money */
   paidBy?: PersonRef;
   receivedBy?: PersonRef;
+  /** Transfer attribution — a Financial Personnel member only */
+  transferredBy?: PersonRef;
+}
+
+/** A Financial Personnel selection (active TeamPerson of this store) → the side it fills */
+async function personnelSides(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  sel: { operation: 'PAYMENT' | 'RECEIVE' | 'TRANSFER'; personId: string },
+): Promise<Pick<CashTransactionInput, 'paidBy' | 'receivedBy' | 'transferredBy'>> {
+  const ref = await resolvePerson(tx, tenantId, { kind: 'PERSON', id: sel.personId }, 'Financial Personnel');
+  return sel.operation === 'PAYMENT' ? { paidBy: ref } : sel.operation === 'RECEIVE' ? { receivedBy: ref } : { transferredBy: ref };
 }
 
 /**
@@ -315,6 +332,7 @@ export async function recordCashTransaction(
       ...(input.createdAt && { createdAt: input.createdAt }),
       ...personColumns('paidBy', input.paidBy),
       ...personColumns('receivedBy', input.receivedBy),
+      ...(input.transferredBy && { transferredByPersonId: input.transferredBy.id, transferredByName: input.transferredBy.name }),
     },
   });
 }

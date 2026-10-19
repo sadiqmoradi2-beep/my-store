@@ -606,6 +606,9 @@ model CashTransaction {
   receivedByPersonId   String?
   receivedByKind       String?
   receivedByName       String?
+  // Transfer: the Financial Personnel member who sent / moved the money (attribution only, never moves money)
+  transferredByPersonId String?
+  transferredByName     String?
 
   register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
   performedBy User         @relation(fields: [performedById], references: [id])
@@ -616,6 +619,7 @@ model CashTransaction {
   receivedByEmployee Employee?   @relation("CashTxReceivedByEmployee", fields: [receivedByEmployeeId], references: [id], onDelete: SetNull)
   receivedByPartner  Partner?    @relation("CashTxReceivedByPartner", fields: [receivedByPartnerId], references: [id], onDelete: SetNull)
   receivedByPerson   TeamPerson? @relation("CashTxReceivedByPerson", fields: [receivedByPersonId], references: [id], onDelete: SetNull)
+  transferredByPerson TeamPerson? @relation("CashTxTransferredByPerson", fields: [transferredByPersonId], references: [id], onDelete: SetNull)
   correctionOf       CashTransaction?  @relation("CashTxCorrections", fields: [correctionOfId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   corrections        CashTransaction[] @relation("CashTxCorrections")
 
@@ -630,6 +634,7 @@ model CashTransaction {
   @@index([receivedByEmployeeId])
   @@index([receivedByPartnerId])
   @@index([receivedByPersonId])
+  @@index([transferredByPersonId])
 }
 
 /// A registered person who is neither an employee nor a partner (Team → People). No payroll, no login.
@@ -715,6 +720,7 @@ model TeamPerson {
 
   paidTransactions     CashTransaction[] @relation("CashTxPaidByPerson")
   receivedTransactions CashTransaction[] @relation("CashTxReceivedByPerson")
+  transferredTransactions CashTransaction[] @relation("CashTxTransferredByPerson")
 
   @@index([tenantId, isActive])
 }

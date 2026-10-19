@@ -15,6 +15,16 @@ export class PersonSelectionDto {
   id: string;
 }
 
+/** Financial Personnel on a non-Cash account: what the person did + which registered person (Team → Financial Personnel) */
+export class PersonnelSelectionDto {
+  @IsIn(['PAYMENT', 'RECEIVE', 'TRANSFER'])
+  operation: 'PAYMENT' | 'RECEIVE' | 'TRANSFER';
+
+  @IsString()
+  @MaxLength(64)
+  personId: string;
+}
+
 /** Manual entry of income/expense/withdrawal — SALE and REFUND are only recorded by the system */
 export class CreateCashTransactionDto {
   @IsEnum(['INCOME', 'EXPENSE', 'WITHDRAWAL'])
@@ -61,6 +71,12 @@ export class CreateCashTransactionDto {
   @ValidateNested()
   @Type(() => PersonSelectionDto)
   receivedBy?: PersonSelectionDto;
+
+  /** Optional, non-Cash accounts only: the Financial Personnel member who paid / received / transferred it */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PersonnelSelectionDto)
+  personnel?: PersonnelSelectionDto;
 }
 
 export class CashTransactionListQueryDto extends PaginationQueryDto {
