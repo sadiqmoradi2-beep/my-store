@@ -159,7 +159,7 @@ export class EmployeesService {
       ? await this.prisma.role.findFirst({
           // SUPER_ADMIN is a global (tenantId: null) role too — never assignable through this
           // tenant-scoped endpoint, only through platform-admin tooling
-          where: { id: dto.roleId, key: { not: ROLES.SUPER_ADMIN }, OR: [{ tenantId: null }, { tenantId }] },
+          where: { id: dto.roleId, key: { not: ROLES.SUPER_ADMIN }, NOT: { key: { startsWith: 'FP_' } }, OR: [{ tenantId: null }, { tenantId }] },
           select: { id: true },
         })
       : await this.prisma.role.findFirst({

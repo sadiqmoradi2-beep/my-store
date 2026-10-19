@@ -1387,7 +1387,7 @@
   },
   "teamPeople": {
     "title": "Financial Personnel",
-    "hint": "People responsible for paying, receiving or transferring money who are neither employees nor partners (for example a cashier helper or a courier). They can be chosen on Income transactions. They get no payroll and no login.",
+    "hint": "People responsible for paying, receiving or transferring money who are neither employees nor partners. They can be chosen on Income transactions. They get no payroll; a login is optional and only the Store Admin can create it.",
     "add": "Add person",
     "edit": "Edit person",
     "name": "Name",
@@ -1404,6 +1404,35 @@
     "deleteExplain": "{name} will no longer be selectable on new transactions. If {name} is named on any existing transaction or transfer, the record is archived instead of removed, so that history keeps showing the name. No money moves and no transaction changes.",
     "deleteConfirm": "Delete",
     "deletedDone": "{name} was deleted.",
-    "archivedDone": "{name} is named on {transactions} transaction(s) and {transfers} transfer(s), so the record was archived instead of removed. History keeps the name; {name} can no longer be selected."
+    "archivedDone": "{name} is named on {transactions} transaction(s) and {transfers} transfer(s), so the record was archived instead of removed. History keeps the name; {name} can no longer be selected.",
+    "login": "Login",
+    "noLogin": "No login",
+    "loginOn": "Login on",
+    "loginOff": "Login off",
+    "noCapabilities": "View only (no transactions)",
+    "access": "Access",
+    "accessTitle": "Login access — {name}",
+    "loginOf": "Login: {email}",
+    "createAccount": "Create Account",
+    "createAccountHint": "Creates a login through the email invite: the person receives a link and sets their own password. They can view the Income page and only do what you tick below, on the accounts of their branch. They are never an employee and never get payroll.",
+    "email": "Email",
+    "emailHint": "The invite link is sent here. It must not belong to another login.",
+    "branch": "Branch",
+    "branchHint": "They can only use the accounts of this branch.",
+    "selectBranch": "Select branch…",
+    "capabilities": "Allowed transactions",
+    "capabilitiesHint": "Nothing is allowed until you tick it. Corrections, Admin Exceptions, payroll and settings are never available to this login.",
+    "caps": {
+      "income": "Create Income",
+      "expense": "Create Expense",
+      "withdrawal": "Create Withdrawal",
+      "transfer": "Create Internal Transfer"
+    },
+    "saveAccess": "Save access",
+    "turnLoginOff": "Turn login off",
+    "turnLoginOn": "Turn login on",
+    "resendInvite": "Resend invite",
+    "inviteSent": "The account was created and an invite email was sent to set the password.",
+    "inviteFailed": "The account was created, but the invite email could not be sent. Use “Resend invite” later."
   }
 }

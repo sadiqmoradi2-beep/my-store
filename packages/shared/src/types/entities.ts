@@ -322,6 +322,15 @@ export interface TeamPersonDto {
   /** Deleted while referenced by financial history: kept for history, never selectable again */
   archivedAt?: string | null;
   createdAt: string;
+  /** Login account (Store Admin view only); null = directory record only, cannot log in */
+  account?: {
+    userId: string;
+    email: string;
+    loginEnabled: boolean;
+    branchId: string | null;
+    branchName: string | null;
+    capabilities: string[];
+  } | null;
 }
 
 

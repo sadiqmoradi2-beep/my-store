@@ -41,3 +41,22 @@ export const FINANCIAL_OPERATIONS_BY_PART: Record<'CASH' | 'CARD' | 'EBT' | 'ZEL
   ZELLE: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
   DEBIT_CARD: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
 };
+
+/** What a Financial Personnel login may be granted — nothing by default (least privilege) */
+export const FINANCIAL_PERSONNEL_CAPABILITIES = [
+  'cash.income.create',
+  'cash.expense.create',
+  'cash.withdrawal.create',
+  'cash.transfer.create',
+] as const;
+export type FinancialPersonnelCapability = (typeof FINANCIAL_PERSONNEL_CAPABILITIES)[number];
+
+/** The capability that allows creating a manual transaction of this type (besides cash.transact) */
+export const CREATE_PERMISSION_OF_TYPE: Record<'INCOME' | 'EXPENSE' | 'WITHDRAWAL', FinancialPersonnelCapability> = {
+  INCOME: 'cash.income.create',
+  EXPENSE: 'cash.expense.create',
+  WITHDRAWAL: 'cash.withdrawal.create',
+};
+
+/** Key prefix of the hidden per-person role of a Financial Personnel login */
+export const FINANCIAL_PERSONNEL_ROLE_PREFIX = 'FP_';

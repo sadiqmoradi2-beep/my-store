@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
 import { PERMISSIONS, ROLES, type TeamPersonDto } from '@my-store/shared';
@@ -9,6 +9,7 @@ import { api } from '@/lib/api-client';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
 import { useAuthStore } from '@/stores/auth-store';
+import { AccessModal, AccountFields, type AccountForm } from '@/components/team/person-access';
 
 /** Team → Financial Personnel: register people who are neither employees nor partners */
 export default function TeamPeoplePage() {
@@ -21,6 +22,7 @@ export default function TeamPeoplePage() {
   // Delete is shown to the Store Admin only; the server re-checks the real built-in Admin role
   const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
   const [deleting, setDeleting] = useState<TeamPersonDto | null>(null);
+  const [access, setAccess] = useState<TeamPersonDto | null>(null);
 
   const { data, isPending, error } = useQuery({
     queryKey: ['team-people'],
@@ -64,6 +66,7 @@ export default function TeamPeoplePage() {
               <tr className="border-b border-line text-xs text-ink-muted">
                 <th className="p-3 text-start font-medium">{t('name')}</th>
                 <th className="p-3 text-start font-medium">{t('notes')}</th>
+                {isAdmin && <th className="p-3 text-start font-medium">{t('login')}</th>}
                 <th className="p-3 text-start font-medium" />
                 <th className="p-3 text-start font-medium" />
               </tr>
@@ -73,6 +76,24 @@ export default function TeamPeoplePage() {
                 <tr key={p.id} className="border-b border-line/60 last:border-0">
                   <td className="p-3 font-semibold text-ink">{p.displayName}</td>
                   <td className="p-3 text-ink-muted">{p.notes ?? '—'}</td>
+                  {isAdmin && (
+                    <td className="p-3 text-xs text-ink-muted">
+                      {p.account ? (
+                        <>
+                          <span className="block text-ink" dir="ltr">
+                            {p.account.email}
+                          </span>
+                          <Badge tone={p.account.loginEnabled ? 'DELIVERED' : 'neutral'}>{p.account.loginEnabled ? t('loginOn') : t('loginOff')}</Badge>{' '}
+                          {p.account.branchName && <span>{p.account.branchName} · </span>}
+                          {p.account.capabilities.length
+                            ? p.account.capabilities.map((c) => t(`caps.${c.split('.')[1]}`)).join(', ')
+                            : t('noCapabilities')}
+                        </>
+                      ) : (
+                        t('noLogin')
+                      )}
+                    </td>
+                  )}
                   <td className="p-3">
                     {p.archivedAt ? (
                       <Badge tone="danger">{t('archived')}</Badge>
@@ -97,6 +118,12 @@ export default function TeamPeoplePage() {
                           {p.isActive ? t('deactivate') : t('activate')}
                         </Button>
                         {isAdmin && (
+                          <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setAccess(p)}>
+                            <KeyRound className="h-3.5 w-3.5" aria-hidden />
+                            {t('access')}
+                          </Button>
+                        )}
+                        {isAdmin && (
                           <Button type="button" variant="ghost" className="h-8 px-2 text-xs text-red-600 dark:text-red-400" onClick={() => setDeleting(p)}>
                             <Trash2 className="h-3.5 w-3.5" aria-hidden />
                             {t('delete')}
@@ -113,6 +140,7 @@ export default function TeamPeoplePage() {
       )}
       {editing && <PersonModal person={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       {deleting && <DeleteModal person={deleting} onClose={() => setDeleting(null)} />}
+      {access && <AccessModal person={access} onClose={() => setAccess(null)} />}
     </div>
   );
 }
@@ -172,17 +200,35 @@ function PersonModal({ person, onClose }: { person: TeamPersonDto | null; onClos
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(person?.displayName ?? '');
   const [notes, setNotes] = useState(person?.notes ?? '');
+  // "Create Account" (Store Admin only): a login through the existing email invite, no password shown to anyone
+  const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
+  const [createAccount, setCreateAccount] = useState(false);
+  const [account, setAccount] = useState<AccountForm>({ email: '', branchId: '', capabilities: [] });
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const mutation = useMutation({
     mutationFn: () =>
       person
         ? api.patch(`/team-people/${person.id}`, { displayName, notes })
-        : api.post('/team-people', { displayName, notes: notes || undefined }),
-    onSuccess: () => {
+        : api.post<{ inviteSent?: boolean }>('/team-people', { displayName, notes: notes || undefined, ...(createAccount && { account }) }),
+    onSuccess: (r) => {
       queryClient.invalidateQueries({ queryKey: ['team-people'] });
       queryClient.invalidateQueries({ queryKey: ['people-directory'] });
-      onClose();
+      if (!person && createAccount) setInviteNotice((r as { inviteSent?: boolean })?.inviteSent ? t('inviteSent') : t('inviteFailed'));
+      else onClose();
     },
   });
+  if (inviteNotice) {
+    return (
+      <Modal open title={t('add')} onClose={onClose}>
+        <p className="text-sm text-ink" role="status">
+          {inviteNotice}
+        </p>
+        <Button type="button" className="mt-4" onClick={onClose}>
+          {tc('close')}
+        </Button>
+      </Modal>
+    );
+  }
   function submit(e: FormEvent) {
     e.preventDefault();
     mutation.mutate();
@@ -196,6 +242,18 @@ function PersonModal({ person, onClose }: { person: TeamPersonDto | null; onClos
         <Field label={t('notes')}>
           <Input maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+        {!person && isAdmin && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+            <input type="checkbox" checked={createAccount} onChange={(e) => setCreateAccount(e.target.checked)} />
+            {t('createAccount')}
+          </label>
+        )}
+        {!person && createAccount && (
+          <>
+            <p className="text-xs text-ink-faint">{t('createAccountHint')}</p>
+            <AccountFields value={account} onChange={setAccount} />
+          </>
+        )}
         <ErrorText error={mutation.error} />
         <div className="flex gap-2">
           <Button type="submit" loading={mutation.isPending}>

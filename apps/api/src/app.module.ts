@@ -25,6 +25,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CashModule } from './modules/cash/cash.module';
 import { CashCorrectionsModule } from './modules/cash-corrections/cash-corrections.module';
 import { CashTransfersModule } from './modules/cash-transfers/cash-transfers.module';
+import { FinancialAccessModule } from './common/financial-access.service';
 import { SalesModule } from './modules/sales/sales.module';
 import { CartsModule } from './modules/carts/carts.module';
 import { PosModule } from './modules/pos/pos.module';
@@ -75,6 +76,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     CashModule,
     CashCorrectionsModule,
     CashTransfersModule,
+    FinancialAccessModule,
     CartsModule,
     PosModule,
     SellersModule,

@@ -290,7 +290,10 @@ describe('BackupsService', () => {
       expect(callOrder).toContain('delete:saleItem');
       expect(callOrder).toContain('delete:supplier');
       expect(callOrder).not.toContain('delete:user');
-      expect(callOrder).not.toContain('delete:role');
+      // roles are kept — only unused hidden Financial Personnel roles (key FP_…) are cleaned up
+      for (const call of txCache.role.deleteMany.mock.calls) {
+        expect(call[0].where).toMatchObject({ key: { startsWith: 'FP_' }, users: { none: {} } });
+      }
       expect(callOrder).toContain('delete:warehouse'); // a full reset removes the warehouses too
       // branches and their Cash / EBT / Zelle boxes go too — one fresh main branch is created
       expect(callOrder).toContain('delete:branch');

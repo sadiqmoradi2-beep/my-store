@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
   CORRECTABLE_TRANSACTION_TYPES,
+  FINANCIAL_PERSONNEL_CAPABILITIES,
   PERMISSIONS,
   ROLES,
   type CashRegisterDto,
@@ -231,7 +232,7 @@ export default function IncomePage() {
         </section>
       )}
 
-      <SalesList from={from} to={to} />
+      {user?.permissions?.includes(PERMISSIONS.SALES_READ) && <SalesList from={from} to={to} />}
 
       {newTx && selected && <TransactionModal register={selected} onClose={() => setNewTx(false)} />}
     </div>
@@ -258,6 +259,10 @@ function RegisterTransactions({
   const [historyTx, setHistoryTx] = useState<CashTransactionDto | null>(null);
   const queryClient = useQueryClient();
   const canTransfer = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.CASH_MANAGE));
+  // New transaction: cash.transact, or any granted Financial Personnel capability
+  const canCreate = !!useAuthStore((s) =>
+    [PERMISSIONS.CASH_TRANSACT, PERMISSIONS.CASH_MANAGE, ...FINANCIAL_PERSONNEL_CAPABILITIES].some((p) => s.user?.permissions?.includes(p)),
+  );
   // A transfer is never edited leg by leg: the controlled correction is one reversal of the whole transfer
   const reverse = useMutation({
     mutationFn: ({ transferId, reason }: { transferId: string; reason: string }) =>
@@ -302,10 +307,12 @@ function RegisterTransactions({
               </option>
             ))}
           </Select>
+          {canCreate && (
           <Button variant="outline" onClick={onNewTx}>
             <Plus className="h-4 w-4" aria-hidden />
             {t('newTransaction')}
           </Button>
+          )}
         </div>
       </div>
 

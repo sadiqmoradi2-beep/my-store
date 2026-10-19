@@ -45,6 +45,11 @@ export const PERMISSIONS = {
   CASH_READ: 'cash.read',
   CASH_MANAGE: 'cash.manage',
   CASH_TRANSACT: 'cash.transact',
+  // Granular capabilities for Financial Personnel logins (cash.transact still covers all manual types)
+  CASH_INCOME_CREATE: 'cash.income.create',
+  CASH_EXPENSE_CREATE: 'cash.expense.create',
+  CASH_WITHDRAWAL_CREATE: 'cash.withdrawal.create',
+  CASH_TRANSFER_CREATE: 'cash.transfer.create',
 
   POS_USE: 'pos.use',
 

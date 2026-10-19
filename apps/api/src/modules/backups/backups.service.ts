@@ -193,6 +193,16 @@ export class BackupsService {
             (id) => id !== currentUserId,
           );
         }
+        if (scope === 'TEAM') {
+          // Financial Personnel are removed by a TEAM reset: their logins are turned off first (kept for history)
+          const fpUsers = (await tx.teamPerson.findMany({ where: { tenantId, userId: { not: null } }, select: { userId: true } }))
+            .map((p) => p.userId!)
+            .filter((id) => id !== currentUserId);
+          if (fpUsers.length) {
+            await tx.user.updateMany({ where: { id: { in: fpUsers }, tenantId }, data: { status: 'INACTIVE', refreshTokenHash: null } });
+            await tx.rolePermission.deleteMany({ where: { role: { tenantId, key: { startsWith: 'FP_' }, users: { some: { id: { in: fpUsers } } } } } });
+          }
+        }
         if (isFullWipe) {
           // Branches are deleted too — detach the remaining logins first
           await tx.user.updateMany({ where: { tenantId }, data: { branchId: null } });
@@ -209,6 +219,10 @@ export class BackupsService {
           await tx.user.deleteMany({
             where: { id: { in: staffUserIds }, tenantId, role: { key: { not: 'ADMIN' } } },
           });
+        }
+        if (isFullWipe) {
+          // Financial Personnel logins were removed with the other logins: drop their now-unused hidden roles
+          await tx.role.deleteMany({ where: { tenantId, key: { startsWith: 'FP_' }, users: { none: {} } } });
         }
         if (isFullWipe) {
           // Start again with one brand-new main branch; its warehouse and Cash / EBT / Zelle boxes are created on first use

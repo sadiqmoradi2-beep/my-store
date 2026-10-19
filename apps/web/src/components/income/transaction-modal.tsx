@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import { FINANCIAL_OPERATIONS_BY_PART, type FinancialOperation } from '@my-store/shared';
+import { CREATE_PERMISSION_OF_TYPE, FINANCIAL_OPERATIONS_BY_PART, PERMISSIONS, type FinancialOperation } from '@my-store/shared';
+import { useAuthStore } from '@/stores/auth-store';
 import type {
   CashRegisterDto,
   CashTransactionType,
@@ -74,10 +75,24 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const ts = useTranslations('sessions');
   const locale = useLocale() as Locale;
   const queryClient = useQueryClient();
-  const [type, setType] = useState<'INCOME' | 'EXPENSE' | 'WITHDRAWAL'>('EXPENSE');
+  // Only what this login may do (the server checks again): cash.transact covers every manual type, a Financial
+  // Personnel login has only the capabilities the Store Admin granted
+  const permissions = useAuthStore((s) => s.user?.permissions) ?? [];
+  const can = (p: string) => permissions.includes(p);
+  const allowedTypes = MANUAL_TX_TYPES.filter(
+    (tt) => can(PERMISSIONS.CASH_TRANSACT) || can(CREATE_PERMISSION_OF_TYPE[tt as 'INCOME' | 'EXPENSE' | 'WITHDRAWAL']),
+  ) as ('INCOME' | 'EXPENSE' | 'WITHDRAWAL')[];
+  const canTransfer = can(PERMISSIONS.CASH_MANAGE) || can(PERMISSIONS.CASH_TRANSFER_CREATE);
+  // salary / partner payouts belong to their own workflows and permissions
+  const categoriesOf = (tt: 'INCOME' | 'EXPENSE' | 'WITHDRAWAL') =>
+    CATEGORIES[tt].filter(
+      (c) => (c.value !== PERSON_CATEGORY || can(PERMISSIONS.EMPLOYEES_MANAGE)) && (c.value !== PARTNER_CATEGORY || can(PERMISSIONS.PARTNERS_MANAGE)),
+    );
+  const firstType = allowedTypes.includes('EXPENSE') ? 'EXPENSE' : (allowedTypes[0] ?? 'EXPENSE');
+  const [type, setType] = useState<'INCOME' | 'EXPENSE' | 'WITHDRAWAL'>(firstType);
   /** Internal transfer to another account — its own form and endpoint, never income or expense */
-  const [isTransfer, setIsTransfer] = useState(false);
-  const [category, setCategory] = useState(CATEGORIES.EXPENSE[0].value);
+  const [isTransfer, setIsTransfer] = useState(allowedTypes.length === 0 && canTransfer);
+  const [category, setCategory] = useState(categoriesOf(firstType)[0].value);
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayDate);
   const [note, setNote] = useState('');
@@ -133,6 +148,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
     queryKey: ['work-sessions', 'active-for-payment'],
     queryFn: () => api.getPaged<WorkSessionDto[]>('/work-sessions?status=ACTIVE&limit=100').then((r) => r.items),
     retry: false,
+    enabled: can(PERMISSIONS.SESSIONS_READ),
   });
   const { data: mine } = useQuery({
     queryKey: ['work-sessions', 'mine'],
@@ -153,7 +169,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
 
   function changeType(next: 'INCOME' | 'EXPENSE' | 'WITHDRAWAL') {
     setType(next);
-    setCategory(CATEGORIES[next][0].value);
+    setCategory(categoriesOf(next)[0].value);
     setPerson('');
     setReceipt(null);
   }
@@ -237,12 +253,12 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
           changeType(e.target.value as typeof type);
         }}
       >
-        {MANUAL_TX_TYPES.map((txType) => (
+        {allowedTypes.map((txType) => (
           <option key={txType} value={txType}>
             {t(`txTypes.${txType}`)}
           </option>
         ))}
-        <option value="TRANSFER">{t('transfer.option')}</option>
+        {canTransfer && <option value="TRANSFER">{t('transfer.option')}</option>}
       </Select>
     </Field>
   );
@@ -269,7 +285,7 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
                 setPerson('');
               }}
             >
-              {CATEGORIES[type].map((c) => (
+              {categoriesOf(type).map((c) => (
                 <option key={c.value} value={c.value}>
                   {t(`categories.${c.key}`)}
                 </option>

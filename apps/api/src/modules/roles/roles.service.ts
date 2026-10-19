@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { FINANCIAL_PERSONNEL_ROLE_PREFIX } from '@my-store/shared';
 import { PERMISSIONS } from '@my-store/shared';
 import { RolePermissionsCacheService } from '../../common/role-permissions-cache.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -28,7 +29,8 @@ export class RolesService {
 
   async list(tenantId: string) {
     const roles = await this.repo.findAllForTenant(tenantId);
-    return roles.map((role) => ({
+    // a Financial Personnel login's own role is managed from Team → Financial Personnel, not here
+    return roles.filter((role) => !role.key.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX)).map((role) => ({
       id: role.id,
       key: role.key,
       name: role.name,
@@ -46,6 +48,7 @@ export class RolesService {
   }
 
   async create(tenantId: string, dto: CreateRoleDto) {
+    if (dto.key.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX)) throw new BadRequestException(`Role keys starting with ${FINANCIAL_PERSONNEL_ROLE_PREFIX} are reserved`);
     const permissions = await this.resolvePermissions(dto.permissionKeys);
     try {
       return await this.repo.create(tenantId, dto.key, dto.name, permissions);
@@ -56,7 +59,7 @@ export class RolesService {
 
   async update(tenantId: string, id: string, dto: UpdateRoleDto) {
     const role = await this.repo.findTenantRole(tenantId, id);
-    if (!role) throw new NotFoundException('Custom role not found (system roles cannot be edited)');
+    if (!role || role.key?.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX)) throw new NotFoundException('Custom role not found (system roles cannot be edited)');
     const permissionIds = dto.permissionKeys
       ? await this.resolvePermissions(dto.permissionKeys)
       : undefined;
@@ -68,7 +71,7 @@ export class RolesService {
 
   async remove(tenantId: string, id: string) {
     const role = await this.repo.findTenantRole(tenantId, id);
-    if (!role) throw new NotFoundException('Custom role not found');
+    if (!role || role.key?.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX)) throw new NotFoundException('Custom role not found');
     if (role._count.users > 0) {
       throw new BadRequestException('This role is assigned to users and cannot be deleted');
     }

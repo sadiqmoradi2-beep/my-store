@@ -45,7 +45,13 @@ export class UsersService {
   async update(tenantId: string, id: string, dto: UpdateUserDto) {
     const existing = await this.repo.findById(tenantId, id);
     if (!existing) throw new NotFoundException('User not found');
-    if (dto.roleId) await this.assertRoleAssignable(tenantId, dto.roleId);
+    if (dto.roleId && dto.roleId !== existing.roleId) {
+      // a Financial Personnel login keeps its own role; capabilities are managed from Team → Financial Personnel
+      if (await this.prisma.teamPerson.findFirst({ where: { userId: id }, select: { id: true } })) {
+        throw new BadRequestException('This is a Financial Personnel login — manage its access from Team → Financial Personnel');
+      }
+    }
+    if (dto.roleId) await this.assertRoleAssignable(tenantId, dto.roleId, existing.roleId);
 
     const { password, ...rest } = dto;
     const data = password
@@ -64,10 +70,14 @@ export class UsersService {
     return { deleted: true };
   }
 
-  private async assertRoleAssignable(tenantId: string, roleId: string) {
+  private async assertRoleAssignable(tenantId: string, roleId: string, currentRoleId?: string) {
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
     const assignable =
-      role && role.key !== ROLES.SUPER_ADMIN && (role.tenantId === null || role.tenantId === tenantId);
+      role &&
+      role.key !== ROLES.SUPER_ADMIN &&
+      (role.tenantId === null || role.tenantId === tenantId) &&
+      // a person's hidden Financial Personnel role is never handed to anybody else
+      (!role.key.startsWith('FP_') || role.id === currentRoleId);
     if (!assignable) {
       throw new BadRequestException('The selected role is not valid');
     }

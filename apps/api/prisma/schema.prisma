@@ -296,6 +296,7 @@ model User {
   licenseKeysCreated         LicenseKey[]           @relation("LicenseKeyCreatedBy")
   purchaseReturnsCreated     PurchaseReturn[]       @relation("PurchaseReturnCreatedBy")
   cashTransfersMade          CashTransfer[]         @relation("CashTransferPerformedBy")
+  teamPerson                 TeamPerson?            @relation("TeamPersonUser")
 
   @@index([tenantId])
 }
@@ -752,9 +753,12 @@ model TeamPerson {
   isActive    Boolean  @default(true)
   /// Deleted while still referenced by financial history: hidden from new selections, name kept for history
   archivedAt  DateTime?
+  /// Optional login account (created by the Store Admin through the invite flow; hidden per-person role)
+  userId      String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  user                 User?             @relation("TeamPersonUser", fields: [userId], references: [id], onDelete: SetNull)
   paidTransactions     CashTransaction[] @relation("CashTxPaidByPerson")
   receivedTransactions CashTransaction[] @relation("CashTxReceivedByPerson")
   transferredTransactions CashTransaction[] @relation("CashTxTransferredByPerson")
