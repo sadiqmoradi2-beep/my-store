@@ -137,6 +137,9 @@ model Tenant {
   platformFeedback    PlatformFeedback[]
   partners            Partner[]
   licenseKeysUsed     LicenseKey[]
+  cashTransactionEdits      CashTransactionEdit[]
+  cashTransactionEditGrants CashTransactionEditGrant[]
+  cashLedgerEvents          CashLedgerEvent[]
 }
 
 model Plan {
@@ -585,7 +588,13 @@ model CashTransaction {
   referenceId   String?
   sessionId     String? // the work session whose cash box paid / received this
   performedById String
-  createdAt     DateTime            @default(now())
+  createdAt     DateTime            @default(now()) // the business date (back-dating and date corrections change it)
+  // The actual moment the row was recorded (UTC). Immutable (DB trigger); NULL = unknown (rows older than Stage D).
+  recordedAt    DateTime?           @default(now())
+  version       Int                 @default(0) // bumped by every correction — optimistic concurrency
+  // Correction entry: a signed amount of the same type added to an original manual transaction
+  correctionOfId   String?
+  correctionEditId String? // the CashTransactionEdit audit row that created it (kept outside backups)
   // Paid By / Who Is Paid — at most one person per side (DB check); kind + name are snapshots kept for history
   paidByEmployeeId     String?
   paidByPartnerId      String?
@@ -607,8 +616,12 @@ model CashTransaction {
   receivedByEmployee Employee?   @relation("CashTxReceivedByEmployee", fields: [receivedByEmployeeId], references: [id], onDelete: SetNull)
   receivedByPartner  Partner?    @relation("CashTxReceivedByPartner", fields: [receivedByPartnerId], references: [id], onDelete: SetNull)
   receivedByPerson   TeamPerson? @relation("CashTxReceivedByPerson", fields: [receivedByPersonId], references: [id], onDelete: SetNull)
+  correctionOf       CashTransaction?  @relation("CashTxCorrections", fields: [correctionOfId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  corrections        CashTransaction[] @relation("CashTxCorrections")
 
   @@index([tenantId, createdAt])
+  @@index([correctionOfId])
+  @@index([registerId, recordedAt])
   @@index([registerId, createdAt])
   @@index([sessionId])
   @@index([paidByEmployeeId])
@@ -620,6 +633,77 @@ model CashTransaction {
 }
 
 /// A registered person who is neither an employee nor a partner (Team → People). No payroll, no login.
+/// Append-only history of corrections to manual Income / Expense / Withdrawal transactions.
+/// Snapshots only (no links to transactions, accounts or users) so it survives resets and restores.
+model CashTransactionEdit {
+  id              String   @id @default(cuid())
+  tenantId        String
+  requestId       String // client idempotency key
+  transactionId   String // the original transaction (snapshot id; may no longer exist after a reset)
+  transactionType String
+  branchId        String?
+  editorUserId    String
+  editorName      String
+  mode            String // WINDOW | EXCEPTION
+  grantId         String?
+  method          String // DIRECT (in place, latest entry) | ENTRIES (correction entries) | NONE (date / description only)
+  reason          String
+  amountBefore    Decimal  @db.Decimal(18, 2)
+  amountAfter     Decimal  @db.Decimal(18, 2)
+  dateBefore      DateTime
+  dateAfter       DateTime
+  registerBeforeId   String
+  registerBeforeName String
+  registerAfterId    String
+  registerAfterName  String
+  noteBefore      String?
+  noteAfter       String?
+  balanceChanges  Json // [{ registerId, registerName, before, after }]
+  entryIds        String[] // correction entries created by this edit
+  recordedAtOfOriginal DateTime?
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, requestId])
+  @@index([tenantId, transactionId])
+  @@index([tenantId, createdAt])
+}
+
+/// A Store Admin's single-use, short-lived exception to correct one transaction (after re-entering the password)
+model CashTransactionEditGrant {
+  id            String    @id @default(cuid())
+  tenantId      String
+  transactionId String
+  userId        String
+  userName      String
+  reason        String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, transactionId])
+}
+
+/// Ledger-wide events that change which corrections are represented in the ledger (backup restore, data reset)
+model CashLedgerEvent {
+  id              String    @id @default(cuid())
+  tenantId        String
+  kind            String // RESTORE | RESET
+  scope           String? // reset scope
+  backupId        String?
+  backupCreatedAt DateTime? // a restore brings back the ledger as it was at this moment
+  userId          String?
+  userName        String?
+  createdAt       DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+}
+
 model TeamPerson {
   id          String   @id @default(cuid())
   tenantId    String

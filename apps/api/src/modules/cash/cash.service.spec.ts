@@ -17,6 +17,7 @@ describe('CashService', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       cashRegister: {
         update: jest.fn().mockImplementation(({ data }) => ({ id: 'reg-1', ...data })),
         findFirst: jest.fn(),
@@ -234,6 +235,7 @@ describe('findIncomeRegister', () => {
 describe('recordCashTransaction', () => {
   function buildTx(register: { balance: Prisma.Decimal; isActive: boolean } | null) {
     return {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       cashRegister: {
         findFirst: jest.fn().mockResolvedValue(register),
         update: jest.fn(),

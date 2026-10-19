@@ -23,6 +23,7 @@ describe('EmployeesService.paySalary', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       salaryPayment: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'sp1', ...data })),
       },
@@ -364,7 +365,7 @@ describe('EmployeesService.list', () => {
         groupBy: jest.fn().mockResolvedValue([{ sellerProfileId: 'seller-1', _sum: { amount: D(90) } }]),
       },
       workSession: { findMany: jest.fn().mockResolvedValue([]) },
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
     };
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -575,7 +576,7 @@ describe('EmployeesService.remove', () => {
       },
       sellerProfile: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn() },
       workSession: { findMany: jest.fn().mockResolvedValue([]) },
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
     };
     usersServiceMock.remove.mockReset();
     workSessionsServiceMock.close.mockReset();

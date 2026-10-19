@@ -124,6 +124,10 @@ export class BackupsService {
           if (model.key === 'category') {
             rows = sortByParentFirst(rows as { id: string; parentId: string | null }[]);
           }
+          if (model.key === 'cashTransaction') {
+            // a backup from before Stage D has no recording time: keep it unknown, never "now"
+            rows = rows.map((row) => ('recordedAt' in row ? row : { ...row, recordedAt: null }));
+          }
           if (model.jsonFields?.length) {
             rows = rows.map((row) => ({
               ...row,
@@ -136,6 +140,10 @@ export class BackupsService {
             await this.delegate(tx, model.key).createMany({ data: rows.slice(i, i + CHUNK) });
           }
         }
+        // Corrections made after this backup are no longer in the ledger; their history stays and says so
+        await tx.cashLedgerEvent.create({
+          data: { tenantId, kind: 'RESTORE', backupId: backup.id, backupCreatedAt: backup.createdAt, userId: me?.id, userName: me?.fullName },
+        });
         // The user performing the restore shouldn't lose access if they weren't in the backup
         const users = (payload.data.user ?? []) as { id: string; email: string }[];
         if (me && !users.some((u) => u.id === me.id || u.email === me.email)) {
@@ -208,6 +216,13 @@ export class BackupsService {
             data: { tenantId, name: 'Main Branch', code: 'MAIN', isMain: true },
           });
           await tx.user.updateMany({ where: { tenantId }, data: { branchId: branch.id } });
+        }
+        if (touchesCash) {
+          // The correction history is kept; this marks that its corrections left the ledger here
+          const me = await tx.user.findUnique({ where: { id: currentUserId }, select: { fullName: true } });
+          await tx.cashLedgerEvent.create({
+            data: { tenantId, kind: 'RESET', scope: scope ?? 'ALL', userId: currentUserId, userName: me?.fullName ?? null },
+          });
         }
         if (touchesCash && !isFullWipe) {
           // The Income history was wiped — Cash / EBT / Zelle start again from zero

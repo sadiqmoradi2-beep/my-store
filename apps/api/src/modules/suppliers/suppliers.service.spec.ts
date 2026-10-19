@@ -41,6 +41,7 @@ describe('SuppliersService.createPurchase', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       purchase: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockImplementation(({ data }) => ({

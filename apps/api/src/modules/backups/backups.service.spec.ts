@@ -43,7 +43,7 @@ describe('BackupsService', () => {
   let callOrder: string[];
   let txCache: Record<
     string,
-    { deleteMany: jest.Mock; createMany: jest.Mock; create: jest.Mock; findMany: jest.Mock; update: jest.Mock; updateMany: jest.Mock }
+    { deleteMany: jest.Mock; createMany: jest.Mock; create: jest.Mock; findUnique?: jest.Mock; findMany: jest.Mock; update: jest.Mock; updateMany: jest.Mock }
   >;
   let txOptsCaptured: unknown;
 
@@ -58,6 +58,7 @@ describe('BackupsService', () => {
           callOrder.push(`create:${key}`);
           return Promise.resolve({ count: args?.data?.length ?? 0 });
         }),
+        findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
@@ -165,6 +166,7 @@ describe('BackupsService', () => {
         }),
         createMany: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ fullName: "Admin" }),
         findMany: jest.fn().mockResolvedValue([{ id: 'su1' }, { id: 'eu1' }, { id: 'orphan1' }]),
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),

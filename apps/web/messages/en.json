@@ -323,6 +323,52 @@
       "EMPLOYEE": "Employees",
       "PARTNER": "Partners",
       "PERSON": "Other people"
+    },
+    "edit": {
+      "title": "Correct transaction",
+      "actions": "Actions",
+      "amount": "Amount",
+      "date": "Date",
+      "account": "Account",
+      "description": "Description",
+      "balance": "Balance",
+      "reason": "Correction reason",
+      "reasonHint": "Required. Kept in the correction history.",
+      "windowOpen": "Inside the editing window (until {deadline}).",
+      "windowClosed": "The editing window is closed or editing is disabled. You can correct this one transaction with an Admin Exception.",
+      "legacy": "Recorded before transaction editing existed (recording time unknown). It can only be corrected with an Admin Exception.",
+      "exceptionTitle": "Admin Exception",
+      "exceptionHint": "Re-enter your password to unlock this one transaction for one correction. It does not change the store’s editing policy.",
+      "password": "Your password",
+      "totp": "2-step verification code",
+      "entriesNote": "If this is not the latest entry of its account, the original stays as recorded and correction entries are added, so earlier balances are never rewritten.",
+      "cancel": "Cancel",
+      "save": "Save correction",
+      "saveException": "Verify and save correction",
+      "historyTitle": "Correction history",
+      "noHistory": "No corrections yet.",
+      "correctionEntry": "Correction",
+      "effective": "Now {amount} on {account}",
+      "modes": {
+        "WINDOW": "Editing window",
+        "EXCEPTION": "Admin Exception"
+      },
+      "methods": {
+        "DIRECT": "Corrected in place",
+        "ENTRIES": "Correction entries",
+        "NONE": "Date / description"
+      },
+      "states": {
+        "ACTIVE": "In the ledger",
+        "UNDONE_BY_RESTORE": "Undone by a backup restore",
+        "REMOVED_BY_RESET": "Removed by a data reset"
+      },
+      "eventsTitle": "Later ledger events",
+      "events": {
+        "RESTORE": "Backup restored",
+        "RESET": "Data reset"
+      },
+      "backupOf": "backup of {date}"
     }
   },
   "pos": {
@@ -1044,7 +1090,20 @@
       "timeZoneCommon": "Common",
       "timeZoneAll": "All time zones",
       "timeZoneSave": "Save time zone",
-      "timeZoneNow": "Store clock now: {time}"
+      "timeZoneNow": "Store clock now: {time}",
+      "editingSection": "Transaction editing",
+      "editingHint": "How long after it was recorded a manual Income, Expense or Withdrawal can be corrected by the Store Admin. The time counts from the moment it was recorded, not its date. Outside the window, one transaction at a time can be corrected with an Admin Exception (password required).",
+      "editingCurrent": "Current policy: {window}",
+      "editingWindow": "Editing window",
+      "editingSave": "Save editing window",
+      "editingWindows": {
+        "DISABLED": "Disabled",
+        "1h": "1 hour",
+        "24h": "24 hours",
+        "7d": "7 days",
+        "30d": "30 days",
+        "1y": "1 year"
+      }
     }
   },
   "feedback": {

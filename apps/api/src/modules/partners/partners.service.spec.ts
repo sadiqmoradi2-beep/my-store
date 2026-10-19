@@ -90,6 +90,7 @@ describe('PartnersService.addLedgerEntry', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       partnerLedgerEntry: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'entry1', ...data })),
       },

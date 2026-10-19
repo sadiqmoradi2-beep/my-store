@@ -181,6 +181,7 @@ describe('SellersService.paySalary', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       sellerSalaryPayment: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'ssp1', ...data })),
       },

@@ -13,6 +13,7 @@ import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { resolveSessionId } from '../work-sessions/session-link';
 import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PersonRef, personColumns, resolvePerson } from './person-ref';
+import { effectiveOf } from './effective-amount';
 import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 
 const DAY_MS = 86_400_000;
@@ -68,16 +69,41 @@ export class CashService {
           performedBy: { select: { fullName: true } },
           session: { select: { code: true, personName: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
       this.prisma.cashTransaction.count({ where }),
     ]);
-    const items = rows.map(({ performedBy, session, ...t }) => ({
-      ...t,
-      performedByName: performedBy.fullName,
-      sessionCode: session?.code ?? null,
-      sessionPerson: session?.personName ?? null,
-    }));
+    // Originals with correction entries: show what they amount to now (original + entries)
+    const originals = rows.filter((r) => !r.correctionOfId);
+    const [effective, editCounts] = await Promise.all([
+      effectiveOf(this.prisma, originals),
+      this.prisma.cashTransactionEdit.groupBy({
+        by: ['transactionId'],
+        where: { tenantId, transactionId: { in: originals.map((r) => r.id) } },
+        _count: { _all: true },
+      }),
+    ]);
+    const effectiveRegisterIds = [...new Set([...effective.values()].filter((e) => e).map((e) => e!.registerId))];
+    const registerNames = new Map(
+      (effectiveRegisterIds.length
+        ? await this.prisma.cashRegister.findMany({ where: { tenantId, id: { in: effectiveRegisterIds } }, select: { id: true, name: true } })
+        : []
+      ).map((r) => [r.id, r.name]),
+    );
+    const countOf = new Map(editCounts.map((c) => [c.transactionId, c._count._all]));
+    const items = rows.map(({ performedBy, session, ...t }) => {
+      const eff = effective.get(t.id);
+      return {
+        ...t,
+        performedByName: performedBy.fullName,
+        sessionCode: session?.code ?? null,
+        sessionPerson: session?.personName ?? null,
+        effectiveAmount: eff ? eff.amount : null,
+        effectiveRegisterId: eff ? eff.registerId : null,
+        effectiveRegisterName: eff ? (registerNames.get(eff.registerId) ?? null) : null,
+        correctionCount: countOf.get(t.id) ?? 0,
+      };
+    });
     return { items, meta: paginationMeta(query.page, query.limit, total) };
   }
 
@@ -252,6 +278,8 @@ export async function recordCashTransaction(
   if (!input.amount.isPositive()) {
     throw new UnprocessableEntityException('Amount must be positive');
   }
+  // Row lock: two movements on the same account at once must not both read the old balance (lost update)
+  await lockRegisters(tx, input.tenantId, [input.registerId]);
   const register = await tx.cashRegister.findFirst({
     where: { id: input.registerId, tenantId: input.tenantId },
     select: { balance: true, isActive: true },
@@ -289,6 +317,12 @@ export async function recordCashTransaction(
       ...personColumns('receivedBy', input.receivedBy),
     },
   });
+}
+
+/** Lock account rows for the rest of the database transaction, always in id order (no lock-order deadlocks) */
+export async function lockRegisters(tx: Prisma.TransactionClient, tenantId: string, ids: string[]) {
+  const sorted = [...new Set(ids)].sort();
+  await tx.$queryRaw`SELECT id FROM "CashRegister" WHERE "tenantId" = ${tenantId} AND id IN (${Prisma.join(sorted)}) ORDER BY id FOR UPDATE`;
 }
 
 /**

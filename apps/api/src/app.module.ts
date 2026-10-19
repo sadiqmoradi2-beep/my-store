@@ -23,6 +23,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CashModule } from './modules/cash/cash.module';
+import { CashCorrectionsModule } from './modules/cash-corrections/cash-corrections.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { CartsModule } from './modules/carts/carts.module';
 import { PosModule } from './modules/pos/pos.module';
@@ -71,6 +72,7 @@ import { ActivityLogInterceptor } from './common/interceptors/activity-log.inter
     SalesModule,
     DashboardModule,
     CashModule,
+    CashCorrectionsModule,
     CartsModule,
     PosModule,
     SellersModule,

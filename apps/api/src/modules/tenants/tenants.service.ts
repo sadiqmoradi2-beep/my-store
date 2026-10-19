@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
-import { isValidTimeZone } from '@my-store/shared';
+import { TRANSACTION_EDITING_WINDOWS, isValidTimeZone, type TransactionEditingWindow } from '@my-store/shared';
+import { assertRealStoreAdmin } from '../../common/store-admin';
 import { PaginationQueryDto, paginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { rm } from 'node:fs/promises';
@@ -41,10 +42,24 @@ export class TenantsService {
     return { timeZone };
   }
 
+  /** Store Admin → Settings: the transaction editing window (only the real built-in Store Admin may change it) */
+  async setEditingWindow(tenantId: string, userId: string, window: TransactionEditingWindow) {
+    await assertRealStoreAdmin(this.prisma, tenantId, userId);
+    if (!(TRANSACTION_EDITING_WINDOWS as readonly string[]).includes(window)) throw new BadRequestException('Unsupported editing window');
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { settings: true } });
+    const settings = { ...((tenant.settings as Record<string, unknown> | null) ?? {}), transactionEditingWindow: window };
+    await this.prisma.tenant.update({ where: { id: tenantId }, data: { settings: settings as Prisma.InputJsonValue } });
+    return { transactionEditingWindow: window };
+  }
+
   async updateCurrent(tenantId: string, dto: UpdateTenantDto) {
     // the generic settings merge must not slip in an invalid zone (the dedicated endpoint validates it)
     if (dto.settings && 'timeZone' in dto.settings && !isValidTimeZone(dto.settings.timeZone)) {
       throw new BadRequestException('Unknown time zone');
+    }
+    // the editing window is a Store Admin decision with its own endpoint
+    if (dto.settings && 'transactionEditingWindow' in dto.settings) {
+      throw new BadRequestException('Use Settings → Transaction editing to change the editing window');
     }
     const { settings, ...rest } = dto;
     let mergedSettings: Prisma.InputJsonValue | undefined;
@@ -159,6 +174,11 @@ export class TenantsService {
     // Same order-aware business-data delete as a full reset (it also removes every login of the store)
     await this.backups.wipeData(id, adminUserId);
     await this.prisma.$transaction([
+      // the only process allowed to remove the append-only correction history (for this transaction only)
+      this.prisma.$executeRaw`SELECT set_config('app.ledger_audit_purge', 'on', true)`,
+      this.prisma.cashTransactionEdit.deleteMany({ where: { tenantId: id } }),
+      this.prisma.cashTransactionEditGrant.deleteMany({ where: { tenantId: id } }),
+      this.prisma.cashLedgerEvent.deleteMany({ where: { tenantId: id } }),
       this.prisma.licenseKey.updateMany({ where: { usedByTenantId: id }, data: { usedByTenantId: null } }),
       this.prisma.activityLog.deleteMany({ where: { tenantId: id } }),
       this.prisma.tenantModule.deleteMany({ where: { tenantId: id } }),

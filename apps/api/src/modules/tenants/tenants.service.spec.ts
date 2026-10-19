@@ -220,6 +220,10 @@ describe('TenantsService — platform admin actions', () => {
       },
       tenantModule: { deleteMany: jest.fn() },
       backup: { deleteMany: jest.fn() },
+      cashTransactionEdit: { deleteMany: jest.fn() },
+      cashTransactionEditGrant: { deleteMany: jest.fn() },
+      cashLedgerEvent: { deleteMany: jest.fn() },
+      $executeRaw: jest.fn(),
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
     backups = { wipeData: jest.fn().mockResolvedValue({ wiped: true }) };

@@ -23,6 +23,7 @@ describe('DebtsService.pay', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       debtPayment: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'pay1', ...data })),
       },
@@ -244,6 +245,7 @@ describe('DebtsService.create — Loan & Deficit', () => {
 
   beforeEach(async () => {
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]) as never,
       debt: { create: jest.fn().mockImplementation(({ data }) => ({ id: 'debt1', ...data })) },
       cashRegister: {
         findFirst: jest.fn().mockResolvedValue({ balance: D(100), isActive: true }),

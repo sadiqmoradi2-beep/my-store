@@ -151,18 +151,21 @@ export class ReportsService {
   private async computeCash(tenantId: string, query: ReportRangeQueryDto) {
     const tz = await getStoreTimeZone(this.prisma, tenantId);
     const { from, to } = rangeOf(query, tz);
-    const rows = await this.prisma.cashTransaction.groupBy({
-      by: ['type', 'category'],
-      where: { tenantId, createdAt: { gte: from, lte: to } },
-      _sum: { amount: true },
-      _count: { _all: true },
-    });
+    const where = { tenantId, createdAt: { gte: from, lte: to } };
+    // Totals include correction entries (signed, same type) so each corrected transaction counts at its
+    // effective amount; the count leaves them out so a corrected transaction is still one transaction.
+    const [rows, counted] = await Promise.all([
+      this.prisma.cashTransaction.groupBy({ by: ['type', 'category'], where, _sum: { amount: true } }),
+      this.prisma.cashTransaction.groupBy({ by: ['type', 'category'], where: { ...where, correctionOfId: null }, _count: { _all: true } }),
+    ]);
+    const countOf = (type: string, category: string | null) =>
+      counted.find((c) => c.type === type && c.category === category)?._count._all ?? 0;
     return rows
       .map((row) => ({
         type: row.type,
         category: row.category,
         total: row._sum.amount ?? new Prisma.Decimal(0),
-        count: row._count._all,
+        count: countOf(row.type, row.category),
       }))
       .sort((a, b) => b.total.comparedTo(a.total));
   }

@@ -235,6 +235,70 @@ export interface CashTransactionDto {
   receivedByKind?: PersonKind | null;
   receivedByName?: string | null;
   createdAt: string;
+  /** The actual recording moment; null = unknown (recorded before transaction editing existed) */
+  recordedAt?: string | null;
+  version?: number;
+  /** Set on a correction entry: the original transaction it corrects */
+  correctionOfId?: string | null;
+  /** Set on an original that has correction entries: its effective amount and account after corrections */
+  effectiveAmount?: string | null;
+  effectiveRegisterId?: string | null;
+  effectiveRegisterName?: string | null;
+  /** Number of corrections recorded in the history (any method) */
+  correctionCount?: number;
+}
+
+/** Can the current Store Admin correct this transaction, and how */
+export interface CashTransactionEditStatusDto {
+  editable: boolean;
+  /** WINDOW = inside the store's editing window; EXCEPTION = needs a single-transaction Admin Exception */
+  mode: 'WINDOW' | 'EXCEPTION' | null;
+  /** Why it can't be corrected at all (linked workflow, closed session, ...) */
+  blockedReason: string | null;
+  window: string;
+  deadline: string | null;
+  recordedAt: string | null;
+  version: number;
+  amount: string;
+  registerId: string;
+  registerName: string;
+  date: string;
+  note: string | null;
+  branchId: string;
+  /** Accounts it may move to (same branch, active) */
+  accounts: { id: string; name: string; part: IncomePart }[];
+  twoFactorRequired: boolean;
+}
+
+export interface CashTransactionEditDto {
+  id: string;
+  transactionId: string;
+  editorName: string;
+  mode: 'WINDOW' | 'EXCEPTION';
+  method: 'DIRECT' | 'ENTRIES' | 'NONE';
+  reason: string;
+  amountBefore: string;
+  amountAfter: string;
+  dateBefore: string;
+  dateAfter: string;
+  registerBeforeName: string;
+  registerAfterName: string;
+  noteBefore: string | null;
+  noteAfter: string | null;
+  balanceChanges: { registerId: string; registerName: string; before: string; after: string }[];
+  entryIds: string[];
+  createdAt: string;
+  /** ACTIVE = represented in today's ledger; UNDONE_BY_RESTORE / REMOVED_BY_RESET = a later restore or reset replaced it */
+  ledgerState: 'ACTIVE' | 'UNDONE_BY_RESTORE' | 'REMOVED_BY_RESET';
+}
+
+export interface CashLedgerEventDto {
+  id: string;
+  kind: 'RESTORE' | 'RESET';
+  scope: string | null;
+  backupCreatedAt: string | null;
+  userName: string | null;
+  createdAt: string;
 }
 
 export type PersonKind = 'EMPLOYEE' | 'PARTNER' | 'PERSON';

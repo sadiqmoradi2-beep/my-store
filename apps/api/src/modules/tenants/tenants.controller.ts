@@ -9,6 +9,7 @@ import { TenantsService } from './tenants.service';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { WipeDataDto } from './dto/wipe-data.dto';
 import { SetTimeZoneDto } from './dto/time-zone.dto';
+import { SetEditingWindowDto } from '../cash-corrections/dto/correction.dto';
 import {
   ChangeTenantPlanDto,
   DeleteTenantDto,
@@ -39,6 +40,13 @@ export class TenantsController {
   @RequirePermissions(PERMISSIONS.TENANTS_UPDATE)
   setTimeZone(@TenantId() tenantId: string, @Body() dto: SetTimeZoneDto) {
     return this.tenantsService.setTimeZone(tenantId, dto.timeZone);
+  }
+
+  /** Store Admin → Settings: how long manual transactions stay correctable (DISABLED by default) */
+  @Patch('current/transaction-editing')
+  @RequirePermissions(PERMISSIONS.TENANTS_UPDATE)
+  setEditingWindow(@TenantId() tenantId: string, @CurrentUser() user: RequestUser, @Body() dto: SetEditingWindowDto) {
+    return this.tenantsService.setEditingWindow(tenantId, user.userId, dto.window);
   }
 
   @Post('current/wipe-data')

@@ -1,11 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, HandCoins, Landmark, Plus, ReceiptText, Wallet } from 'lucide-react';
+import { CreditCard, HandCoins, History, Landmark, Pencil, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
+  CORRECTABLE_TRANSACTION_TYPES,
   PERMISSIONS,
+  ROLES,
   type CashRegisterDto,
   type CashTransactionDto,
   type CashTransactionType,
@@ -21,6 +23,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { SalesList } from '@/components/income/sales-list';
 import { SessionReport } from '@/components/sessions/session-report';
 import { TransactionModal } from '@/components/income/transaction-modal';
+import { TransactionEditModal, TransactionHistoryModal } from '@/components/income/transaction-edit-modal';
 import { useRequirePermission } from '@/hooks/use-require-permission';
 
 const TX_TONES: Record<CashTransactionType, string> = {
@@ -239,6 +242,12 @@ function RegisterTransactions({
   const locale = useLocale() as Locale;
   const [page, setPage] = useState(1);
   const [referenceType, setReferenceType] = useState<(typeof REFERENCE_FILTERS)[number]>('');
+  // Edit is shown to the Store Admin only; the server re-checks the real built-in Admin role
+  const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
+  const [editTx, setEditTx] = useState<CashTransactionDto | null>(null);
+  const [historyTx, setHistoryTx] = useState<CashTransactionDto | null>(null);
+  const correctable = (tx: CashTransactionDto) =>
+    !tx.referenceType && !tx.correctionOfId && (CORRECTABLE_TRANSACTION_TYPES as readonly string[]).includes(tx.type);
 
   const { data, isPending, error } = useQuery({
     queryKey: ['cash-transactions', register.id, page, referenceType],
@@ -291,12 +300,13 @@ function RegisterTransactions({
                 <th className="p-3 text-start font-medium">{t('paidByColumn')}</th>
                 <th className="p-3 text-start font-medium">{t('performedBy')}</th>
                 <th className="p-3 text-start font-medium">{t('date')}</th>
+                {isAdmin && <th className="p-3 text-start font-medium" aria-label={t('edit.actions')} />}
               </tr>
             </thead>
             <tbody>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-ink-faint">
+                  <td colSpan={isAdmin ? 8 : 7} className="p-8 text-center text-ink-faint">
                     {tc('noData')}
                   </td>
                 </tr>
@@ -305,8 +315,27 @@ function RegisterTransactions({
                 <tr key={tx.id} className="border-b border-line/60 last:border-0">
                   <td className="p-3">
                     <Badge tone={TX_TONES[tx.type]}>{t(`txTypes.${tx.type}`)}</Badge>
+                    {tx.correctionOfId && (
+                      <span className="ms-1">
+                        <Badge tone="neutral">{t('edit.correctionEntry')}</Badge>
+                      </span>
+                    )}
                   </td>
-                  <td className="p-3 font-bold text-ink">{formatMoney(tx.amount, locale)}</td>
+                  <td className="p-3 font-bold text-ink">
+                    {tx.effectiveAmount ? (
+                      <>
+                        <span className="line-through opacity-60">{formatMoney(tx.amount, locale)}</span>
+                        <span className="block text-xs font-semibold text-primary-700 dark:text-primary-300">
+                          {t('edit.effective', {
+                            amount: formatMoney(tx.effectiveAmount, locale),
+                            account: tx.effectiveRegisterName ?? '',
+                          })}
+                        </span>
+                      </>
+                    ) : (
+                      formatMoney(tx.amount, locale)
+                    )}
+                  </td>
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
                   <td className="p-3 text-ink-muted">
                     {tx.category ?? tx.note ?? '—'}
@@ -337,12 +366,43 @@ function RegisterTransactions({
                   </td>
                   <td className="p-3 text-ink-muted">{tx.performedByName}</td>
                   <td className="p-3 text-xs text-ink-faint">{formatDate(tx.createdAt, locale)}</td>
+                  {isAdmin && (
+                    <td className="p-3">
+                      {correctable(tx) && (
+                        <span className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditTx(tx)}
+                            className="cursor-pointer rounded p-1 text-ink-muted hover:text-primary-600"
+                            title={t('edit.title')}
+                            aria-label={t('edit.title')}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden />
+                          </button>
+                          {!!tx.correctionCount && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryTx(tx)}
+                              className="cursor-pointer rounded p-1 text-ink-muted hover:text-primary-600"
+                              title={t('edit.historyTitle')}
+                              aria-label={t('edit.historyTitle')}
+                            >
+                              <History className="h-4 w-4" aria-hidden />
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </Card>
       )}
+
+      {editTx && <TransactionEditModal tx={editTx} onClose={() => setEditTx(null)} />}
+      {historyTx && <TransactionHistoryModal tx={historyTx} onClose={() => setHistoryTx(null)} />}
 
       {data && data.meta.totalPages > 1 && (
         <div className="flex items-center justify-between">
