@@ -27,13 +27,18 @@ export type DebtStatus = (typeof DEBT_STATUSES)[number];
 export const CURRENCIES = ['USDT'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
-export const SELLER_PAY_TYPES = ['COMMISSION', 'FIXED_SALARY'] as const;
+export const SELLER_PAY_TYPES = ['COMMISSION', 'FIXED_SALARY', 'HOURLY'] as const;
 export type SellerPayType = (typeof SELLER_PAY_TYPES)[number];
 
 export const SELLER_PAY_TYPE_NAMES: Record<SellerPayType, string> = {
   COMMISSION: 'Commission',
   FIXED_SALARY: 'Fixed salary',
+  HOURLY: 'Hourly',
 };
+
+/** Review state of one payable stretch of work for an hourly employee */
+export const WORK_INTERVAL_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAID'] as const;
+export type WorkIntervalStatus = (typeof WORK_INTERVAL_STATUSES)[number];
 
 export const EMPLOYEE_POSITIONS = ['WORKER', 'SELLER', 'MANAGER', 'OTHER'] as const;
 export type EmployeePosition = (typeof EMPLOYEE_POSITIONS)[number];

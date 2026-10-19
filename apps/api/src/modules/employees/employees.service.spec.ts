@@ -508,6 +508,7 @@ describe('EmployeesService.attendance/markAttendance', () => {
   beforeEach(async () => {
     prisma = {
       employee: { findFirst: jest.fn().mockResolvedValue({ ...employee }) },
+      employeeWorkInterval: { findFirst: jest.fn().mockResolvedValue(null) },
       employeeAttendance: {
         findMany: jest.fn().mockResolvedValue([]),
         upsert: jest.fn().mockImplementation(({ create }) => ({ id: 'att1', ...create })),

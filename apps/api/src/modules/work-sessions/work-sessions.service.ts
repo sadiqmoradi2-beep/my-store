@@ -562,6 +562,18 @@ export class WorkSessionsService {
   async reopen(tenantId: string, userId: string, id: string, dto: ReopenSessionDto) {
     const session = await this.findRow(tenantId, id);
     if (session.status !== 'CLOSED') throw new UnprocessableEntityException('Only a closed session can be reopened');
+    // Reopening moves the session's end time — not allowed once its hours are approved or paid as payroll
+    const payroll = await this.prisma.employeeWorkInterval.findFirst({
+      where: { tenantId, workSessionId: id, status: { in: ['APPROVED', 'PAID'] } },
+      select: { status: true },
+    });
+    if (payroll) {
+      throw new UnprocessableEntityException(
+        payroll.status === 'PAID'
+          ? 'The hours of this session are already paid — it can no longer be reopened'
+          : 'The hours of this session are approved for payroll — reject that approval before reopening',
+      );
+    }
     const field = PERSON_FIELD[session.role];
     const other = await this.prisma.workSession.findFirst({
       where: { tenantId, status: 'ACTIVE', [field]: personIdOf(session), NOT: { id } },

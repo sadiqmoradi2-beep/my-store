@@ -43,6 +43,8 @@ export const BACKUP_MODELS: BackupModel[] = [
   { key: 'employeeAttendance', where: t },
   { key: 'employeeShift', where: t },
   { key: 'salaryPayment', where: t },
+  { key: 'employeeWorkInterval', where: t },
+  { key: 'employeeWorkIntervalEvent', where: t },
   { key: 'supplier', where: t },
   { key: 'purchase', where: t },
   { key: 'purchaseItem', where: (tenantId) => ({ purchase: { tenantId } }) },

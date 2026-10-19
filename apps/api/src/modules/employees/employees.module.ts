@@ -6,10 +6,12 @@ import { UsersModule } from '../users/users.module';
 import { WorkSessionsModule } from '../work-sessions/work-sessions.module';
 import { EmployeesController } from './employees.controller';
 import { EmployeesService } from './employees.service';
+import { WorkIntervalsController } from './work-intervals.controller';
+import { WorkIntervalsService } from './work-intervals.service';
 
 @Module({
   imports: [CashModule, SellersModule, AuthModule, UsersModule, WorkSessionsModule],
-  controllers: [EmployeesController],
-  providers: [EmployeesService],
+  controllers: [EmployeesController, WorkIntervalsController],
+  providers: [EmployeesService, WorkIntervalsService],
 })
 export class EmployeesModule {}

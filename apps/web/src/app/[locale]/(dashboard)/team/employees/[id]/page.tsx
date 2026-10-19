@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Pencil, Plus } from 'lucide-react';
+import { CalendarDays, Clock, Pencil, Plus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, use, useState } from 'react';
 import {
@@ -16,6 +16,7 @@ import {
   type SalaryPaymentDto,
 } from '@my-store/shared';
 import { DebtLedgerView } from '@/components/debts/debt-ledger-view';
+import { WorkHours } from '@/components/team/work-hours';
 import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { BackLink, Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
@@ -73,8 +74,12 @@ export default function EmployeeAccountPage({ params }: { params: Promise<{ id: 
           </p>
         </div>
         <div>
-          <p className="text-xs text-ink-faint">{t('salary')}</p>
-          <p className="mt-1 font-bold text-ink">{formatMoney(employee.salary, locale)}</p>
+          <p className="text-xs text-ink-faint">{employee.payType === 'HOURLY' ? t('hourlyRate') : t('salary')}</p>
+          <p className="mt-1 font-bold text-ink">
+            {employee.payType === 'HOURLY'
+              ? `${formatMoney(employee.hourlyRate ?? 0, locale)} USDT / h`
+              : formatMoney(employee.salary, locale)}
+          </p>
         </div>
         <div>
           <p className="text-xs text-ink-faint">{t('hiredAt')}</p>
@@ -113,6 +118,16 @@ export default function EmployeeAccountPage({ params }: { params: Promise<{ id: 
         <NewAdvanceForm employeeId={id} />
         <SalaryHistory employeeId={id} />
       </section>
+
+      {employee.payType === 'HOURLY' && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary-600" aria-hidden />
+            <h2 className="text-base font-bold text-ink">{t('workHoursTitle')}</h2>
+          </div>
+          <WorkHours employeeId={id} />
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">

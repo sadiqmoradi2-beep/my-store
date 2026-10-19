@@ -434,7 +434,8 @@
     "payType": "Pay type",
     "payTypes": {
       "FIXED_SALARY": "Fixed salary",
-      "COMMISSION": "Commission"
+      "COMMISSION": "Commission",
+      "HOURLY": "Hourly"
     },
     "accessLevel": "Manager access",
     "noLoginAccount": "No login account — role cannot be assigned",
@@ -475,7 +476,10 @@
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
     "receipt": "Pay slip / receipt (optional)",
-    "receiptHint": "Image or PDF, up to 5 MB"
+    "receiptHint": "Image or PDF, up to 5 MB",
+    "hourlyRate": "Hourly rate (USDT)",
+    "hourlyRateHint": "Paid per approved hour. Hours that are already approved keep the rate they were approved at.",
+    "workHoursTitle": "Work hours"
   },
   "debts": {
     "title": "Loan & Deficit",
@@ -1233,5 +1237,45 @@
     "address": "Address",
     "phone": "Phone",
     "confirmDelete": "Delete the branch \"{name}\"? Its Cash / EBT / Zelle boxes will be hidden from Income."
+  },
+  "workHours": {
+    "from": "From",
+    "to": "To",
+    "pendingCount": "{count, plural, =0 {Nothing to review} one {# to review} other {# to review}}",
+    "approvedLabel": "Approved, unpaid",
+    "paidLabel": "Paid",
+    "sourceHint": "Each stretch comes from one attendance day or one work session. When both cover the same time, approve one and reject the other. A stretch belongs to the day it started.",
+    "empty": "No recorded work in this range. Hours come from attendance (with check-in and check-out) or from this employee’s work sessions.",
+    "source": "Source",
+    "start": "Start",
+    "end": "End",
+    "recorded": "Recorded",
+    "payable": "Payable",
+    "status": "Status",
+    "overlap": "Overlaps another stretch",
+    "noEnd": "No end time — enter the payable time",
+    "statuses": {
+      "PENDING": "To review",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "PAID": "Paid"
+    },
+    "approve": "Approve",
+    "approveCorrected": "Approve corrected time",
+    "reject": "Reject",
+    "payableHours": "Payable hours",
+    "payableMinutes": "Minutes",
+    "reason": "Reason",
+    "correctionHint": "Required because the payable time differs from what was recorded",
+    "payTitle": "Pay approved hours in this range",
+    "nothingToPay": "No approved, unpaid hours in this range.",
+    "previewLine": "{count} approved stretch(es), {time} →",
+    "payFrom": "Pay from",
+    "payFromHint": "The Income account the salary leaves from",
+    "noCashEffect": "Record only (no cash effect)",
+    "note": "Note",
+    "pay": "Pay these hours",
+    "confirmPay": "Pay {amount} USDT for {time}? These hours become locked.",
+    "paidDone": "Paid {amount} USDT. The hours are now locked."
   }
 }

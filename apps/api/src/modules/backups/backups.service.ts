@@ -14,6 +14,17 @@ const CHUNK = 1000;
 /** Kept by a "full data wipe": roles and the logins of the owner / admins. Everything else goes. */
 const WIPE_PRESERVED_KEYS = new Set(['role', 'rolePermission', 'user']);
 
+/**
+ * Scope resets that must only touch part of a table. A "Work sessions" reset removes only the hourly-pay
+ * stretches that came from work sessions — attendance-based hours are not session history.
+ */
+const SCOPE_WHERE: Partial<Record<ResetScope, Record<string, (tenantId: string) => object>>> = {
+  WORK_SESSIONS: {
+    employeeWorkInterval: (tenantId) => ({ tenantId, workSessionId: { not: null } }),
+    employeeWorkIntervalEvent: (tenantId) => ({ tenantId, interval: { workSessionId: { not: null } } }),
+  },
+};
+
 interface BackupPayload {
   version: number;
   tenantId: string;
@@ -179,7 +190,8 @@ export class BackupsService {
           await tx.user.updateMany({ where: { tenantId }, data: { branchId: null } });
         }
         for (const model of orderedModels) {
-          await this.delegate(tx, model.key).deleteMany({ where: model.where(tenantId) });
+          const narrowed = scope ? SCOPE_WHERE[scope]?.[model.key] : undefined;
+          await this.delegate(tx, model.key).deleteMany({ where: narrowed ? narrowed(tenantId) : model.where(tenantId) });
         }
         if (staffUserIds.length > 0 && isFullWipe) {
           // Feedback sent by those logins would otherwise block deleting them

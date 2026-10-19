@@ -97,7 +97,9 @@ export default function EmployeesPage() {
                   </td>
                   <td className="p-3 text-ink-muted">{employee.position}</td>
                   <td className="p-3 font-bold text-ink">
-                    {formatMoney(employee.salary, locale)}{' '}
+                    {employee.payType === 'HOURLY'
+                      ? `${formatMoney(employee.hourlyRate ?? 0, locale)} / h`
+                      : formatMoney(employee.salary, locale)}{' '}
                     <span className="text-xs font-normal text-ink-faint">{tc('currency')}</span>
                   </td>
                   <td className="p-3 text-xs text-ink-faint">
@@ -304,6 +306,7 @@ function EmployeeModal({
     phone: employee?.phone ?? '',
     payType: (employee?.payType ?? 'FIXED_SALARY') as SellerPayType,
     salary: employee?.salary ?? '',
+    hourlyRate: employee?.hourlyRate ?? '',
     isActive: employee?.isActive ?? true,
     notes: employee?.notes ?? '',
   });
@@ -314,11 +317,11 @@ function EmployeeModal({
   const [customRoleId, setCustomRoleId] = useState('');
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
-  /** Worker is always Fixed Amount — every other position can also earn commission */
+  /** Worker: Fixed Amount or Hourly — every other position can also earn commission */
   function changePositionPreset(next: EmployeePosition) {
     setPositionPreset(next);
     if (next === 'WORKER') {
-      set({ payType: 'FIXED_SALARY' });
+      if (form.payType === 'COMMISSION') set({ payType: 'FIXED_SALARY' });
       setCommissionPercent('');
       setCreateLogin(false);
       setEmail('');
@@ -326,6 +329,9 @@ function EmployeeModal({
   }
 
   const isCommission = !employee && positionPreset !== 'WORKER' && form.payType === 'COMMISSION';
+  const isHourly = form.payType === 'HOURLY';
+  // Worker can't earn commission; editing keeps every type available
+  const payTypes = !employee && positionPreset === 'WORKER' ? SELLER_PAY_TYPES.filter((pt) => pt !== 'COMMISSION') : SELLER_PAY_TYPES;
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
@@ -347,7 +353,8 @@ function EmployeeModal({
           position: form.position,
           phone: form.phone || undefined,
           payType: form.payType,
-          salary: Number(form.salary),
+          salary: isHourly ? 0 : Number(form.salary),
+          ...(isHourly && { hourlyRate: Number(form.hourlyRate) }),
           notes: form.notes || undefined,
           isActive: form.isActive,
         });
@@ -361,7 +368,8 @@ function EmployeeModal({
         positionPreset,
         phone: form.phone || undefined,
         payType: form.payType,
-        salary: isCommission ? 0 : Number(form.salary),
+        salary: isCommission || isHourly ? 0 : Number(form.salary),
+        ...(isHourly && { hourlyRate: Number(form.hourlyRate) }),
         notes: form.notes || undefined,
         email: canLogin && createLogin ? email : undefined,
         createLogin: canLogin && createLogin ? true : undefined,
@@ -411,18 +419,29 @@ function EmployeeModal({
               </Select>
             </Field>
           )}
-          {(employee || positionPreset !== 'WORKER') && (
-            <Field label={t('payType')}>
+          <Field label={t('payType')}>
               <Select value={form.payType} onChange={(e) => set({ payType: e.target.value as SellerPayType })}>
-                {SELLER_PAY_TYPES.map((pt) => (
+                {payTypes.map((pt) => (
                   <option key={pt} value={pt}>
                     {t(`payTypes.${pt}`)}
                   </option>
                 ))}
               </Select>
             </Field>
+          {isHourly && (
+            <Field label={t('hourlyRate')} hint={t('hourlyRateHint')}>
+              <Input
+                required
+                type="number"
+                min={0.01}
+                step="0.01"
+                dir="ltr"
+                value={form.hourlyRate}
+                onChange={(e) => set({ hourlyRate: e.target.value })}
+              />
+            </Field>
           )}
-          {!isCommission && (
+          {!isCommission && !isHourly && (
             <Field label={t('salary')}>
               <Input
                 required

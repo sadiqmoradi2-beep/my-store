@@ -49,6 +49,7 @@ describe('WorkSessionsService', () => {
       workSessionAudit: { create: jest.fn() },
     };
     prisma = {
+      employeeWorkInterval: { findFirst: jest.fn().mockResolvedValue(null) },
       rolePermission: { findMany: jest.fn().mockImplementation(() => Promise.resolve(perms.map((key) => ({ permission: { key } })))) },
       workSession: {
         findFirst: jest.fn().mockResolvedValue({ ...baseSession }),

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -6,7 +6,7 @@ import { EMPLOYEE_POSITION_ROLE, ROLES } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction, transactionDate } from '../cash/cash.service';
-import { resolveSessionId } from '../work-sessions/session-link';
+import { createSalaryPayment } from './salary-payment';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
@@ -128,8 +128,10 @@ export class EmployeesService {
    * their own first password via an emailed invite link — no temp password is generated or shown.
    */
   async create(tenantId: string, dto: CreateEmployeeDto) {
-    // Worker is always Fixed Amount — every other position can also earn commission
-    const payType = dto.positionPreset === 'WORKER' ? 'FIXED_SALARY' : (dto.payType ?? 'FIXED_SALARY');
+    // Worker: Fixed Amount or Hourly — every other position can also earn commission
+    const payType =
+      dto.positionPreset === 'WORKER' && dto.payType !== 'HOURLY' ? 'FIXED_SALARY' : (dto.payType ?? 'FIXED_SALARY');
+    const hourlyRate = hourlyRateFor(payType, dto.hourlyRate);
     const shouldCreateLogin = !!dto.email && dto.createLogin !== false;
     if (!shouldCreateLogin) {
       return this.prisma.employee.create({
@@ -140,6 +142,7 @@ export class EmployeesService {
           phone: dto.phone,
           payType,
           salary: new Prisma.Decimal(dto.salary),
+          hourlyRate,
           hiredAt: dto.hiredAt ? new Date(dto.hiredAt) : undefined,
           userId: dto.userId,
           notes: dto.notes,
@@ -186,6 +189,7 @@ export class EmployeesService {
           phone: dto.phone,
           payType,
           salary: new Prisma.Decimal(dto.salary),
+          hourlyRate,
           hiredAt: dto.hiredAt ? new Date(dto.hiredAt) : undefined,
           userId: user.id,
           notes: dto.notes,
@@ -215,7 +219,13 @@ export class EmployeesService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateEmployeeDto) {
-    await this.get(tenantId, id);
+    const current = await this.get(tenantId, id);
+    const payType = dto.payType ?? current.payType;
+    // Switching to (or staying) HOURLY needs a rate; the rate already snapshotted on approved hours never changes
+    const hourlyRate =
+      payType === 'HOURLY'
+        ? hourlyRateFor('HOURLY', dto.hourlyRate ?? (current.hourlyRate ? Number(current.hourlyRate) : undefined))
+        : undefined;
     return this.prisma.employee.update({
       where: { id },
       data: {
@@ -224,6 +234,7 @@ export class EmployeesService {
         ...(dto.phone !== undefined && { phone: dto.phone }),
         ...(dto.payType && { payType: dto.payType }),
         ...(dto.salary != null && { salary: new Prisma.Decimal(dto.salary) }),
+        ...(hourlyRate && { hourlyRate }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
       },
@@ -274,47 +285,24 @@ export class EmployeesService {
   /** Pay salary: payment row + register expense (if a register is selected and the payment is PAID) */
   async paySalary(tenantId: string, userId: string, employeeId: string, dto: PaySalaryDto) {
     const employee = await this.get(tenantId, employeeId);
-    const amount = new Prisma.Decimal(dto.amount);
-    const bonus = new Prisma.Decimal(dto.bonus ?? 0);
-    const deduction = new Prisma.Decimal(dto.deduction ?? 0);
-    const status = dto.status ?? 'PAID';
-    const netAmount = amount.plus(bonus).minus(deduction);
     const at = transactionDate(dto.date);
-    return this.prisma.$transaction(async (tx) => {
-      const payment = await tx.salaryPayment.create({
-        data: {
-          tenantId,
-          employeeId,
-          amount,
-          bonus,
-          deduction,
-          status,
-          period: dto.period,
-          registerId: dto.registerId,
-          note: dto.note,
-          receiptImageUrl: dto.receiptImageUrl,
-          performedById: userId,
-          paidAt: status === 'PAID' ? (at ?? new Date()) : undefined,
-          ...(at && { createdAt: at }),
-        },
-      });
-      if (dto.registerId && status === 'PAID') {
-        await recordCashTransaction(tx, {
-          tenantId,
-          userId,
-          registerId: dto.registerId,
-          type: 'EXPENSE',
-          amount: netAmount,
-          category: 'Salary',
-          note: `Salary for ${employee.fullName} — ${dto.period}`,
-          referenceType: 'salary',
-          referenceId: payment.id,
-          sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
-          createdAt: at,
-        });
-      }
-      return payment;
-    });
+    return this.prisma.$transaction((tx) =>
+      createSalaryPayment(tx, {
+        tenantId,
+        userId,
+        employee,
+        amount: new Prisma.Decimal(dto.amount),
+        bonus: new Prisma.Decimal(dto.bonus ?? 0),
+        deduction: new Prisma.Decimal(dto.deduction ?? 0),
+        status: dto.status ?? 'PAID',
+        period: dto.period,
+        registerId: dto.registerId,
+        note: dto.note,
+        receiptImageUrl: dto.receiptImageUrl,
+        sessionId: dto.sessionId,
+        at,
+      }),
+    );
   }
 
   /** Transition a PENDING salary payment to PAID, recording the deferred cash effect */
@@ -438,6 +426,18 @@ export class EmployeesService {
   async markAttendance(tenantId: string, userId: string, employeeId: string, dto: MarkAttendanceDto) {
     await this.get(tenantId, employeeId);
     const date = new Date(dto.date);
+    // Hours already approved or paid from this day must not change underneath payroll
+    const locked = await this.prisma.employeeWorkInterval.findFirst({
+      where: { tenantId, employeeId, attendance: { date }, status: { in: ['APPROVED', 'PAID'] } },
+      select: { status: true },
+    });
+    if (locked) {
+      throw new ConflictException(
+        locked.status === 'PAID'
+          ? 'The hours of this day are already paid — this attendance is locked'
+          : 'The hours of this day are approved — reject that approval in Work hours before changing it',
+      );
+    }
     return this.prisma.employeeAttendance.upsert({
       where: { employeeId_date: { employeeId, date } },
       create: {
@@ -459,4 +459,11 @@ export class EmployeesService {
       },
     });
   }
+}
+
+/** HOURLY needs a positive rate (USDT per hour); other pay types store none */
+function hourlyRateFor(payType: string, rate: number | undefined): Prisma.Decimal | null {
+  if (payType !== 'HOURLY') return null;
+  if (rate == null || !(rate > 0)) throw new BadRequestException('An hourly rate greater than 0 is required for Hourly pay');
+  return new Prisma.Decimal(rate);
 }

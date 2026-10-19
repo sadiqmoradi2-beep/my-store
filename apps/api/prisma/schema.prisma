@@ -612,6 +612,7 @@ enum DebtStatus {
 enum SellerPayType {
   COMMISSION
   FIXED_SALARY
+  HOURLY
 }
 
 model SellerProfile {
@@ -678,6 +679,7 @@ model Employee {
   phone     String?
   payType   SellerPayType @default(FIXED_SALARY)
   salary    Decimal       @db.Decimal(18, 2)
+  hourlyRate Decimal?     @db.Decimal(18, 2) // pay per approved hour, HOURLY only (USDT)
   hiredAt   DateTime      @default(now())
   isActive  Boolean       @default(true)
   notes     String?
@@ -689,6 +691,7 @@ model Employee {
   workSessions   WorkSession[]
   shifts         EmployeeShift[]
   attendance     EmployeeAttendance[]
+  workIntervals  EmployeeWorkInterval[]
 
   @@index([tenantId])
 }
@@ -711,6 +714,7 @@ model EmployeeAttendance {
 
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   recordedBy User     @relation("EmployeeAttendanceRecordedBy", fields: [recordedById], references: [id])
+  workInterval EmployeeWorkInterval?
 
   @@unique([employeeId, date])
   @@index([tenantId, employeeId])
@@ -761,9 +765,70 @@ model SalaryPayment {
 
   employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   performedBy User     @relation("SalaryPaymentPerformedBy", fields: [performedById], references: [id])
+  workIntervals EmployeeWorkInterval[]
 
   @@index([tenantId, createdAt])
   @@index([employeeId])
+}
+
+enum WorkIntervalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+/// One payable stretch of work for an HOURLY employee, taken from exactly ONE source: an attendance
+/// day or a work session (DB check: exactly one of attendanceId / workSessionId). Each source can feed
+/// payroll only once (unique). Minutes are whole numbers; money is computed from approvedMinutes × the
+/// rate snapshotted when the stretch was approved.
+model EmployeeWorkInterval {
+  id              String             @id @default(cuid())
+  tenantId        String
+  employeeId      String
+  attendanceId    String?            @unique
+  workSessionId   String?            @unique
+  startAt         DateTime
+  endAt           DateTime? // null = source has no trustworthy end — needs review, never estimated
+  recordedMinutes Int? // from the source; null when endAt is missing or before startAt
+  approvedMinutes Int?
+  hourlyRate      Decimal?           @db.Decimal(18, 2) // snapshot at approval
+  status          WorkIntervalStatus @default(PENDING)
+  correctionReason String?
+  approvedById    String?
+  approvedAt      DateTime?
+  salaryPaymentId String?
+  paidAt          DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  employee      Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendance    EmployeeAttendance? @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+  workSession   WorkSession?        @relation(fields: [workSessionId], references: [id], onDelete: Restrict)
+  salaryPayment SalaryPayment?      @relation(fields: [salaryPaymentId], references: [id], onDelete: Restrict)
+  events        EmployeeWorkIntervalEvent[]
+
+  @@index([tenantId, employeeId, status])
+  @@index([employeeId, startAt])
+  @@index([salaryPaymentId])
+}
+
+/// Append-only history of every review step on a work interval (who, what, why)
+model EmployeeWorkIntervalEvent {
+  id          String   @id @default(cuid())
+  tenantId    String
+  intervalId  String
+  action      String // APPROVED | CORRECTED | REJECTED | PAID
+  fromMinutes Int?
+  toMinutes   Int?
+  reason      String?
+  userId      String
+  userName    String // snapshot
+  createdAt   DateTime @default(now())
+
+  interval EmployeeWorkInterval @relation(fields: [intervalId], references: [id], onDelete: Cascade)
+
+  @@index([intervalId, createdAt])
 }
 
 // ──────────────── Work sessions (cash box of a seller / employee / partner) ────────────────
@@ -801,6 +866,7 @@ model WorkSession {
   audits       WorkSessionAudit[]
   transactions CashTransaction[]
   sales        Sale[]
+  workInterval EmployeeWorkInterval?
 
   @@unique([tenantId, code])
   @@index([tenantId, status])

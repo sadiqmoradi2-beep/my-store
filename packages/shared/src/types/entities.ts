@@ -315,6 +315,8 @@ export interface EmployeeDto {
   phone: string | null;
   payType: SellerPayType;
   salary: string;
+  /** Pay per approved hour (USDT) — HOURLY employees only */
+  hourlyRate: string | null;
   hiredAt: string;
   isActive: boolean;
   notes: string | null;
@@ -360,6 +362,36 @@ export interface EmployeeShiftDto {
   closingCash: string | null;
   startedAt: string;
   endedAt: string | null;
+}
+
+/** One payable stretch of work (from an attendance day OR a work session) awaiting / after admin review */
+export interface WorkIntervalDto {
+  id: string;
+  employeeId: string;
+  source: 'ATTENDANCE' | 'WORK_SESSION';
+  sourceLabel: string;
+  startAt: string;
+  endAt: string | null;
+  recordedMinutes: number | null;
+  approvedMinutes: number | null;
+  hourlyRate: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
+  correctionReason: string | null;
+  approvedAt: string | null;
+  salaryPaymentId: string | null;
+  paidAt: string | null;
+  /** Ids of other non-rejected stretches of this employee whose time overlaps this one */
+  overlapsWith: string[];
+  /** No trustworthy end time — must be reviewed, never estimated */
+  needsReview: boolean;
+}
+
+export interface HourlyPayPreviewDto {
+  from: string;
+  to: string;
+  intervals: { id: string; startAt: string; approvedMinutes: number; hourlyRate: string; amount: string }[];
+  totalMinutes: number;
+  totalAmount: string;
 }
 
 export interface EmployeeAttendanceDto {

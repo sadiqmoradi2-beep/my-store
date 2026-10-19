@@ -58,6 +58,14 @@ export class CreateEmployeeDto {
   @Min(0)
   salary: number;
 
+  /** Pay per approved hour (USDT) — required when payType is HOURLY */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(100_000)
+  hourlyRate?: number;
+
   /** positionPreset SELLER only: commission percent for a linked seller profile */
   @IsOptional()
   @Type(() => Number)
@@ -121,6 +129,13 @@ export class UpdateEmployeeDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   salary?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(100_000)
+  hourlyRate?: number;
 
   @IsOptional()
   @IsBoolean()
