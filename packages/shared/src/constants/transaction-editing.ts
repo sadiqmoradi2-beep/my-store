@@ -27,16 +27,17 @@ export const CORRECTION_REFERENCE_TYPE = 'correction';
 export const EDIT_GRANT_TTL_MS = 10 * 60_000;
 
 /**
- * Financial Personnel attribution on manual transactions of non-Cash accounts (Cash uses Paid By / Who Is Paid).
+ * Financial Personnel attribution on manual Income / Expense / Withdrawal transactions.
  * PAYMENT = who paid / handed over the money, RECEIVE = who received it, TRANSFER = who sent / moved it.
- * Attribution only: it never moves money. Transfer only where the account is an actual transfer channel.
+ * Attribution only: it never moves money (a real account-to-account move is an Internal Transfer).
+ * Cash already records Paid By / Who Is Paid (required), so only Transferred By is added there.
  */
 export const FINANCIAL_OPERATIONS = ['PAYMENT', 'RECEIVE', 'TRANSFER'] as const;
 export type FinancialOperation = (typeof FINANCIAL_OPERATIONS)[number];
 export const FINANCIAL_OPERATIONS_BY_PART: Record<'CASH' | 'CARD' | 'EBT' | 'ZELLE' | 'DEBIT_CARD', readonly FinancialOperation[]> = {
-  CASH: [],
-  CARD: ['PAYMENT', 'RECEIVE'],
-  EBT: ['PAYMENT', 'RECEIVE'],
+  CASH: ['TRANSFER'],
+  CARD: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
+  EBT: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
   ZELLE: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
   DEBIT_CARD: ['PAYMENT', 'RECEIVE', 'TRANSFER'],
 };

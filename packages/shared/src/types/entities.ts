@@ -319,6 +319,8 @@ export interface TeamPersonDto {
   displayName: string;
   notes: string | null;
   isActive: boolean;
+  /** Deleted while referenced by financial history: kept for history, never selectable again */
+  archivedAt?: string | null;
   createdAt: string;
 }
 

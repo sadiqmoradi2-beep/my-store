@@ -1397,6 +1397,13 @@
     "deactivate": "Deactivate",
     "activate": "Activate",
     "empty": "No Financial Personnel registered yet.",
-    "deactivateHint": "Deactivated Financial Personnel can no longer be chosen, but old transactions keep their name."
+    "deactivateHint": "Deactivated Financial Personnel can no longer be chosen, but old transactions keep their name.",
+    "archived": "Archived",
+    "delete": "Delete",
+    "deleteTitle": "Delete {name}?",
+    "deleteExplain": "{name} will no longer be selectable on new transactions. If {name} is named on any existing transaction or transfer, the record is archived instead of removed, so that history keeps showing the name. No money moves and no transaction changes.",
+    "deleteConfirm": "Delete",
+    "deletedDone": "{name} was deleted.",
+    "archivedDone": "{name} is named on {transactions} transaction(s) and {transfers} transfer(s), so the record was archived instead of removed. History keeps the name; {name} can no longer be selected."
   }
 }

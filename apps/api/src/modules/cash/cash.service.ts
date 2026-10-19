@@ -119,10 +119,11 @@ export class CashService {
     if (register.part === 'CASH') {
       if (!dto.paidBy) throw new BadRequestException('Paid By is required for a Cash transaction');
       if (!dto.receivedBy) throw new BadRequestException('Who Is Paid is required for a Cash transaction');
-      if (dto.personnel) throw new BadRequestException('On the Cash account use Paid By / Who Is Paid');
     } else if (dto.paidBy || dto.receivedBy) {
       throw new BadRequestException('Paid By / Who Is Paid are only recorded on the Cash account');
-    } else if (dto.personnel && !FINANCIAL_OPERATIONS_BY_PART[register.part].includes(dto.personnel.operation)) {
+    }
+    if (dto.personnel && !FINANCIAL_OPERATIONS_BY_PART[register.part].includes(dto.personnel.operation)) {
+      // Cash: payer and recipient are the required Paid By / Who Is Paid; only Transferred By is extra
       throw new BadRequestException(`${dto.personnel.operation.toLowerCase()} is not an operation of the ${INCOME_PART_NAMES[register.part]} account`);
     }
     return this.prisma.$transaction(async (tx) =>

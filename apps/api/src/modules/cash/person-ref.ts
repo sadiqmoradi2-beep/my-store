@@ -26,7 +26,7 @@ export async function resolvePerson(
       ? await db.employee.findFirst({ where: { id: ref.id, tenantId, deletedAt: null, isActive: true }, select: { fullName: true } }).then((e) => e && e.fullName)
       : ref.kind === 'PARTNER'
         ? await db.partner.findFirst({ where: { id: ref.id, tenantId, deletedAt: null, isActive: true }, select: { name: true } }).then((p) => p && p.name)
-        : await db.teamPerson.findFirst({ where: { id: ref.id, tenantId, isActive: true }, select: { displayName: true } }).then((p) => p && p.displayName);
+        : await db.teamPerson.findFirst({ where: { id: ref.id, tenantId, isActive: true, archivedAt: null }, select: { displayName: true } }).then((p) => p && p.displayName);
   if (!found) throw new BadRequestException(`${label}: choose an active person of this store`);
   return { kind: ref.kind, id: ref.id, name: found };
 }

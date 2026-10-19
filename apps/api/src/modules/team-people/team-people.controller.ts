@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '@my-store/shared';
 import { RequireModule } from '../../common/decorators/require-module.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
+import { CurrentUser, RequestUser } from '../../common/decorators/current-user.decorator';
 import { CreateTeamPersonDto, UpdateTeamPersonDto } from './dto/team-person.dto';
 import { TeamPeopleService } from './team-people.service';
 
@@ -39,5 +40,13 @@ export class TeamPeopleController {
   @RequirePermissions(PERMISSIONS.EMPLOYEES_MANAGE)
   update(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: UpdateTeamPersonDto) {
     return this.service.update(tenantId, id, dto);
+  }
+
+  /** Real Store Admin only (checked in the service): hard delete when unreferenced, otherwise archive */
+  @Delete(':id')
+  @RequireModule('employees')
+  @RequirePermissions(PERMISSIONS.EMPLOYEES_MANAGE)
+  remove(@TenantId() tenantId: string, @CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.service.remove(tenantId, user.userId, id);
   }
 }

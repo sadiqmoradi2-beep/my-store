@@ -101,9 +101,9 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
   const needsPeople = isCash && !isLinked;
   const [payer, setPayer] = useState('');
   const [payee, setPayee] = useState('');
-  // Other accounts: optionally the Financial Personnel member who paid / received / transferred it
+  // Optionally the Financial Personnel member who paid / received / transferred it (Cash: Transferred By only)
   const operations = FINANCIAL_OPERATIONS_BY_PART[register.part];
-  const showPersonnel = !isCash && !isLinked && operations.length > 0;
+  const showPersonnel = !isLinked && operations.length > 0;
   const [operation, setOperation] = useState<FinancialOperation | ''>('');
   const [personnelId, setPersonnelId] = useState('');
   const { data: directory } = useQuery({

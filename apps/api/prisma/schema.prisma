@@ -750,6 +750,8 @@ model TeamPerson {
   displayName String
   notes       String?
   isActive    Boolean  @default(true)
+  /// Deleted while still referenced by financial history: hidden from new selections, name kept for history
+  archivedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

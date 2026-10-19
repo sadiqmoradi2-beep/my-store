@@ -1,16 +1,16 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import { PERMISSIONS, type TeamPersonDto } from '@my-store/shared';
+import { PERMISSIONS, ROLES, type TeamPersonDto } from '@my-store/shared';
 import { api } from '@/lib/api-client';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
 import { useAuthStore } from '@/stores/auth-store';
 
-/** Team → People: register people who are neither employees nor partners */
+/** Team → Financial Personnel: register people who are neither employees nor partners */
 export default function TeamPeoplePage() {
   const t = useTranslations('teamPeople');
   const tc = useTranslations('common');
@@ -18,6 +18,9 @@ export default function TeamPeoplePage() {
   const canManage = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.EMPLOYEES_MANAGE));
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<TeamPersonDto | 'new' | null>(null);
+  // Delete is shown to the Store Admin only; the server re-checks the real built-in Admin role
+  const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
+  const [deleting, setDeleting] = useState<TeamPersonDto | null>(null);
 
   const { data, isPending, error } = useQuery({
     queryKey: ['team-people'],
@@ -71,10 +74,14 @@ export default function TeamPeoplePage() {
                   <td className="p-3 font-semibold text-ink">{p.displayName}</td>
                   <td className="p-3 text-ink-muted">{p.notes ?? '—'}</td>
                   <td className="p-3">
-                    <Badge tone={p.isActive ? 'DELIVERED' : 'neutral'}>{p.isActive ? t('active') : t('inactive')}</Badge>
+                    {p.archivedAt ? (
+                      <Badge tone="danger">{t('archived')}</Badge>
+                    ) : (
+                      <Badge tone={p.isActive ? 'DELIVERED' : 'neutral'}>{p.isActive ? t('active') : t('inactive')}</Badge>
+                    )}
                   </td>
                   <td className="p-3">
-                    {canManage && (
+                    {canManage && !p.archivedAt && (
                       <div className="flex gap-1">
                         <button type="button" onClick={() => setEditing(p)} aria-label={t('edit')} className="cursor-pointer rounded-lg p-1.5 text-ink-muted hover:bg-surface-3 hover:text-ink">
                           <Pencil className="h-4 w-4" />
@@ -89,6 +96,12 @@ export default function TeamPeoplePage() {
                         >
                           {p.isActive ? t('deactivate') : t('activate')}
                         </Button>
+                        {isAdmin && (
+                          <Button type="button" variant="ghost" className="h-8 px-2 text-xs text-red-600 dark:text-red-400" onClick={() => setDeleting(p)}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                            {t('delete')}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -99,7 +112,57 @@ export default function TeamPeoplePage() {
         </Card>
       )}
       {editing && <PersonModal person={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {deleting && <DeleteModal person={deleting} onClose={() => setDeleting(null)} />}
     </div>
+  );
+}
+
+/** Confirm, then delete: the server removes an unreferenced person, or archives one named in financial history */
+function DeleteModal({ person, onClose }: { person: TeamPersonDto; onClose: () => void }) {
+  const t = useTranslations('teamPeople');
+  const tc = useTranslations('common');
+  const queryClient = useQueryClient();
+  const [result, setResult] = useState<{ result: 'DELETED' | 'ARCHIVED'; references: { transactions: number; transfers: number } | null } | null>(null);
+  const mutation = useMutation({
+    mutationFn: () => api.delete<{ result: 'DELETED' | 'ARCHIVED'; references: { transactions: number; transfers: number } | null }>(`/team-people/${person.id}`),
+    onSuccess: (r) => {
+      setResult(r);
+      queryClient.invalidateQueries({ queryKey: ['team-people'] });
+      queryClient.invalidateQueries({ queryKey: ['people-directory'] });
+    },
+  });
+  return (
+    <Modal open title={t('deleteTitle', { name: person.displayName })} onClose={onClose}>
+      {result ? (
+        <div className="space-y-4">
+          <p className="text-sm text-ink" role="status">
+            {result.result === 'DELETED'
+              ? t('deletedDone', { name: person.displayName })
+              : t('archivedDone', {
+                  name: person.displayName,
+                  transactions: result.references?.transactions ?? 0,
+                  transfers: result.references?.transfers ?? 0,
+                })}
+          </p>
+          <Button type="button" onClick={onClose}>
+            {tc('close')}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-ink-muted">{t('deleteExplain', { name: person.displayName })}</p>
+          <ErrorText error={mutation.error} />
+          <div className="flex gap-2">
+            <Button type="button" className="bg-red-600 hover:bg-red-700" loading={mutation.isPending} onClick={() => mutation.mutate()}>
+              {t('deleteConfirm')}
+            </Button>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              {tc('cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

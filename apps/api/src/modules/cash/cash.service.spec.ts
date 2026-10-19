@@ -119,7 +119,7 @@ describe('CashService', () => {
       await expect(service.createTransaction('t1', 'u1', 'reg-2', { type: 'INCOME', amount: 5, ...PEOPLE })).rejects.toThrow('only recorded on the Cash account');
     });
 
-    it('Financial Personnel on other accounts: one side per operation, active person of this store, never on Cash', async () => {
+    it('Financial Personnel: one side per operation, active person of this store; Cash adds only Transferred By', async () => {
       prisma.cashRegister.findFirst.mockResolvedValue({ id: 'reg-z', tenantId: 't1', branchId: 'b1', part: 'ZELLE' });
       tx.cashRegister.findFirst.mockResolvedValue({ balance: D(1000), isActive: true });
       for (const [operation, side] of [['PAYMENT', 'paidBy'], ['RECEIVE', 'receivedBy']] as const) {
@@ -135,22 +135,25 @@ describe('CashService', () => {
       const data = tx.cashTransaction.create.mock.calls[0][0].data;
       expect(data).toMatchObject({ transferredByPersonId: 'tp1', transferredByName: 'Mohammad' });
       expect(data.paidByKind).toBeUndefined();
-      expect(tx.teamPerson.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'tp1', tenantId: 't1', isActive: true } }));
+      expect(tx.teamPerson.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'tp1', tenantId: 't1', isActive: true, archivedAt: null } }));
       // inactive / other store → not found
       tx.teamPerson.findFirst.mockResolvedValueOnce(null);
       await expect(
         service.createTransaction('t1', 'u1', 'reg-z', { type: 'EXPENSE', amount: 5, personnel: { operation: 'PAYMENT', personId: 'other' } }),
       ).rejects.toThrow('Financial Personnel');
-      // EBT is not a transfer channel
+      // every account type supports all three roles (attribution only)
       prisma.cashRegister.findFirst.mockResolvedValue({ id: 'reg-e', tenantId: 't1', branchId: 'b1', part: 'EBT' });
-      await expect(
-        service.createTransaction('t1', 'u1', 'reg-e', { type: 'INCOME', amount: 5, personnel: { operation: 'TRANSFER', personId: 'tp1' } }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      // Cash keeps Paid By / Who Is Paid
+      tx.cashTransaction.create.mockClear();
+      await service.createTransaction('t1', 'u1', 'reg-e', { type: 'INCOME', amount: 5, personnel: { operation: 'TRANSFER', personId: 'tp1' } });
+      expect(tx.cashTransaction.create.mock.calls[0][0].data.transferredByPersonId).toBe('tp1');
+      // Cash: payer / recipient stay the required Paid By / Who Is Paid; only Transferred By is added
       prisma.cashRegister.findFirst.mockResolvedValue({ id: 'reg-1', tenantId: 't1', branchId: 'b1', part: 'CASH' });
       await expect(
         service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 5, ...PEOPLE, personnel: { operation: 'PAYMENT', personId: 'tp1' } }),
-      ).rejects.toThrow('Paid By / Who Is Paid');
+      ).rejects.toBeInstanceOf(BadRequestException);
+      tx.cashTransaction.create.mockClear();
+      await service.createTransaction('t1', 'u1', 'reg-1', { type: 'INCOME', amount: 5, ...PEOPLE, personnel: { operation: 'TRANSFER', personId: 'tp1' } });
+      expect(tx.cashTransaction.create.mock.calls[0][0].data).toMatchObject({ transferredByPersonId: 'tp1', paidByKind: 'EMPLOYEE' });
     });
 
     it('a past date back-fills the transaction on that day; a future date → 400', async () => {
