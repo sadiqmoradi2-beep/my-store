@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ReportsService, rangeOf } from '../reports/reports.service';
 import { ExportQueryDto } from './dto/export-query.dto';
 import { ExportSheet, jalali } from './export-sheet';
+import { getStoreTimeZone } from '../../common/store-time-zone';
 
 @Injectable()
 export class ExportsService {
@@ -16,6 +17,10 @@ export class ExportsService {
     private readonly prisma: PrismaService,
     private readonly reportsService: ReportsService,
   ) {}
+
+  timeZone(tenantId: string) {
+    return getStoreTimeZone(this.prisma, tenantId);
+  }
 
   async products(tenantId: string): Promise<ExportSheet> {
     const [products, stockSums] = await Promise.all([
@@ -62,7 +67,7 @@ export class ExportsService {
   }
 
   async sales(tenantId: string, query: ExportQueryDto): Promise<ExportSheet> {
-    const { from, to } = rangeOf(query);
+    const { from, to } = rangeOf(query, await this.timeZone(tenantId));
     const sales = await this.prisma.sale.findMany({
       where: {
         tenantId,
@@ -131,7 +136,7 @@ export class ExportsService {
   }
 
   async cash(tenantId: string, query: ExportQueryDto): Promise<ExportSheet> {
-    const { from, to } = rangeOf(query);
+    const { from, to } = rangeOf(query, await this.timeZone(tenantId));
     const transactions = await this.prisma.cashTransaction.findMany({
       where: { tenantId, createdAt: { gte: from, lte: to } },
       include: {
@@ -205,9 +210,10 @@ export class ExportsService {
 
   async salesReport(tenantId: string, query: ExportQueryDto): Promise<ExportSheet> {
     const report = await this.reportsService.sales(tenantId, query);
+    const tz = await this.timeZone(tenantId);
     const monthly = query.granularity === 'month';
     const rows: Record<string, unknown>[] = report.points.map((p) => ({
-      bucket: monthly ? jalali(p.bucket).slice(0, 7) : jalali(p.bucket).slice(0, 10),
+      bucket: monthly ? jalali(p.bucket, tz).slice(0, 7) : jalali(p.bucket, tz).slice(0, 10),
       sales: p.sales,
       total: p.total.toNumber(),
       cost: p.cost.toNumber(),

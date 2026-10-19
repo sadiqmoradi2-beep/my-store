@@ -493,7 +493,8 @@
     "receiptHint": "Image or PDF, up to 5 MB",
     "hourlyRate": "Hourly rate (USDT)",
     "hourlyRateHint": "Paid per approved hour. Hours that are already approved keep the rate they were approved at.",
-    "workHoursTitle": "Work hours"
+    "workHoursTitle": "Work hours",
+    "overnightHint": "A check-out earlier than the check-in counts as the next morning (night shift)."
   },
   "debts": {
     "title": "Loan & Deficit",
@@ -1035,7 +1036,15 @@
       "wipeScope": "What to reset",
       "wipeConfirmLabel": "Type \"{word}\" to confirm",
       "wipeSubmit": "Reset now",
-      "wipeDone": "Data reset."
+      "wipeDone": "Data reset.",
+      "timeZoneSection": "Store time zone",
+      "timeZoneHint": "Decides which calendar day attendance, work hours, hourly pay ranges and reports belong to. Times are stored exactly; daylight saving is handled automatically.",
+      "timeZoneDefault": "Not chosen yet — the store uses {zone}, as before. Choose your store’s zone below.",
+      "timeZone": "Time zone",
+      "timeZoneCommon": "Common",
+      "timeZoneAll": "All time zones",
+      "timeZoneSave": "Save time zone",
+      "timeZoneNow": "Store clock now: {time}"
     }
   },
   "feedback": {

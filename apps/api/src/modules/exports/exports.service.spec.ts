@@ -9,6 +9,7 @@ const D = (v: number) => new Prisma.Decimal(v);
 describe('ExportsService', () => {
   let service: ExportsService;
   let prisma: {
+    tenant: { findUnique: jest.Mock };
     product: { findMany: jest.Mock };
     stock: { groupBy: jest.Mock; findMany: jest.Mock };
     sale: { findMany: jest.Mock };
@@ -17,6 +18,7 @@ describe('ExportsService', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       product: { findMany: jest.fn().mockResolvedValue([]) },
       stock: { groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]) },
       sale: { findMany: jest.fn().mockResolvedValue([]) },
@@ -81,8 +83,9 @@ describe('ExportsService', () => {
       const args = prisma.sale.findMany.mock.calls[0][0];
       expect(args.where.tenantId).toBe('t1');
       expect(args.where.branchId).toBe('b1');
-      expect(args.where.createdAt.gte.toISOString().slice(0, 10)).toBe('2026-01-01');
-      expect(args.where.createdAt.lte.getHours()).toBe(23);
+      // store without a chosen zone keeps the default (Asia/Kabul, UTC+4:30)
+      expect(args.where.createdAt.gte.toISOString()).toBe('2025-12-31T19:30:00.000Z');
+      expect(args.where.createdAt.lte.toISOString()).toBe('2026-01-31T19:29:59.999Z');
     });
 
     it('no input range → defaults to 30 days and no branch filter', async () => {

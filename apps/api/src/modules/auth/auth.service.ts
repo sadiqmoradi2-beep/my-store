@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import { AuthUser, JwtPayload, LoginResponse, ROLES, RoleKey, TwoFactorRequired } from '@my-store/shared';
+import { AuthUser, JwtPayload, LoginResponse, ROLES, RoleKey, TwoFactorRequired, storeTimeZoneOf } from '@my-store/shared';
 import { generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -260,6 +260,7 @@ export class AuthService {
       twoFactorEnabled: user.totpEnabledAt !== null,
       permissions: user.role.rolePermissions.map((rp) => rp.permission.key),
       planStopped: user.tenant?.subscription?.status === 'CANCELLED',
+      timeZone: user.tenant ? storeTimeZoneOf(user.tenant.settings) : null,
     };
   }
 

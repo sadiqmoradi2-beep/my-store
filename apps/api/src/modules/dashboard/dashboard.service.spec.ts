@@ -13,11 +13,12 @@ const sums = (total: number | null, cost: number | null, count = 0) => ({
 
 describe('DashboardService.summary', () => {
   let service: DashboardService;
-  let repo: { sumSales: jest.Mock; topProducts: jest.Mock };
+  let repo: { sumSales: jest.Mock; topProducts: jest.Mock; storeTimeZone: jest.Mock };
   let inventoryService: { lowStocks: jest.Mock };
 
   beforeEach(async () => {
     repo = {
+      storeTimeZone: jest.fn().mockResolvedValue('Asia/Kabul'),
       sumSales: jest.fn().mockResolvedValue(sums(1000, 700, 5)),
       topProducts: jest.fn().mockResolvedValue([]),
     };

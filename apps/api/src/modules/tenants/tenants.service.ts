@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
+import { isValidTimeZone } from '@my-store/shared';
 import { PaginationQueryDto, paginationMeta } from '../../common/dto/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { rm } from 'node:fs/promises';
@@ -31,7 +32,20 @@ export class TenantsService {
   }
 
   /** settings is saved as a merge, not a full replacement — existing keys (like purchasing power percent) are preserved */
+  /** Only the time-zone key changes — every other store setting is kept */
+  async setTimeZone(tenantId: string, timeZone: string) {
+    if (!isValidTimeZone(timeZone)) throw new BadRequestException(`Unknown time zone: ${timeZone}`);
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { settings: true } });
+    const settings = { ...((tenant.settings as Record<string, unknown> | null) ?? {}), timeZone };
+    await this.prisma.tenant.update({ where: { id: tenantId }, data: { settings: settings as Prisma.InputJsonValue } });
+    return { timeZone };
+  }
+
   async updateCurrent(tenantId: string, dto: UpdateTenantDto) {
+    // the generic settings merge must not slip in an invalid zone (the dedicated endpoint validates it)
+    if (dto.settings && 'timeZone' in dto.settings && !isValidTimeZone(dto.settings.timeZone)) {
+      throw new BadRequestException('Unknown time zone');
+    }
     const { settings, ...rest } = dto;
     let mergedSettings: Prisma.InputJsonValue | undefined;
     if (settings !== undefined) {

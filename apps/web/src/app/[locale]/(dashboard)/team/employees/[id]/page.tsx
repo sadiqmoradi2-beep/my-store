@@ -7,6 +7,8 @@ import { FormEvent, use, useState } from 'react';
 import {
   ATTENDANCE_STATUSES,
   ATTENDANCE_STATUS_NAMES,
+  DEFAULT_STORE_TIME_ZONE,
+  storeClockTime,
   PERMISSIONS,
   type AttendanceStatus,
   type DebtDirection,
@@ -21,6 +23,7 @@ import { api } from '@/lib/api-client';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format';
 import { BackLink, Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
+import { useAuthStore } from '@/stores/auth-store';
 
 const ATTENDANCE_TONES: Record<AttendanceStatus, string> = {
   PRESENT: 'DELIVERED',
@@ -347,6 +350,7 @@ function monthRange(offset: number) {
 }
 
 function AttendanceSection({ employeeId }: { employeeId: string }) {
+  const tz = useAuthStore((s) => s.user?.timeZone) ?? DEFAULT_STORE_TIME_ZONE;
   const t = useTranslations('employees');
   const tc = useTranslations('common');
   const locale = useLocale() as Locale;
@@ -433,10 +437,10 @@ function AttendanceSection({ employeeId }: { employeeId: string }) {
                     </Badge>
                   </td>
                   <td className="p-2 text-ink-muted" dir="ltr">
-                    {row.checkIn ? formatDate(row.checkIn, locale) : '—'}
+                    {row.checkIn ? storeClockTime(new Date(row.checkIn), tz) : '—'}
                   </td>
                   <td className="p-2 text-ink-muted" dir="ltr">
-                    {row.checkOut ? formatDate(row.checkOut, locale) : '—'}
+                    {row.checkOut ? storeClockTime(new Date(row.checkOut), tz) : '—'}
                   </td>
                   <td className="p-2">
                     <button
@@ -480,8 +484,9 @@ function AttendanceModal({
   const queryClient = useQueryClient();
   const [date, setDate] = useState(entry?.date.slice(0, 10) ?? todayISODate());
   const [status, setStatus] = useState<AttendanceStatus>(entry?.status ?? 'PRESENT');
-  const [checkIn, setCheckIn] = useState(entry?.checkIn?.slice(11, 16) ?? '');
-  const [checkOut, setCheckOut] = useState(entry?.checkOut?.slice(11, 16) ?? '');
+  const tz = useAuthStore((s) => s.user?.timeZone) ?? DEFAULT_STORE_TIME_ZONE;
+  const [checkIn, setCheckIn] = useState(entry?.checkIn ? storeClockTime(new Date(entry.checkIn), tz) : '');
+  const [checkOut, setCheckOut] = useState(entry?.checkOut ? storeClockTime(new Date(entry.checkOut), tz) : '');
   const [note, setNote] = useState(entry?.note ?? '');
 
   const mutation = useMutation({
@@ -525,7 +530,7 @@ function AttendanceModal({
           <Field label={t('checkIn')}>
             <Input type="time" dir="ltr" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
           </Field>
-          <Field label={t('checkOut')}>
+          <Field label={t('checkOut')} hint={t('overnightHint')}>
             <Input type="time" dir="ltr" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
           </Field>
         </div>

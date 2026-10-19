@@ -7,7 +7,8 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { IncomePart, Prisma } from '@prisma/client';
-import { kabulGregorianMonthStartUtc, PERMISSIONS, ROLES, SessionRole, sessionResult } from '@my-store/shared';
+import { PERMISSIONS, ROLES, SessionRole, sessionResult, storeMonthStartUtc } from '@my-store/shared';
+import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { RequestUser } from '../../common/decorators/current-user.decorator';
@@ -279,8 +280,10 @@ export class WorkSessionsService {
 
   /** Sessions overlapping the range, summed per person — used by the Income and Reports pages */
   async report(tenantId: string, query: SessionReportQueryDto) {
-    const from = query.from ? new Date(query.from) : kabulGregorianMonthStartUtc();
-    const to = query.to ? new Date(new Date(query.to).getTime() + DAY_MS - 1) : new Date();
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const days = storeDayFilter(tz, query.from, query.to);
+    const from = days.gte ?? storeMonthStartUtc(tz);
+    const to = days.lte ?? new Date();
     const sessions = await this.prisma.workSession.findMany({
       where: { tenantId, startedAt: { lte: to }, OR: [{ closedAt: null }, { closedAt: { gte: from } }] },
       take: 1000,

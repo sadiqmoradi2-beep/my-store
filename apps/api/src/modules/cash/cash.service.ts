@@ -5,12 +5,13 @@ import {
   CASH_TRANSACTION_DIRECTION,
   INCOME_PARTS,
   INCOME_PART_NAMES,
-  kabulGregorianMonthStartUtc,
+  storeMonthStartUtc,
   PAYMENT_METHOD_PART,
 } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { resolveSessionId } from '../work-sessions/session-link';
+import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PersonRef, personColumns, resolvePerson } from './person-ref';
 import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 
@@ -118,8 +119,10 @@ export class CashService {
    */
   async incomeSummary(tenantId: string, query: IncomeSummaryQueryDto) {
     await this.ensureRegisters(tenantId);
-    const from = query.from ? new Date(query.from) : kabulGregorianMonthStartUtc();
-    const to = query.to ? endOfDay(new Date(query.to)) : new Date();
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const days = storeDayFilter(tz, query.from, query.to);
+    const from = days.gte ?? storeMonthStartUtc(tz);
+    const to = days.lte ?? new Date();
     const registerWhere: Prisma.CashRegisterWhereInput = {
       tenantId,
       isActive: true,
@@ -204,11 +207,6 @@ export class CashService {
   }
 }
 
-function endOfDay(date: Date): Date {
-  const start = new Date(date);
-  start.setUTCHours(0, 0, 0, 0);
-  return new Date(start.getTime() + DAY_MS - 1);
-}
 
 interface CashTransactionInput {
   tenantId: string;

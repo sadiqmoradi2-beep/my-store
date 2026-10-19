@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { KABUL_UTC_OFFSET_MINUTES } from '@my-store/shared';
+import { storeDayEndUtc, storeDayStartUtc } from '@my-store/shared';
+import { getStoreTimeZone } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CacheService } from '../../redis/cache.service';
 import { ReportRangeQueryDto, SalesReportQueryDto } from './dto/report.dto';
@@ -49,18 +50,17 @@ export class ReportsService {
   }
 
   private async computeSales(tenantId: string, query: SalesReportQueryDto) {
-    const { from, to } = rangeOf(query);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const { from, to } = rangeOf(query, tz);
     const trunc = query.granularity === 'month' ? 'month' : 'day';
     const branchFilter = query.branchId
       ? Prisma.sql`AND s."branchId" = ${query.branchId}`
       : Prisma.empty;
 
-    // The day/month boundary is computed based on Kabul time: createdAt is shifted forward so
-    // date_trunc aligns with Kabul midnight, then the result is shifted back by the same amount
-    // (consistent with endOfKabulDay)
+    // Day / month buckets follow the store's calendar (daylight-saving aware): createdAt (UTC) is
+    // converted to store wall time, truncated, and the bucket start converted back to UTC
     const rows = await this.prisma.$queryRaw<RawSalesPoint[]>`
-      SELECT date_trunc(${trunc}, s."createdAt" + (${KABUL_UTC_OFFSET_MINUTES} * interval '1 minute'))
-               - (${KABUL_UTC_OFFSET_MINUTES} * interval '1 minute') AS bucket,
+      SELECT (date_trunc(${trunc}, (s."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC' AS bucket,
              COALESCE(SUM(s.total), 0)           AS total,
              COALESCE(SUM(s.cost), 0)            AS cost,
              COUNT(*)::int                       AS sales
@@ -102,7 +102,8 @@ export class ReportsService {
   }
 
   private async computeProducts(tenantId: string, query: ReportRangeQueryDto) {
-    const { from, to } = rangeOf(query);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const { from, to } = rangeOf(query, tz);
     const where = {
       sale: { tenantId, createdAt: { gte: from, lte: to } },
     };
@@ -148,7 +149,8 @@ export class ReportsService {
   }
 
   private async computeCash(tenantId: string, query: ReportRangeQueryDto) {
-    const { from, to } = rangeOf(query);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const { from, to } = rangeOf(query, tz);
     const rows = await this.prisma.cashTransaction.groupBy({
       by: ['type', 'category'],
       where: { tenantId, createdAt: { gte: from, lte: to } },
@@ -173,7 +175,8 @@ export class ReportsService {
   }
 
   private async computeBranches(tenantId: string, query: ReportRangeQueryDto) {
-    const { from, to } = rangeOf(query);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const { from, to } = rangeOf(query, tz);
     const rows = await this.prisma.$queryRaw<RawBranchRow[]>`
       SELECT s."branchId"                        AS "branchId",
              COALESCE(SUM(s.total), 0)           AS total,
@@ -210,7 +213,8 @@ export class ReportsService {
   }
 
   private async computeSellers(tenantId: string, query: ReportRangeQueryDto) {
-    const { from, to } = rangeOf(query);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const { from, to } = rangeOf(query, tz);
     const rows = await this.prisma.$queryRaw<RawSellerRow[]>`
       SELECT s."createdById"                       AS "sellerId",
              COALESCE(SUM(s.total), 0)              AS total,
@@ -247,20 +251,8 @@ export class ReportsService {
 }
 
 /** Report range — defaults to the last 30 days; "to" includes the entire final day (Kabul time) */
-export function rangeOf(query: ReportRangeQueryDto): { from: Date; to: Date } {
-  const to = query.to ? endOfKabulDay(new Date(query.to)) : new Date();
-  const from = query.from ? new Date(query.from) : new Date(to.getTime() - 30 * DAY_MS);
+export function rangeOf(query: ReportRangeQueryDto, tz: string): { from: Date; to: Date } {
+  const to = query.to ? storeDayEndUtc(query.to.slice(0, 10), tz) : new Date();
+  const from = query.from ? storeDayStartUtc(query.from.slice(0, 10), tz) : new Date(to.getTime() - 30 * DAY_MS);
   return { from, to };
-}
-
-const KABUL_OFFSET_MS = KABUL_UTC_OFFSET_MINUTES * 60_000;
-
-/**
- * End of day in Kabul time (UTC+4:30) expressed in UTC — independent of the server's time zone,
- * and consistent with the shift applied to date_trunc in computeSales.
- */
-function endOfKabulDay(date: Date): Date {
-  const kabul = new Date(date.getTime() + KABUL_OFFSET_MS);
-  const kabulMidnightUtc = Date.UTC(kabul.getUTCFullYear(), kabul.getUTCMonth(), kabul.getUTCDate());
-  return new Date(kabulMidnightUtc - KABUL_OFFSET_MS + DAY_MS - 1);
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { kabulDayStartUtc, kabulGregorianMonthStartUtc } from '@my-store/shared';
+import { storeMonthStartUtc, storeTodayStartUtc } from '@my-store/shared';
 import { CacheService } from '../../redis/cache.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { DashboardRepository } from './dashboard.repository';
@@ -21,8 +21,9 @@ export class DashboardService {
   }
 
   private async computeSummary(tenantId: string, branchId?: string) {
-    const dayStart = kabulDayStartUtc();
-    const monthStart = kabulGregorianMonthStartUtc();
+    const tz = await this.repo.storeTimeZone(tenantId);
+    const dayStart = storeTodayStartUtc(tz);
+    const monthStart = storeMonthStartUtc(tz);
 
     const [today, month, lowStocks, top] = await Promise.all([
       this.repo.sumSales(tenantId, dayStart, branchId),

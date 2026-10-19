@@ -5,7 +5,9 @@ import { AlertTriangle, Check, Clock, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
 import {
+  DEFAULT_STORE_TIME_ZONE,
   INCOME_PART_NAMES,
+  storeDateOf,
   PERMISSIONS,
   type CashRegisterDto,
   type HourlyPayPreviewDto,
@@ -13,7 +15,7 @@ import {
   type WorkIntervalDto,
 } from '@my-store/shared';
 import { api } from '@/lib/api-client';
-import { formatDateTime, formatMoney } from '@/lib/format';
+import { formatMoney, formatStoreDateTime } from '@/lib/format';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Select, Spinner } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -25,7 +27,6 @@ const STATUS_TONES: Record<WorkIntervalDto['status'], string> = {
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 const isRealDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number(v.slice(0, 4)) >= 2000;
 
@@ -40,8 +41,9 @@ export function WorkHours({ employeeId }: { employeeId: string }) {
   const locale = useLocale() as Locale;
   const queryClient = useQueryClient();
   const canManage = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.EMPLOYEES_MANAGE));
-  const today = new Date();
-  const [range, setRange] = useState({ from: isoDay(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoDay(today) });
+  const tz = useAuthStore((s) => s.user?.timeZone) ?? DEFAULT_STORE_TIME_ZONE;
+  const today = storeDateOf(new Date(), tz);
+  const [range, setRange] = useState({ from: `${today.slice(0, 8)}01`, to: today });
   const [acting, setActing] = useState<{ row: WorkIntervalDto; mode: 'approve' | 'reject' } | null>(null);
   const qs = `from=${range.from}&to=${range.to}`;
   // a date being typed passes through values like "0002-09-01" — wait for a complete, sensible range
@@ -130,8 +132,8 @@ export function WorkHours({ employeeId }: { employeeId: string }) {
                     )}
                     {r.correctionReason && <p className="mt-0.5 text-xs text-ink-faint">{r.correctionReason}</p>}
                   </td>
-                  <td className="p-2 text-ink-muted">{formatDateTime(r.startAt, locale)}</td>
-                  <td className="p-2 text-ink-muted">{r.endAt ? formatDateTime(r.endAt, locale) : '—'}</td>
+                  <td className="p-2 text-ink-muted">{formatStoreDateTime(r.startAt, tz, locale)}</td>
+                  <td className="p-2 text-ink-muted">{r.endAt ? formatStoreDateTime(r.endAt, tz, locale) : '—'}</td>
                   <td className="p-2 text-ink">{hm(r.recordedMinutes)}</td>
                   <td className="p-2 font-bold text-ink">
                     {hm(r.approvedMinutes)}

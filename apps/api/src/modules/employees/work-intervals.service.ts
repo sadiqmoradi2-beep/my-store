@@ -6,25 +6,21 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EmployeeWorkInterval, Prisma } from '@prisma/client';
-import { KABUL_UTC_OFFSET_MINUTES } from '@my-store/shared';
+import { storeDayStartUtc, storeNextDayStartUtc } from '@my-store/shared';
+import { getStoreTimeZone } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { createSalaryPayment } from './salary-payment';
 import { ApproveIntervalDto, HourlyPayDto, RejectIntervalDto, WorkIntervalRangeDto } from './dto/work-interval.dto';
 
-const OFFSET_MS = KABUL_UTC_OFFSET_MINUTES * 60_000;
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 
-/** [start, end) in UTC for a Kabul calendar-day range, both days inclusive */
-export function kabulRange(range: WorkIntervalRangeDto) {
-  const day = (s: string) => {
-    const [y, m, d] = s.split('-').map(Number);
-    return Date.UTC(y, m - 1, d) - OFFSET_MS;
-  };
-  const start = day(range.from);
-  const end = day(range.to) + 86_400_000;
+/** [start, end) in UTC for a store calendar-day range, both days inclusive (daylight-saving aware) */
+export function storeRange(range: WorkIntervalRangeDto, tz: string) {
+  const start = storeDayStartUtc(range.from, tz);
+  const end = storeNextDayStartUtc(range.to, tz);
   if (!(end > start)) throw new BadRequestException('"to" must be on or after "from"');
-  if (end - start > 400 * 86_400_000) throw new BadRequestException('Choose a range of at most about a year');
-  return { start: new Date(start), end: new Date(end) };
+  if (end.getTime() - start.getTime() > 400 * 86_400_000) throw new BadRequestException('Choose a range of at most about a year');
+  return { start, end };
 }
 
 /** Whole minutes between two instants; null when there is no trustworthy end */
@@ -76,7 +72,7 @@ export class WorkIntervalsService {
    */
   async sync(tenantId: string, employeeId: string, range: WorkIntervalRangeDto) {
     await this.hourlyEmployee(tenantId, employeeId);
-    const { start, end } = kabulRange(range);
+    const { start, end } = storeRange(range, await getStoreTimeZone(this.prisma, tenantId));
     const [attendance, sessions, existing] = await Promise.all([
       this.prisma.employeeAttendance.findMany({
         where: { tenantId, employeeId, date: { gte: new Date(`${range.from}T00:00:00Z`), lte: new Date(`${range.to}T00:00:00Z`) } },
@@ -116,7 +112,7 @@ export class WorkIntervalsService {
   /** Stretches that start in the range, with overlap and needs-review flags */
   async list(tenantId: string, employeeId: string, range: WorkIntervalRangeDto) {
     await this.hourlyEmployee(tenantId, employeeId);
-    const { start, end } = kabulRange(range);
+    const { start, end } = storeRange(range, await getStoreTimeZone(this.prisma, tenantId));
     const rows: Row[] = await this.prisma.employeeWorkInterval.findMany({
       where: { tenantId, employeeId, startAt: { gte: start, lt: end } },
       include: { attendance: { select: { date: true } }, workSession: { select: { code: true } } },
@@ -237,7 +233,7 @@ export class WorkIntervalsService {
   /** Approved, unpaid stretches that start in the range — exactly what "pay" would pay */
   async preview(tenantId: string, employeeId: string, range: WorkIntervalRangeDto) {
     await this.hourlyEmployee(tenantId, employeeId);
-    const { start, end } = kabulRange(range);
+    const { start, end } = storeRange(range, await getStoreTimeZone(this.prisma, tenantId));
     const rows = await this.prisma.employeeWorkInterval.findMany({
       where: { tenantId, employeeId, status: 'APPROVED', salaryPaymentId: null, startAt: { gte: start, lt: end } },
       orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
@@ -248,7 +244,7 @@ export class WorkIntervalsService {
   async pay(tenantId: string, userId: string, employeeId: string, dto: HourlyPayDto) {
     const user = await this.actor(userId);
     const employee = await this.hourlyEmployee(tenantId, employeeId);
-    const { start, end } = kabulRange(dto);
+    const { start, end } = storeRange(dto, await getStoreTimeZone(this.prisma, tenantId));
     const ids = [...new Set(dto.intervalIds)];
     return this.prisma.$transaction(async (tx) => {
       // lock exactly the previewed rows; a concurrent payment waits here and then finds them PAID

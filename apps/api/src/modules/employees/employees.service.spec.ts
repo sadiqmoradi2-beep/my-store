@@ -34,6 +34,7 @@ describe('EmployeesService.paySalary', () => {
       workSession: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: { findFirst: jest.fn().mockResolvedValue({ ...employee }) },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) as never,
     };
@@ -96,6 +97,7 @@ describe('EmployeesService.create', () => {
       },
     };
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'emp-new', ...data })),
       },
@@ -283,6 +285,7 @@ describe('EmployeesService.payCommission', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: {
         findFirst: jest.fn().mockResolvedValue({ id: 'emp1', tenantId: 't1', userId: 'user-1' }),
       },
@@ -337,6 +340,7 @@ describe('EmployeesService.list', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: {
         findMany: jest.fn().mockResolvedValue([
           { id: 'emp1', tenantId: 't1', userId: 'user-1', fullName: 'Ali', isActive: true },
@@ -442,6 +446,7 @@ describe('EmployeesService.startShift/endShift', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: { findFirst: jest.fn().mockResolvedValue({ ...employee }) },
       employeeShift: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -507,6 +512,7 @@ describe('EmployeesService.attendance/markAttendance', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: { findFirst: jest.fn().mockResolvedValue({ ...employee }) },
       employeeWorkInterval: { findFirst: jest.fn().mockResolvedValue(null) },
       employeeAttendance: {
@@ -562,6 +568,7 @@ describe('EmployeesService.remove', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       employee: {
         findFirst: jest.fn().mockResolvedValue({ ...employee }),
         update: jest.fn(),

@@ -1,6 +1,6 @@
 'use client';
 
-import { formatDisplayDate, type Locale } from '@my-store/shared';
+import { formatDisplayDate, storeClockTime, storeDateOf, type Locale } from '@my-store/shared';
 
 /** Gregorian-formatted date */
 export function formatDate(value: string | Date, _locale?: Locale): string {
@@ -23,6 +23,12 @@ export function formatDateTime(value: string | Date, locale?: Locale): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   return `${formatDate(date, locale)}, ${time}`;
+}
+
+/** Date and time on the STORE's clock (its configured time zone), e.g. 26 September 2026, 09:15 */
+export function formatStoreDateTime(value: string | Date, timeZone: string, locale?: Locale): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return `${formatDate(new Date(`${storeDateOf(date, timeZone)}T12:00:00`), locale)}, ${storeClockTime(date, timeZone)}`;
 }
 
 /** Length of a session, e.g. 2d 3h 5m */

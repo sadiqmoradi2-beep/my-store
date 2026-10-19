@@ -28,6 +28,7 @@ describe('CashService', () => {
       teamPerson: { findFirst: jest.fn().mockResolvedValue({ displayName: 'Mohammad' }) },
     };
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       branch: { findMany: jest.fn().mockResolvedValue([{ id: 'b1' }]) },
       cashRegister: {
         findFirst: jest.fn().mockResolvedValue({ id: 'reg-1', tenantId: 't1', branchId: 'b1', part: 'CASH' }),

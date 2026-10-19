@@ -8,6 +8,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { TenantsService } from './tenants.service';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { WipeDataDto } from './dto/wipe-data.dto';
+import { SetTimeZoneDto } from './dto/time-zone.dto';
 import {
   ChangeTenantPlanDto,
   DeleteTenantDto,
@@ -31,6 +32,13 @@ export class TenantsController {
   @RequirePermissions(PERMISSIONS.TENANTS_UPDATE)
   updateCurrent(@TenantId() tenantId: string, @Body() dto: UpdateTenantDto) {
     return this.tenantsService.updateCurrent(tenantId, dto);
+  }
+
+  /** The store's IANA time zone — decides which calendar day attendance, pay ranges and reports use */
+  @Patch('current/time-zone')
+  @RequirePermissions(PERMISSIONS.TENANTS_UPDATE)
+  setTimeZone(@TenantId() tenantId: string, @Body() dto: SetTimeZoneDto) {
+    return this.tenantsService.setTimeZone(tenantId, dto.timeZone);
   }
 
   @Post('current/wipe-data')

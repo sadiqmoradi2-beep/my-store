@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getStoreTimeZone } from '../../common/store-time-zone';
 
 @Injectable()
 export class DashboardRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  storeTimeZone(tenantId: string) {
+    return getStoreTimeZone(this.prisma, tenantId);
+  }
 
   private saleWhere(tenantId: string, since: Date, branchId?: string): Prisma.SaleWhereInput {
     return {

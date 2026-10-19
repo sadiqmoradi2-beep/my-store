@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { applyMovement } from '../inventory/inventory.service';
@@ -250,10 +251,7 @@ export class SuppliersService {
       tenantId,
       ...(query.supplierId && { supplierId: query.supplierId }),
       ...((query.from || query.to) && {
-        receivedAt: {
-          ...(query.from && { gte: new Date(query.from) }),
-          ...(query.to && { lte: endOfDay(new Date(query.to)) }),
-        },
+        receivedAt: storeDayFilter(await getStoreTimeZone(this.prisma, tenantId), query.from, query.to),
       }),
     };
     const skip = (query.page - 1) * query.limit;

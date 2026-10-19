@@ -8,28 +8,32 @@ const D = (v: number) => new Prisma.Decimal(v);
 
 describe('rangeOf', () => {
   it('بدون from/to → بازه پیش‌فرض ۳۰ روزه تا اکنون', () => {
-    const { from, to } = rangeOf({});
+    const { from, to } = rangeOf({}, 'UTC');
     const diffDays = (to.getTime() - from.getTime()) / 86_400_000;
     expect(Math.round(diffDays)).toBe(30);
   });
 
   it('from و to صریح → همان بازه با تا انتهای روز', () => {
-    const { from, to } = rangeOf({ from: '2026-01-01', to: '2026-01-10' });
-    expect(from.toISOString().slice(0, 10)).toBe('2026-01-01');
-    expect(to.getHours()).toBe(23);
-    expect(to.getMinutes()).toBe(59);
-    expect(to.getSeconds()).toBe(59);
+    const { from, to } = rangeOf({ from: '2026-01-01', to: '2026-01-10' }, 'UTC');
+    expect(from.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+    expect(to.toISOString()).toBe('2026-01-10T23:59:59.999Z');
+  });
+
+  it('store calendar days follow the store zone (New York, winter = UTC-5)', () => {
+    const { from, to } = rangeOf({ from: '2026-01-01', to: '2026-01-01' }, 'America/New_York');
+    expect(from.toISOString()).toBe('2026-01-01T05:00:00.000Z');
+    expect(to.toISOString()).toBe('2026-01-02T04:59:59.999Z');
   });
 
   it('فقط from → to برابر اکنون است', () => {
     const before = new Date();
-    const { from, to } = rangeOf({ from: '2025-01-01' });
+    const { from, to } = rangeOf({ from: '2025-01-01' }, 'UTC');
     expect(from.toISOString().slice(0, 10)).toBe('2025-01-01');
     expect(to.getTime()).toBeGreaterThanOrEqual(before.getTime());
   });
 
   it('فقط to → from برابر ۳۰ روز قبل از to است', () => {
-    const { from, to } = rangeOf({ to: '2026-02-15' });
+    const { from, to } = rangeOf({ to: '2026-02-15' }, 'UTC');
     const diffDays = (to.getTime() - from.getTime()) / 86_400_000;
     expect(Math.round(diffDays)).toBe(30);
   });
@@ -38,6 +42,7 @@ describe('rangeOf', () => {
 describe('ReportsService', () => {
   let service: ReportsService;
   let prisma: {
+    tenant: { findUnique: jest.Mock };
     $queryRaw: jest.Mock;
     saleItem: { groupBy: jest.Mock };
     product: { findMany: jest.Mock };
@@ -47,6 +52,7 @@ describe('ReportsService', () => {
 
   beforeEach(async () => {
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
       saleItem: { groupBy: jest.fn().mockResolvedValue([]) },
       product: { findMany: jest.fn().mockResolvedValue([]) },

@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { EMPLOYEE_POSITION_ROLE, ROLES } from '@my-store/shared';
+import { EMPLOYEE_POSITION_ROLE, ROLES, storeWallTimeToUtc } from '@my-store/shared';
+import { getStoreTimeZone } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction, transactionDate } from '../cash/cash.service';
@@ -285,6 +286,7 @@ export class EmployeesService {
   /** Pay salary: payment row + register expense (if a register is selected and the payment is PAID) */
   async paySalary(tenantId: string, userId: string, employeeId: string, dto: PaySalaryDto) {
     const employee = await this.get(tenantId, employeeId);
+    assertNotHourly(employee.payType);
     const at = transactionDate(dto.date);
     return this.prisma.$transaction((tx) =>
       createSalaryPayment(tx, {
@@ -308,6 +310,7 @@ export class EmployeesService {
   /** Transition a PENDING salary payment to PAID, recording the deferred cash effect */
   async markSalaryPaid(tenantId: string, userId: string, employeeId: string, paymentId: string, registerId?: string) {
     const employee = await this.get(tenantId, employeeId);
+    assertNotHourly(employee.payType);
     const payment = await this.prisma.salaryPayment.findFirst({
       where: { id: paymentId, tenantId, employeeId },
     });
@@ -427,6 +430,14 @@ export class EmployeesService {
   async markAttendance(tenantId: string, userId: string, employeeId: string, dto: MarkAttendanceDto) {
     await this.get(tenantId, employeeId);
     const date = new Date(dto.date);
+    const tz = await getStoreTimeZone(this.prisma, tenantId);
+    const checkIn = dto.checkIn ? storeWallTimeToUtc(dto.checkIn, tz) : null;
+    let checkOut = dto.checkOut ? storeWallTimeToUtc(dto.checkOut, tz) : null;
+    // A night shift: a check-out on the store clock at or before the check-in ends on the next day
+    if (checkIn && checkOut && checkOut.getTime() <= checkIn.getTime() && !/(Z|[+-]\d{2}:?\d{2})$/i.test(dto.checkOut!)) {
+      const next = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1)).toISOString().slice(0, 10);
+      checkOut = storeWallTimeToUtc(`${next}T${dto.checkOut!.slice(11, 16)}`, tz);
+    }
     // Hours already approved or paid from this day must not change underneath payroll
     const locked = await this.prisma.employeeWorkInterval.findFirst({
       where: { tenantId, employeeId, attendance: { date }, status: { in: ['APPROVED', 'PAID'] } },
@@ -446,15 +457,15 @@ export class EmployeesService {
         employeeId,
         date,
         status: dto.status,
-        checkIn: dto.checkIn ? new Date(dto.checkIn) : undefined,
-        checkOut: dto.checkOut ? new Date(dto.checkOut) : undefined,
+        checkIn: checkIn ?? undefined,
+        checkOut: checkOut ?? undefined,
         note: dto.note,
         recordedById: userId,
       },
       update: {
         status: dto.status,
-        checkIn: dto.checkIn ? new Date(dto.checkIn) : null,
-        checkOut: dto.checkOut ? new Date(dto.checkOut) : null,
+        checkIn,
+        checkOut,
         note: dto.note,
         recordedById: userId,
       },
@@ -467,4 +478,9 @@ function hourlyRateFor(payType: string, rate: number | undefined): Prisma.Decima
   if (payType !== 'HOURLY') return null;
   if (rate == null || !(rate > 0)) throw new BadRequestException('An hourly rate greater than 0 is required for Hourly pay');
   return new Prisma.Decimal(rate);
+}
+
+/** Hourly pay only goes through approved Work hours — never as a typed-in salary amount */
+export function assertNotHourly(payType: string) {
+  if (payType === 'HOURLY') throw new BadRequestException('Hourly employees are paid from Team → Employee → Work hours (approved hours only). For an advance use Loan & Deficit.');
 }

@@ -17,41 +17,42 @@ export class ExportsController {
   @Get('products')
   @RequirePermissions(PERMISSIONS.PRODUCTS_READ)
   async products(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.products(tenantId), query);
+    await this.send(res, await this.exportsService.products(tenantId), query, tenantId);
   }
 
   @Get('sales')
   @RequirePermissions(PERMISSIONS.SALES_READ)
   async sales(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.sales(tenantId, query), query);
+    await this.send(res, await this.exportsService.sales(tenantId, query), query, tenantId);
   }
 
   @Get('stock')
   @RequirePermissions(PERMISSIONS.INVENTORY_READ)
   async stock(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.stock(tenantId), query);
+    await this.send(res, await this.exportsService.stock(tenantId), query, tenantId);
   }
 
   @Get('cash')
   @RequirePermissions(PERMISSIONS.CASH_READ)
   async cash(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.cash(tenantId, query), query);
+    await this.send(res, await this.exportsService.cash(tenantId, query), query, tenantId);
   }
 
   @Get('debts')
   @RequirePermissions(PERMISSIONS.DEBTS_READ)
   async debts(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.debts(tenantId), query);
+    await this.send(res, await this.exportsService.debts(tenantId), query, tenantId);
   }
 
   @Get('sales-report')
   @RequirePermissions(PERMISSIONS.REPORTS_VIEW)
   async salesReport(@TenantId() tenantId: string, @Query() query: ExportQueryDto, @Res() res: Response) {
-    await this.send(res, await this.exportsService.salesReport(tenantId, query), query);
+    await this.send(res, await this.exportsService.salesReport(tenantId, query), query, tenantId);
   }
 
-  private async send(res: Response, sheet: ExportSheet, query: ExportQueryDto) {
-    const { buffer, fileName, contentType } = await renderSheet(sheet, query.format ?? 'xlsx');
+  private async send(res: Response, sheet: ExportSheet, query: ExportQueryDto, tenantId: string) {
+    const tz = await this.exportsService.timeZone(tenantId);
+    const { buffer, fileName, contentType } = await renderSheet(sheet, query.format ?? 'xlsx', tz);
     res
       .setHeader('Content-Type', contentType)
       .setHeader('Content-Disposition', `attachment; filename="${fileName}"`)

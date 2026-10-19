@@ -1,13 +1,17 @@
 import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { kabulRange, minutesBetween, payFor, WorkIntervalsService } from './work-intervals.service';
+import { minutesBetween, payFor, storeRange, WorkIntervalsService } from './work-intervals.service';
 
 describe('hourly payroll helpers', () => {
-  it('a Kabul day range is [day start, day after end) in UTC', () => {
-    const { start, end } = kabulRange({ from: '2026-09-01', to: '2026-09-01' });
-    expect(start.toISOString()).toBe('2026-08-31T19:30:00.000Z');
-    expect(end.toISOString()).toBe('2026-09-01T19:30:00.000Z');
-    expect(() => kabulRange({ from: '2026-09-02', to: '2026-09-01' })).toThrow('"to"');
+  it('a store day range is [day start, day after end) in UTC, per zone and across DST', () => {
+    const kabul = storeRange({ from: '2026-09-01', to: '2026-09-01' }, 'Asia/Kabul');
+    expect(kabul.start.toISOString()).toBe('2026-08-31T19:30:00.000Z');
+    expect(kabul.end.toISOString()).toBe('2026-09-01T19:30:00.000Z');
+    // New York falls back on 1 Nov 2026: that day is 25 hours long
+    const ny = storeRange({ from: '2026-11-01', to: '2026-11-01' }, 'America/New_York');
+    expect(ny.start.toISOString()).toBe('2026-11-01T04:00:00.000Z');
+    expect(ny.end.toISOString()).toBe('2026-11-02T05:00:00.000Z');
+    expect(() => storeRange({ from: '2026-09-02', to: '2026-09-01' }, 'UTC')).toThrow('"to"');
   });
 
   it('minutes need a real end after the start — never estimated', () => {
@@ -32,6 +36,7 @@ describe('WorkIntervalsService.pay', () => {
     };
     const prisma = {
       employee: { findFirst: jest.fn().mockResolvedValue({ id: 'e1', payType: 'HOURLY', fullName: 'E', hourlyRate: new Prisma.Decimal(10) }) },
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       user: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'u1', fullName: 'Admin' }) },
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
     };

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { IncomePart, PAYMENT_METHOD_NAMES, PAYMENT_METHOD_PART } from '@my-store/shared';
+import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { findIncomeRegister, recordCashTransaction } from '../cash/cash.service';
@@ -30,10 +31,7 @@ export class SalesService {
       ...(query.paymentMethod && { paymentMethod: query.paymentMethod }),
       ...(query.branchId && { branchId: query.branchId }),
       ...((query.from || query.to) && {
-        createdAt: {
-          ...(query.from && { gte: new Date(query.from) }),
-          ...(query.to && { lte: endOfDay(new Date(query.to)) }),
-        },
+        createdAt: storeDayFilter(await getStoreTimeZone(this.prisma, tenantId), query.from, query.to),
       }),
     };
     const skip = (query.page - 1) * query.limit;
@@ -228,11 +226,6 @@ export class SalesService {
   }
 }
 
-function endOfDay(date: Date): Date {
-  const start = new Date(date);
-  start.setUTCHours(0, 0, 0, 0);
-  return new Date(start.getTime() + DAY_MS - 1);
-}
 
 type SaleRow = Prisma.SaleGetPayload<{
   include: { branch: { select: { name: true } }; createdBy: { select: { fullName: true } }; items: true };

@@ -157,7 +157,17 @@ export class SellersService {
 
   /** Pay a seller — a fixed salary, or a commission payout for a commission seller */
   async paySalary(tenantId: string, userId: string, id: string, dto: PaySellerSalaryDto) {
-    await this.get(tenantId, id);
+    const profile = await this.get(tenantId, id);
+    // An hourly seller has no salary or commission to pay here — and an hourly employee may only be
+    // paid here for commission actually earned (a commission profile), never a typed-in salary
+    const linkedEmployee = profile.userId
+      ? await this.prisma.employee.findFirst({ where: { tenantId, userId: profile.userId, deletedAt: null }, select: { payType: true } })
+      : null;
+    if (profile.payType === 'HOURLY' || (linkedEmployee?.payType === 'HOURLY' && profile.payType !== 'COMMISSION')) {
+      throw new BadRequestException(
+        'Hourly employees are paid from Team → Employee → Work hours (approved hours only). For an advance use Loan & Deficit.',
+      );
+    }
     const amount = new Prisma.Decimal(dto.amount);
     const at = transactionDate(dto.date);
     return this.prisma.$transaction(async (tx) => {

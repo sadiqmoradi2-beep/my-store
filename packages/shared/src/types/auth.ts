@@ -37,6 +37,8 @@ export interface AuthUser {
   permissions: string[];
   /** The platform admin stopped this store's plan — the store is read-only */
   planStopped?: boolean;
+  /** The store's IANA time zone (null for the platform admin) */
+  timeZone?: string | null;
 }
 
 export interface LoginResponse {

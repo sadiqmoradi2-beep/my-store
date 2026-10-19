@@ -57,6 +57,7 @@ describe('SalesService.createFromCart', () => {
       cart: { delete: jest.fn() },
     };
     prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: null }) },
       cart: { findFirst: jest.fn().mockResolvedValue({ ...cart }) },
       branch: {
         findFirst: jest.fn().mockResolvedValue({ id: 'b1', name: 'Main' }),
@@ -246,8 +247,9 @@ describe('SalesService.createFromCart', () => {
 });
 
 describe('SalesService.list', () => {
-  it('applies method, branch and date filters (whole last day included)', async () => {
+  it('applies method, branch and date filters — whole store days in the store zone', async () => {
     const prisma = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ settings: { timeZone: 'America/New_York' } }) },
       sale: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
     };
     const moduleRef = await Test.createTestingModule({
@@ -265,7 +267,7 @@ describe('SalesService.list', () => {
     expect(where.tenantId).toBe('t1');
     expect(where.paymentMethod).toBe('EBT');
     expect(where.branchId).toBe('b1');
-    expect(where.createdAt.gte.toISOString().slice(0, 10)).toBe('2026-01-01');
-    expect(where.createdAt.lte.toISOString().slice(0, 10)).toBe('2026-01-31');
+    expect(where.createdAt.gte.toISOString()).toBe('2026-01-01T05:00:00.000Z');
+    expect(where.createdAt.lte.toISOString()).toBe('2026-02-01T04:59:59.999Z');
   });
 });

@@ -12,6 +12,7 @@ import {
   type TenantDto,
 } from '@my-store/shared';
 import { api } from '@/lib/api-client';
+import { TimeZoneCard } from '@/components/settings/time-zone-card';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button, Card, ErrorText, Field, Input, Select } from '@/components/ui';
 import { TwoFactorCard } from '@/components/two-factor-card';
@@ -31,6 +32,7 @@ export default function AccountSettingsPage() {
       <ChangeEmailCard currentEmail={user?.email ?? ''} onSuccess={setUser} />
       <ChangePasswordCard />
       <TwoFactorCard />
+      <TimeZoneCard />
       <ActivityLogRetentionCard />
       <WipeDataCard />
     </div>
