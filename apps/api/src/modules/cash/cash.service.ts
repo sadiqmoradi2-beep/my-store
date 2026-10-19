@@ -194,6 +194,8 @@ export class CashService {
       balance: zero(),
       income: zero(),
       expenses: zero(),
+      transfersIn: zero(),
+      transfersOut: zero(),
       profit: zero(),
       salesCount: 0,
     }));
@@ -204,7 +206,10 @@ export class CashService {
       const target = byPart.get(partOfRegister.get(f.registerId)!);
       if (!target) continue;
       const amount = f._sum.amount ?? zero();
-      if (CASH_TRANSACTION_DIRECTION[f.type as CashTransactionType] === 1) target.income = target.income.add(amount);
+      // internal transfers move money between the store's own accounts: neither income nor expense
+      if (f.type === 'TRANSFER_IN') target.transfersIn = target.transfersIn.add(amount);
+      else if (f.type === 'TRANSFER_OUT') target.transfersOut = target.transfersOut.add(amount);
+      else if (CASH_TRANSACTION_DIRECTION[f.type as CashTransactionType] === 1) target.income = target.income.add(amount);
       else target.expenses = target.expenses.add(amount);
     }
 

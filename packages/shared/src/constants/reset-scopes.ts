@@ -65,7 +65,7 @@ export const RESET_SCOPE_MODEL_KEYS: Record<Exclude<ResetScope, 'ALL'>, string[]
     'category',
   ],
   SALES: ['saleItem', 'sale', 'cartItem', 'cart'],
-  CASH: ['cashTransaction', 'gatewayIntent'],
+  CASH: ['cashTransaction', 'cashTransfer', 'gatewayIntent'],
   SUPPLIERS: ['purchaseReturn', 'purchaseItem', 'purchase', 'supplier'],
   DEBTS: ['debtPayment', 'debt'],
   EMPLOYEES_HISTORY: ['employeeWorkIntervalEvent', 'employeeWorkInterval', 'employeeAttendance', 'employeeShift', 'salaryPayment'],

@@ -241,7 +241,9 @@
       "INCOME": "Income",
       "EXPENSE": "Expense",
       "REFUND": "Refund",
-      "WITHDRAWAL": "Withdrawal"
+      "WITHDRAWAL": "Withdrawal",
+      "TRANSFER_IN": "Transfer in",
+      "TRANSFER_OUT": "Transfer out"
     },
     "amount": "Amount",
     "balanceAfter": "Balance after",
@@ -379,7 +381,20 @@
       "TRANSFER": "Transferred by"
     },
     "financialPersonnel": "Financial Personnel",
-    "noPersonnel": "No active Financial Personnel — add them in Team → Financial Personnel."
+    "noPersonnel": "No active Financial Personnel — add them in Team → Financial Personnel.",
+    "transfer": {
+      "option": "Internal transfer",
+      "title": "Internal transfer",
+      "from": "Source account",
+      "to": "Destination account",
+      "selectAccount": "Select account…",
+      "by": "Transferred By",
+      "hint": "Moves money between the store’s own accounts. It is not income or an expense, and the store’s total balance does not change.",
+      "save": "Transfer",
+      "summary": "Transfers: +{in} / −{out}",
+      "reverse": "Reverse transfer",
+      "reversePrompt": "Reverse this whole transfer (both accounts). Reason:"
+    }
   },
   "pos": {
     "title": "My Store",

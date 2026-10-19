@@ -198,6 +198,22 @@ describe('CashService', () => {
       expect(cash.expenses.toString()).toBe('150');
     });
 
+    it('internal transfers are neither income nor expense — reported apart', async () => {
+      prisma.cashTransaction.groupBy.mockResolvedValue([
+        { registerId: 'r-cash', type: 'INCOME', _sum: { amount: D(100) } },
+        { registerId: 'r-cash', type: 'TRANSFER_OUT', _sum: { amount: D(60) } },
+        { registerId: 'r-zelle', type: 'TRANSFER_IN', _sum: { amount: D(60) } },
+      ]);
+      const result = await service.incomeSummary('t1', {});
+      const cash = result.parts.find((p) => p.part === 'CASH')!;
+      const zelle = result.parts.find((p) => p.part === 'ZELLE')!;
+      expect(cash.income.toString()).toBe('100');
+      expect(cash.expenses.toString()).toBe('0');
+      expect(cash.transfersOut.toString()).toBe('60');
+      expect(zelle.income.toString()).toBe('0');
+      expect(zelle.transfersIn.toString()).toBe('60');
+    });
+
     it('Card gets its own Income part, separate from Zelle', async () => {
       const result = await service.incomeSummary('t1', {});
       const card = result.parts.find((p) => p.part === 'CARD')!;

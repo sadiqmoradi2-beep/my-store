@@ -41,7 +41,7 @@ export const PAYMENT_METHOD_PART: Record<PaymentMethod, IncomePart> = {
   DEBIT_CARD: 'DEBIT_CARD',
 };
 
-export const CASH_TRANSACTION_TYPES = ['SALE', 'INCOME', 'EXPENSE', 'REFUND', 'WITHDRAWAL'] as const;
+export const CASH_TRANSACTION_TYPES = ['SALE', 'INCOME', 'EXPENSE', 'REFUND', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT'] as const;
 export type CashTransactionType = (typeof CASH_TRANSACTION_TYPES)[number];
 
 /** Direction of each cash transaction type's effect on balance: +1 money in, −1 money out */
@@ -51,7 +51,14 @@ export const CASH_TRANSACTION_DIRECTION: Record<CashTransactionType, 1 | -1> = {
   EXPENSE: -1,
   REFUND: -1,
   WITHDRAWAL: -1,
+  // internal transfer legs: move money between the store's own accounts — never income or expense
+  TRANSFER_IN: 1,
+  TRANSFER_OUT: -1,
 };
+
+/** Internal transfer legs — excluded from income / expense totals everywhere */
+export const TRANSFER_TRANSACTION_TYPES = ['TRANSFER_IN', 'TRANSFER_OUT'] as const;
+export const TRANSFER_REFERENCE_TYPE = 'transfer';
 
 // ─────────────────── Display names ───────────────────
 
@@ -61,6 +68,8 @@ export const CASH_TRANSACTION_TYPE_NAMES: Record<CashTransactionType, string> = 
   EXPENSE: 'Expense',
   REFUND: 'Refund',
   WITHDRAWAL: 'Withdrawal',
+  TRANSFER_IN: 'Transfer in',
+  TRANSFER_OUT: 'Transfer out',
 };
 
 // ─────────────────── Online payment options ───────────────────

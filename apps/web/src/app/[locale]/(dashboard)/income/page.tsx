@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { CreditCard, HandCoins, History, Landmark, Pencil, Plus, ReceiptText, Wallet } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CreditCard, HandCoins, History, Landmark, Pencil, Plus, ReceiptText, Undo2, Wallet } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
@@ -32,6 +32,8 @@ const TX_TONES: Record<CashTransactionType, string> = {
   EXPENSE: 'danger',
   REFUND: 'danger',
   WITHDRAWAL: 'RETURNED',
+  TRANSFER_IN: 'neutral',
+  TRANSFER_OUT: 'neutral',
 };
 
 
@@ -180,6 +182,14 @@ export default function IncomePage() {
                     </div>
                     <p className="mt-2 text-xs text-ink-muted">{t('balance')}</p>
                     <p className="text-lg font-black text-ink">{money(part.balance)}</p>
+                    {(Number(part.transfersIn ?? 0) > 0 || Number(part.transfersOut ?? 0) > 0) && (
+                      <p className="mt-1 text-xs text-ink-faint">
+                        {t('transfer.summary', {
+                          in: formatMoney(part.transfersIn ?? 0, locale),
+                          out: formatMoney(part.transfersOut ?? 0, locale),
+                        })}
+                      </p>
+                    )}
                     <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <dt className="text-ink-faint">{t('partIncome')}</dt>
@@ -246,6 +256,20 @@ function RegisterTransactions({
   const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
   const [editTx, setEditTx] = useState<CashTransactionDto | null>(null);
   const [historyTx, setHistoryTx] = useState<CashTransactionDto | null>(null);
+  const queryClient = useQueryClient();
+  const canTransfer = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.CASH_MANAGE));
+  // A transfer is never edited leg by leg: the controlled correction is one reversal of the whole transfer
+  const reverse = useMutation({
+    mutationFn: ({ transferId, reason }: { transferId: string; reason: string }) =>
+      api.post(`/cash-transfers/${transferId}/reverse`, { requestId: crypto.randomUUID(), reason }),
+    onSuccess: () => {
+      for (const key of ['cash-registers', 'cash-transactions', 'income-summary', 'cash-transfers']) queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  function askReverse(tx: CashTransactionDto) {
+    const reason = window.prompt(t('transfer.reversePrompt'));
+    if (reason && reason.trim().length >= 3 && tx.referenceId) reverse.mutate({ transferId: tx.referenceId, reason: reason.trim() });
+  }
   const correctable = (tx: CashTransactionDto) =>
     !tx.referenceType && !tx.correctionOfId && (CORRECTABLE_TRANSACTION_TYPES as readonly string[]).includes(tx.type);
 
@@ -300,13 +324,13 @@ function RegisterTransactions({
                 <th className="p-3 text-start font-medium">{t('paidByColumn')}</th>
                 <th className="p-3 text-start font-medium">{t('performedBy')}</th>
                 <th className="p-3 text-start font-medium">{t('date')}</th>
-                {isAdmin && <th className="p-3 text-start font-medium" aria-label={t('edit.actions')} />}
+                {(isAdmin || canTransfer) && <th className="p-3 text-start font-medium" aria-label={t('edit.actions')} />}
               </tr>
             </thead>
             <tbody>
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="p-8 text-center text-ink-faint">
+                  <td colSpan={isAdmin || canTransfer ? 8 : 7} className="p-8 text-center text-ink-faint">
                     {tc('noData')}
                   </td>
                 </tr>
@@ -338,7 +362,7 @@ function RegisterTransactions({
                   </td>
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
                   <td className="p-3 text-ink-muted">
-                    {tx.category ?? tx.note ?? '—'}
+                    {tx.referenceType === 'transfer' ? tx.note : (tx.category ?? tx.note ?? '—')}
                     {(tx.paidByName || tx.receivedByName) && (
                       <span className="block text-xs text-ink-faint">
                         {t('paidByPerson')}: <span className="text-ink">{tx.paidByName ?? '—'}</span> → {t('whoIsPaid')}:{' '}
@@ -371,9 +395,20 @@ function RegisterTransactions({
                   </td>
                   <td className="p-3 text-ink-muted">{tx.performedByName}</td>
                   <td className="p-3 text-xs text-ink-faint">{formatDate(tx.createdAt, locale)}</td>
-                  {isAdmin && (
+                  {(isAdmin || canTransfer) && (
                     <td className="p-3">
-                      {correctable(tx) && (
+                      {canTransfer && tx.referenceType === 'transfer' && (
+                        <button
+                          type="button"
+                          onClick={() => askReverse(tx)}
+                          className="cursor-pointer rounded p-1 text-ink-muted hover:text-primary-600"
+                          title={t('transfer.reverse')}
+                          aria-label={t('transfer.reverse')}
+                        >
+                          <Undo2 className="h-4 w-4" aria-hidden />
+                        </button>
+                      )}
+                      {isAdmin && correctable(tx) && (
                         <span className="flex gap-1">
                           <button
                             type="button"
@@ -406,6 +441,7 @@ function RegisterTransactions({
         </Card>
       )}
 
+      <ErrorText error={reverse.error} />
       {editTx && <TransactionEditModal tx={editTx} onClose={() => setEditTx(null)} />}
       {historyTx && <TransactionHistoryModal tx={historyTx} onClose={() => setHistoryTx(null)} />}
 

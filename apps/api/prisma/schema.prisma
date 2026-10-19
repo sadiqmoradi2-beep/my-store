@@ -97,6 +97,8 @@ enum CashTransactionType {
   EXPENSE
   REFUND
   WITHDRAWAL
+  TRANSFER_IN // internal transfer, destination leg (+)
+  TRANSFER_OUT // internal transfer, source leg (−)
 }
 
 enum AttendanceStatus {
@@ -140,6 +142,7 @@ model Tenant {
   cashTransactionEdits      CashTransactionEdit[]
   cashTransactionEditGrants CashTransactionEditGrant[]
   cashLedgerEvents          CashLedgerEvent[]
+  cashTransfers             CashTransfer[]
 }
 
 model Plan {
@@ -292,6 +295,7 @@ model User {
   partnerLedgerEntriesMade   PartnerLedgerEntry[]   @relation("PartnerLedgerEntryPerformedBy")
   licenseKeysCreated         LicenseKey[]           @relation("LicenseKeyCreatedBy")
   purchaseReturnsCreated     PurchaseReturn[]       @relation("PurchaseReturnCreatedBy")
+  cashTransfersMade          CashTransfer[]         @relation("CashTransferPerformedBy")
 
   @@index([tenantId])
 }
@@ -568,6 +572,8 @@ model CashRegister {
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch       Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
   transactions CashTransaction[]
+  transfersOut CashTransfer[] @relation("CashTransferFrom")
+  transfersIn  CashTransfer[] @relation("CashTransferTo")
 
   @@index([tenantId])
   @@index([branchId])
@@ -709,6 +715,35 @@ model CashLedgerEvent {
   @@index([tenantId, createdAt])
 }
 
+/// An internal transfer between two accounts of the same store. Its two ledger legs are CashTransaction rows
+/// (TRANSFER_OUT on the source, TRANSFER_IN on the destination) with referenceType 'transfer' + referenceId = id.
+model CashTransfer {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  requestId             String // client idempotency key
+  fromRegisterId        String
+  toRegisterId          String
+  amount                Decimal  @db.Decimal(18, 2)
+  transferredByPersonId String?
+  transferredByName     String
+  note                  String?
+  performedById         String
+  createdAt             DateTime @default(now()) // business date
+  recordedAt            DateTime @default(now())
+  /// Set on a reversal: the transfer it undoes (each transfer can be reversed once)
+  reversalOfId          String?  @unique
+  reversalReason        String?
+
+  tenant              Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromRegister        CashRegister @relation("CashTransferFrom", fields: [fromRegisterId], references: [id], onDelete: Cascade)
+  toRegister          CashRegister @relation("CashTransferTo", fields: [toRegisterId], references: [id], onDelete: Cascade)
+  transferredByPerson TeamPerson?  @relation("CashTransferBy", fields: [transferredByPersonId], references: [id], onDelete: SetNull)
+  performedBy         User         @relation("CashTransferPerformedBy", fields: [performedById], references: [id])
+
+  @@unique([tenantId, requestId])
+  @@index([tenantId, createdAt])
+}
+
 model TeamPerson {
   id          String   @id @default(cuid())
   tenantId    String
@@ -721,6 +756,7 @@ model TeamPerson {
   paidTransactions     CashTransaction[] @relation("CashTxPaidByPerson")
   receivedTransactions CashTransaction[] @relation("CashTxReceivedByPerson")
   transferredTransactions CashTransaction[] @relation("CashTxTransferredByPerson")
+  cashTransfers           CashTransfer[]    @relation("CashTransferBy")
 
   @@index([tenantId, isActive])
 }

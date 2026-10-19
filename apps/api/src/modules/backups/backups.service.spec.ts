@@ -332,7 +332,7 @@ describe('BackupsService', () => {
         updateMany: jest.fn(),
       };
       await service.wipeData('t1', 'u1', 'CASH');
-      expect(callOrder).toEqual(['delete:cashTransaction', 'delete:gatewayIntent']);
+      expect(callOrder).toEqual(['delete:cashTransaction', 'delete:cashTransfer', 'delete:gatewayIntent']);
       expect(txCache.cashRegister.updateMany).toHaveBeenCalledWith({
         where: { tenantId: 't1' },
         data: { balance: 0, openingBalance: 0 },

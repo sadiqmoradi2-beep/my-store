@@ -36,6 +36,7 @@ export const BACKUP_MODELS: BackupModel[] = [
   { key: 'sale', where: t },
   { key: 'saleItem', where: (tenantId) => ({ sale: { tenantId } }) },
   { key: 'cashRegister', where: t },
+  { key: 'cashTransfer', where: t },
   { key: 'cashTransaction', where: t },
   { key: 'stock', where: t },
   { key: 'stockMovement', where: t },

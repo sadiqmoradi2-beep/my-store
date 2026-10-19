@@ -34,6 +34,8 @@ const CASH_TYPE_TONES: Record<string, string> = {
   EXPENSE: 'danger',
   REFUND: 'PENDING',
   WITHDRAWAL: 'RETURNED',
+  TRANSFER_IN: 'neutral',
+  TRANSFER_OUT: 'neutral',
 };
 
 function isoDate(date: Date): string {

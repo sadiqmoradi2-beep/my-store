@@ -339,6 +339,9 @@ export interface IncomePartSummaryDto {
   income: string;
   /** Money that went out of this part during the range (expenses, salaries, withdrawals, debts paid) */
   expenses: string;
+  /** Internal transfers into / out of this part — never income or expense */
+  transfersIn?: string;
+  transfersOut?: string;
   /** Profit of the sales paid into this part during the range */
   profit: string;
   salesCount: number;
@@ -1011,4 +1014,20 @@ export interface SessionReportDto {
     harvested: string;
     difference: string;
   };
+}
+
+/** An internal transfer between two accounts of the same store */
+export interface CashTransferDto {
+  id: string;
+  fromRegisterId: string;
+  fromRegisterName?: string;
+  toRegisterId: string;
+  toRegisterName?: string;
+  amount: string;
+  transferredByName: string;
+  note: string | null;
+  createdAt: string;
+  recordedAt: string;
+  reversalOfId: string | null;
+  reversedById?: string | null;
 }
