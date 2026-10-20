@@ -7,6 +7,7 @@ import type { CashRegisterDto, DirectoryPersonDto, Locale } from '@my-store/shar
 import { api } from '@/lib/api-client';
 import { formatMoney } from '@/lib/format';
 import { Button, ErrorText, Field, Input, Select } from '@/components/ui';
+import { FinancialActorField, useFinancialActor } from './financial-actor-field';
 
 function todayDate() {
   const d = new Date();
@@ -27,12 +28,12 @@ export function TransferForm({ register, typeField, onClose }: { register: CashR
   const [toRegisterId, setToRegisterId] = useState('');
   const [amount, setAmount] = useState('');
   const [personId, setPersonId] = useState('');
+  const actorContext = useFinancialActor();
   const [date, setDate] = useState(todayDate);
   const [note, setNote] = useState('');
   const { data: registers } = useQuery({ queryKey: ['cash-registers'], queryFn: () => api.get<CashRegisterDto[]>('/cash-registers') });
   const { data: directory } = useQuery({ queryKey: ['people-directory'], queryFn: () => api.get<DirectoryPersonDto[]>('/team-people/directory') });
-  const personnel = (directory ?? []).filter((p) => p.kind === 'PERSON');
-  const destinations = (registers ?? []).filter((r) => r.id !== register.id && r.isActive);
+  const destinations = (registers ?? []).filter((r) => r.id !== register.id && r.isActive && (!actorContext.data?.actor || r.branchId === actorContext.data.branchId));
   const isToday = date === todayDate();
 
   const save = useMutation({
@@ -42,7 +43,7 @@ export function TransferForm({ register, typeField, onClose }: { register: CashR
         fromRegisterId: register.id,
         toRegisterId,
         amount: Number(amount),
-        transferredById: personId,
+        transferredById: actorContext.data?.canSelectActor ? personId : undefined,
         date: isToday ? undefined : new Date(`${date}T12:00:00`).toISOString(),
         note: note || undefined,
       }),
@@ -86,24 +87,13 @@ export function TransferForm({ register, typeField, onClose }: { register: CashR
           <Input required type="date" dir="ltr" max={todayDate()} value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
-      <Field label={t('transfer.by')} hint={personnel.length === 0 ? t('noPersonnel') : undefined}>
-        <Select required value={personId} onChange={(e) => setPersonId(e.target.value)}>
-          <option value="" disabled>
-            {t('selectPerson')}
-          </option>
-          {personnel.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <FinancialActorField context={actorContext.data} error={actorContext.error} label={t('transfer.by')} value={personId} onChange={setPersonId} directory={directory} branchId={register.branchId} />
       <Field label={t('note')}>
         <Input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
       </Field>
       <ErrorText error={save.error} />
       <div className="flex gap-2">
-        <Button type="submit" loading={save.isPending}>
+        <Button type="submit" loading={save.isPending} disabled={!actorContext.data || !!actorContext.error}>
           {t('transfer.save')}
         </Button>
         <Button type="button" variant="ghost" onClick={onClose}>

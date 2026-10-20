@@ -21,6 +21,7 @@ export async function resolvePerson(
   ref: { kind: PersonKind; id: string },
   label: string,
 ): Promise<PersonRef> {
+  if (!['EMPLOYEE', 'PARTNER', 'PERSON'].includes(ref.kind)) throw new BadRequestException(`${label}: invalid person kind`);
   const found =
     ref.kind === 'EMPLOYEE'
       ? await db.employee.findFirst({ where: { id: ref.id, tenantId, deletedAt: null, isActive: true }, select: { fullName: true } }).then((e) => e && e.fullName)

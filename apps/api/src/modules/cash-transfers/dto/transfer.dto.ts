@@ -25,9 +25,11 @@ export class CreateTransferDto {
   amount: number;
 
   /** Team → Financial Personnel: who moved the money */
+  @IsOptional()
   @IsString()
   @MaxLength(64)
-  transferredById: string;
+  @MinLength(1)
+  transferredById?: string;
 
   /** Business date — empty for now; a past date back-fills (no future dates) */
   @IsOptional()

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 /** Sanity cap on a register transaction/balance — guards against a typo (extra digit) */
@@ -12,16 +12,18 @@ export class PersonSelectionDto {
 
   @IsString()
   @MaxLength(64)
+  @MinLength(1)
   id: string;
 }
 
-/** Financial Personnel on a non-Cash account: what the person did + which registered person (Team → Financial Personnel) */
+/** Staff attribution only. Selection is restricted to Store Admin; other logins resolve their own identity. */
 export class PersonnelSelectionDto {
   @IsIn(['PAYMENT', 'RECEIVE', 'TRANSFER'])
   operation: 'PAYMENT' | 'RECEIVE' | 'TRANSFER';
 
   @IsString()
   @MaxLength(64)
+  @MinLength(1)
   personId: string;
 }
 
@@ -60,23 +62,29 @@ export class CreateCashTransactionDto {
   @IsDateString()
   date?: string;
 
-  /** The person who pays — required on the Cash account */
+  /** External payer for income. Outgoing requests may use this as a validated legacy staff actor alias. */
   @IsOptional()
   @ValidateNested()
   @Type(() => PersonSelectionDto)
   paidBy?: PersonSelectionDto;
 
-  /** The person who receives the money — required on the Cash account */
+  /** Actual recipient for expenses/withdrawals. Incoming requests may use this as a validated legacy staff actor alias. */
   @IsOptional()
   @ValidateNested()
   @Type(() => PersonSelectionDto)
   receivedBy?: PersonSelectionDto;
 
-  /** Optional, non-Cash accounts only: the Financial Personnel member who paid / received / transferred it */
+  /** Optional staff actor on any account; RECEIVE for income, PAYMENT for expense/withdrawal. */
   @IsOptional()
   @ValidateNested()
   @Type(() => PersonnelSelectionDto)
   personnel?: PersonnelSelectionDto;
+
+  /** Descriptive payment destination; never creates another money movement. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  destination?: string;
 }
 
 export class CashTransactionListQueryDto extends PaginationQueryDto {

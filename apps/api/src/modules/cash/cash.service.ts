@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { CashTransactionType, IncomePart, PaymentMethod, Prisma } from '@prisma/client';
 import {
   CASH_TRANSACTION_DIRECTION,
-  FINANCIAL_OPERATIONS_BY_PART,
   INCOME_PARTS,
   INCOME_PART_NAMES,
   storeMonthStartUtc,
   PAYMENT_METHOD_PART,
+  PERMISSIONS,
 } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
@@ -15,6 +15,7 @@ import { resolveSessionId } from '../work-sessions/session-link';
 import { getStoreTimeZone, storeDayFilter } from '../../common/store-time-zone';
 import { PersonRef, personColumns, resolvePerson } from './person-ref';
 import { effectiveOf } from './effective-amount';
+import { resolveFinancialActor } from '../../common/financial-actor';
 import { CashTransactionListQueryDto, CreateCashTransactionDto, IncomeSummaryQueryDto } from './dto/cash.dto';
 
 const DAY_MS = 86_400_000;
@@ -97,6 +98,7 @@ export class CashService {
       return {
         ...t,
         performedByName: performedBy.fullName,
+        createdByUserId: t.performedById,
         sessionCode: session?.code ?? null,
         sessionPerson: session?.personName ?? null,
         effectiveAmount: eff ? eff.amount : null,
@@ -115,19 +117,25 @@ export class CashService {
     dto: CreateCashTransactionDto,
   ) {
     const register = await this.getRegister(tenantId, registerId);
-    // Paid By and Who Is Paid: both required on the Cash account, and only there
-    if (register.part === 'CASH') {
-      if (!dto.paidBy) throw new BadRequestException('Paid By is required for a Cash transaction');
-      if (!dto.receivedBy) throw new BadRequestException('Who Is Paid is required for a Cash transaction');
-    } else if (dto.paidBy || dto.receivedBy) {
-      throw new BadRequestException('Paid By / Who Is Paid are only recorded on the Cash account');
-    }
-    if (dto.personnel && !FINANCIAL_OPERATIONS_BY_PART[register.part].includes(dto.personnel.operation)) {
-      // Cash: payer and recipient are the required Paid By / Who Is Paid; only Transferred By is extra
-      throw new BadRequestException(`${dto.personnel.operation.toLowerCase()} is not an operation of the ${INCOME_PART_NAMES[register.part]} account`);
-    }
-    return this.prisma.$transaction(async (tx) =>
-      recordCashTransaction(tx, {
+    const expectedOperation = dto.type === 'INCOME' ? 'RECEIVE' : 'PAYMENT';
+    if (dto.personnel && dto.personnel.operation !== expectedOperation) throw new BadRequestException('Financial actor operation does not match transaction type');
+    return this.prisma.$transaction(async (tx) => {
+      // Legacy clients put the staff actor on the paying (outgoing) or collecting (incoming) side.
+      // Validate that alias too; it must never bypass the dedicated personnel selection.
+      const legacyActor = dto.type === 'INCOME' ? dto.receivedBy : dto.paidBy;
+      if (legacyActor && legacyActor.kind !== 'PERSON') throw new BadRequestException('Staff actors must be Financial Personnel');
+      if (legacyActor && dto.personnel && legacyActor.id !== dto.personnel.personId) throw new BadRequestException('Conflicting financial actors');
+      const { actor, user, isAdmin } = await resolveFinancialActor(tx, tenantId, userId, dto.type, [registerId], dto.personnel?.personId ?? legacyActor?.id);
+      const sessionId = await resolveSessionId(tx, tenantId, userId, dto.sessionId);
+      if (sessionId) {
+        const canChooseSession = isAdmin || user.role.rolePermissions.some((rp) => rp.permission.key === PERMISSIONS.SESSIONS_READ);
+        const session = await tx.workSession.findFirst({ where: {
+          id: sessionId, tenantId, status: 'ACTIVE',
+          ...(!canChooseSession && { OR: [{ employee: { userId } }, { seller: { userId } }] }),
+        }, select: { id: true } });
+        if (!session) throw new ForbiddenException('This cash box is not authorized for this account');
+      }
+      return recordCashTransaction(tx, {
         tenantId,
         userId,
         registerId,
@@ -136,13 +144,15 @@ export class CashService {
         category: dto.category,
         note: dto.note,
         receiptUrl: dto.receiptUrl,
-        sessionId: await resolveSessionId(tx, tenantId, userId, dto.sessionId),
+        sessionId,
         createdAt: transactionDate(dto.date),
-        paidBy: dto.paidBy && (await resolvePerson(tx, tenantId, dto.paidBy, 'Paid By')),
-        receivedBy: dto.receivedBy && (await resolvePerson(tx, tenantId, dto.receivedBy, 'Who Is Paid')),
-        ...(dto.personnel && (await personnelSides(tx, tenantId, dto.personnel))),
-      }),
-    );
+        // External payer and actual recipient remain in the existing relations.
+        paidBy: dto.type === 'INCOME' && dto.paidBy ? await resolvePerson(tx, tenantId, dto.paidBy, 'External payer') : dto.type !== 'INCOME' ? actor : undefined,
+        receivedBy: dto.type !== 'INCOME' && dto.receivedBy ? await resolvePerson(tx, tenantId, dto.receivedBy, 'Recipient') : dto.type === 'INCOME' ? actor : undefined,
+        staffActor: actor,
+        destination: dto.destination?.trim() || undefined,
+      });
+    });
   }
 
   /**
@@ -266,16 +276,8 @@ interface CashTransactionInput {
   receivedBy?: PersonRef;
   /** Transfer attribution — a Financial Personnel member only */
   transferredBy?: PersonRef;
-}
-
-/** A Financial Personnel selection (active TeamPerson of this store) → the side it fills */
-async function personnelSides(
-  tx: Prisma.TransactionClient,
-  tenantId: string,
-  sel: { operation: 'PAYMENT' | 'RECEIVE' | 'TRANSFER'; personId: string },
-): Promise<Pick<CashTransactionInput, 'paidBy' | 'receivedBy' | 'transferredBy'>> {
-  const ref = await resolvePerson(tx, tenantId, { kind: 'PERSON', id: sel.personId }, 'Financial Personnel');
-  return sel.operation === 'PAYMENT' ? { paidBy: ref } : sel.operation === 'RECEIVE' ? { receivedBy: ref } : { transferredBy: ref };
+  staffActor?: PersonRef;
+  destination?: string;
 }
 
 /**
@@ -335,6 +337,8 @@ export async function recordCashTransaction(
       referenceId: input.referenceId,
       sessionId: input.sessionId ?? null,
       performedById: input.userId,
+      ...(input.staffActor && { staffActorPersonId: input.staffActor.id, staffActorName: input.staffActor.name }),
+      ...(input.destination && { destination: input.destination }),
       ...(input.createdAt && { createdAt: input.createdAt }),
       ...personColumns('paidBy', input.paidBy),
       ...personColumns('receivedBy', input.receivedBy),

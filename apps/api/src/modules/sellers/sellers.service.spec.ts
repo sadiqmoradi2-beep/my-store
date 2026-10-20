@@ -182,10 +182,14 @@ describe('SellersService.paySalary', () => {
   beforeEach(async () => {
     tx = {
       $queryRaw: jest.fn().mockResolvedValue([]) as never,
+      user: { findFirst: jest.fn().mockResolvedValue({ id: 'u1', tenantId: 't1', role: { key: 'ADMIN', isSystem: true, tenantId: null,
+        rolePermissions: ['employees.manage', 'sellers.manage', 'partners.manage'].map((key) => ({ permission: { key } })) } }) },
+      teamPerson: { findUnique: jest.fn().mockResolvedValue(null) },
       sellerSalaryPayment: {
         create: jest.fn().mockImplementation(({ data }) => ({ id: 'ssp1', ...data })),
       },
       cashRegister: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'reg1', branchId: 'b1' }]),
         findFirst: jest.fn().mockResolvedValue({ balance: D(1000), isActive: true }),
         update: jest.fn(),
       },

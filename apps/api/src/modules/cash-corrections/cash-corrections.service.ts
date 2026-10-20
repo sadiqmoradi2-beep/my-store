@@ -249,15 +249,11 @@ export class CashCorrectionsService {
         const balances = new Map(accounts.map((a) => [a.id, a.balance]));
         for (const leg of legs) {
           const account = accountOf(leg.registerId);
-          if (account.part === 'CASH' && leg.amount.isPositive() && account.id !== t.registerId && (!t.paidByKind || !t.receivedByKind)) {
-            throw new UnprocessableEntityException('Moving it to the Cash account needs Paid By / Who Is Paid. Record a new Cash transaction instead.');
-          }
           const start = balances.get(leg.registerId)!;
           const after = start.add(leg.amount.mul(direction));
           if (after.isNegative()) throw insufficient(account.name, start);
           balances.set(leg.registerId, after);
           await tx.cashRegister.update({ where: { id: leg.registerId }, data: { balance: after } });
-          const keepPeople = account.part === 'CASH';
           const entry = await tx.cashTransaction.create({
             data: {
               tenantId,
@@ -273,13 +269,14 @@ export class CashCorrectionsService {
               correctionEditId: editId,
               sessionId: t.sessionId,
               performedById: userId,
+              staffActorPersonId: t.staffActorPersonId,
+              staffActorName: t.staffActorName,
+              destination: t.destination,
               createdAt: wantDate,
-              ...(keepPeople && {
-                paidByEmployeeId: t.paidByEmployeeId, paidByPartnerId: t.paidByPartnerId, paidByPersonId: t.paidByPersonId,
-                paidByKind: t.paidByKind, paidByName: t.paidByName,
-                receivedByEmployeeId: t.receivedByEmployeeId, receivedByPartnerId: t.receivedByPartnerId, receivedByPersonId: t.receivedByPersonId,
-                receivedByKind: t.receivedByKind, receivedByName: t.receivedByName,
-              }),
+              paidByEmployeeId: t.paidByEmployeeId, paidByPartnerId: t.paidByPartnerId, paidByPersonId: t.paidByPersonId,
+              paidByKind: t.paidByKind, paidByName: t.paidByName,
+              receivedByEmployeeId: t.receivedByEmployeeId, receivedByPartnerId: t.receivedByPartnerId, receivedByPersonId: t.receivedByPersonId,
+              receivedByKind: t.receivedByKind, receivedByName: t.receivedByName,
             },
           });
           entryIds.push(entry.id);

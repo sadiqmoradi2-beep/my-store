@@ -66,21 +66,24 @@ export function AccessModal({ person, onClose }: { person: TeamPersonDto; onClos
     capabilities: account?.capabilities ?? [],
   });
   const [notice, setNotice] = useState<string | null>(null);
+  const [linkExisting, setLinkExisting] = useState(false);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['team-people'] });
 
   const save = useMutation({
     mutationFn: () =>
       account
         ? api.patch(`/team-people/${person.id}/account`, { capabilities: form.capabilities, branchId: form.branchId || undefined })
-        : api.post<{ inviteSent: boolean }>(`/team-people/${person.id}/account`, form),
+        : linkExisting
+          ? api.post(`/team-people/${person.id}/account/link`, { email: form.email })
+          : api.post<{ inviteSent: boolean }>(`/team-people/${person.id}/account`, form),
     onSuccess: (r) => {
       refresh();
-      if (!account) setNotice((r as { inviteSent?: boolean })?.inviteSent ? t('inviteSent') : t('inviteFailed'));
+      if (!account && !linkExisting) setNotice((r as { inviteSent?: boolean })?.inviteSent ? t('inviteSent') : t('inviteFailed'));
       else onClose();
     },
   });
   const toggleLogin = useMutation({
-    mutationFn: (enabled: boolean) => api.patch(`/team-people/${person.id}/account`, { loginEnabled: enabled, ...(enabled && { capabilities: form.capabilities }) }),
+    mutationFn: (enabled: boolean) => api.patch(`/team-people/${person.id}/account`, { loginEnabled: enabled, ...(enabled && account?.managed !== false && { capabilities: form.capabilities }) }),
     onSuccess: () => {
       refresh();
       onClose();
@@ -116,12 +119,15 @@ export function AccessModal({ person, onClose }: { person: TeamPersonDto; onClos
           ) : (
             <p className="rounded-lg bg-surface-3 p-2 text-xs text-ink-muted">{t('createAccountHint')}</p>
           )}
-          {(!account || account.loginEnabled) && <AccountFields value={form} onChange={setForm} withEmail={!account} />}
+          {!account && <label className="flex gap-2 text-sm"><input type="checkbox" checked={linkExisting} onChange={(e) => setLinkExisting(e.target.checked)} />{t('linkExisting')}</label>}
+          {!account && linkExisting ? <Field label={t('email')} hint={t('linkExistingHint')}><Input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+            : (!account || (account.loginEnabled && account.managed !== false)) && <AccountFields value={form} onChange={setForm} withEmail={!account} />}
+          {account?.managed === false && <p className="text-sm text-ink-muted">{t('linkedExistingHint')}</p>}
           <ErrorText error={save.error ?? toggleLogin.error ?? invite.error} />
           <div className="flex flex-wrap gap-2">
-            {(!account || account.loginEnabled) && (
+            {(!account || (account.loginEnabled && account.managed !== false)) && (
               <Button type="submit" loading={save.isPending}>
-                {account ? t('saveAccess') : t('createAccount')}
+                {account ? t('saveAccess') : linkExisting ? t('linkExisting') : t('createAccount')}
               </Button>
             )}
             {account && (

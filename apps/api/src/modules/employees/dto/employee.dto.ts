@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { PaymentAttributionDto } from '../../../common/dto/payment-attribution.dto';
 import {
   IsBoolean,
   IsDateString,
@@ -146,7 +147,7 @@ export class UpdateEmployeeDto {
   notes?: string;
 }
 
-export class PaySalaryDto {
+export class PaySalaryDto extends PaymentAttributionDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)

@@ -6,7 +6,9 @@ import { RequireModule } from '../../common/decorators/require-module.decorator'
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { TenantId } from '../../common/decorators/tenant-id.decorator';
 import { CurrentUser, RequestUser } from '../../common/decorators/current-user.decorator';
-import { CreatePersonAccountDto, CreateTeamPersonDto, UpdatePersonAccountDto, UpdateTeamPersonDto } from './dto/team-person.dto';
+import { CreatePersonAccountDto, CreateTeamPersonDto, LinkPersonUserDto, UpdatePersonAccountDto, UpdateTeamPersonDto } from './dto/team-person.dto';
+import { financialIdentity } from '../../common/financial-actor';
+import { PrismaService } from '../../prisma/prisma.service';
 import { TeamPersonAccountService } from './team-person-account.service';
 import { TeamPeopleService } from './team-people.service';
 
@@ -18,7 +20,22 @@ export class TeamPeopleController {
     private readonly service: TeamPeopleService,
     private readonly access: FinancialAccessService,
     private readonly accounts: TeamPersonAccountService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  @Get('actor-context')
+  @RequirePermissions(PERMISSIONS.CASH_READ)
+  async actorContext(@TenantId() tenantId: string, @CurrentUser() user: RequestUser) {
+    const { isAdmin, linked, user: operator } = await financialIdentity(this.prisma, tenantId, user.userId);
+    return { canSelectActor: isAdmin, actor: linked ? { id: linked.id, name: linked.displayName } : null, operatorName: operator.fullName, branchId: operator.branchId };
+  }
+
+  @Post(':id/account/link')
+  @RequireModule('employees')
+  @RequirePermissions(PERMISSIONS.EMPLOYEES_MANAGE)
+  linkAccount(@TenantId() tenantId: string, @CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: LinkPersonUserDto) {
+    return this.accounts.linkExisting(tenantId, user.userId, id, dto.email);
+  }
 
   /** Everyone selectable as Paid By / Who Is Paid — needed by whoever records Cash transactions */
   @Get('directory')
@@ -45,8 +62,8 @@ export class TeamPeopleController {
   @Patch(':id')
   @RequireModule('employees')
   @RequirePermissions(PERMISSIONS.EMPLOYEES_MANAGE)
-  update(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: UpdateTeamPersonDto) {
-    return this.service.update(tenantId, id, dto);
+  update(@TenantId() tenantId: string, @CurrentUser() user: RequestUser, @Param('id') id: string, @Body() dto: UpdateTeamPersonDto) {
+    return this.service.update(tenantId, id, dto, user.userId);
   }
 
   /** Real Store Admin only (checked in the service): hard delete when unreferenced, otherwise archive */

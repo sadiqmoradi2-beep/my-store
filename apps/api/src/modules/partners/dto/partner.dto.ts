@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { PaymentAttributionDto } from '../../../common/dto/payment-attribution.dto';
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { PARTNER_ENTRY_TYPES, PartnerEntryType } from '@my-store/shared';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
@@ -55,7 +56,7 @@ export class UpdatePartnerDto {
   isActive?: boolean;
 }
 
-export class CreateLedgerEntryDto {
+export class CreateLedgerEntryDto extends PaymentAttributionDto {
   @IsEnum(PARTNER_ENTRY_TYPES)
   type: PartnerEntryType;
 

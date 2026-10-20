@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { ConflictException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { FINANCIAL_PERSONNEL_CAPABILITIES, FINANCIAL_PERSONNEL_ROLE_PREFIX, PERMISSIONS } from '@my-store/shared';
@@ -25,9 +25,14 @@ async function setRolePermissions(tx: Tx, roleId: string, keys: string[]) {
 }
 
 /** Turn a login off at once: no session refresh, no permissions (the guard re-reads them), status INACTIVE */
-export async function disableLogin(tx: Tx, userId: string) {
-  const user = await tx.user.update({ where: { id: userId }, data: { status: 'INACTIVE', refreshTokenHash: null } });
-  await tx.rolePermission.deleteMany({ where: { roleId: user.roleId } });
+export async function disableLogin(tx: Tx, tenantId: string, userId: string) {
+  const user = await tx.user.findFirst({ where: { id: userId, tenantId }, include: { role: true, teamPerson: true } });
+  if (!user) throw new ForbiddenException('Linked login does not belong to this store');
+  await tx.user.update({ where: { id: userId }, data: { status: 'INACTIVE', refreshTokenHash: null } });
+  // Existing users may have a shared built-in/custom role. Never revoke everybody else's permissions.
+  if (user.role.tenantId === tenantId && user.teamPerson && user.role.key === roleKeyOf(user.teamPerson.id)) {
+    await tx.rolePermission.deleteMany({ where: { roleId: user.roleId } });
+  }
   return user.roleId;
 }
 
@@ -46,13 +51,40 @@ export class TeamPersonAccountService {
     private readonly permissionsCache: RolePermissionsCacheService,
   ) {}
 
+  /** Attach an existing login without changing role, branch, credentials or permissions. No reassignment. */
+  async linkExisting(tenantId: string, adminId: string, personId: string, email: string) {
+    await assertRealStoreAdmin(this.prisma, tenantId, adminId);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "TeamPerson" WHERE id = ${personId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      const person = await tx.teamPerson.findFirst({ where: { id: personId, tenantId, isActive: true, archivedAt: null } });
+      if (!person) throw new NotFoundException('Active Financial Personnel not found');
+      if (person.userId) throw new ConflictException('This person already has a login account');
+      const user = await tx.user.findFirst({
+        where: { tenantId, email: email.trim().toLowerCase(), status: 'ACTIVE', deletedAt: null }, include: { role: true, branch: true },
+      });
+      if (!user || user.role.key === 'ADMIN' || user.role.key === 'SUPER_ADMIN' || user.role.key.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX) ||
+          (user.role.tenantId !== null && user.role.tenantId !== tenantId) || !user.branch?.isActive || user.branch.tenantId !== tenantId) {
+        throw new ForbiddenException('Choose an active non-admin user with an active branch in this store');
+      }
+      if (await tx.teamPerson.findUnique({ where: { userId: user.id } })) throw new ConflictException('This login is already linked');
+      // The unique userId constraint also prevents simultaneous links to two different people.
+      try {
+        await tx.teamPerson.update({ where: { id: personId }, data: { userId: user.id } });
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException('This login is already linked');
+        throw e;
+      }
+      return { linked: true };
+    });
+  }
+
   /** Inside the caller's transaction: role + user + link, so a failure leaves no orphan person, user or role */
   async provision(tx: Tx, tenantId: string, person: { id: string; displayName: string }, dto: CreatePersonAccountDto) {
     const email = dto.email.trim().toLowerCase();
     if (await tx.user.findUnique({ where: { email } })) {
       throw new ConflictException('This email is already registered — use another email');
     }
-    const branch = await tx.branch.findFirst({ where: { id: dto.branchId, tenantId }, select: { id: true } });
+    const branch = await tx.branch.findFirst({ where: { id: dto.branchId, tenantId, isActive: true }, select: { id: true } });
     if (!branch) throw new NotFoundException('Branch not found');
     const capabilities = sanitizeCapabilities(dto.capabilities);
     const role = await tx.role.create({
@@ -94,6 +126,7 @@ export class TeamPersonAccountService {
       const person = await tx.teamPerson.findFirst({ where: { id: personId, tenantId } });
       if (!person) throw new NotFoundException('Person not found');
       if (person.archivedAt) throw new UnprocessableEntityException('This person was deleted (archived)');
+      if (!person.isActive) throw new UnprocessableEntityException('Activate this person first');
       if (person.userId) throw new ConflictException('This person already has a login account');
       return this.provision(tx, tenantId, person, dto);
     });
@@ -104,19 +137,24 @@ export class TeamPersonAccountService {
   async update(tenantId: string, adminId: string, personId: string, dto: UpdatePersonAccountDto) {
     await assertRealStoreAdmin(this.prisma, tenantId, adminId);
     const roleId = await this.prisma.$transaction(async (tx) => {
-      const person = await tx.teamPerson.findFirst({ where: { id: personId, tenantId }, include: { user: true } });
+      await tx.$queryRaw`SELECT id FROM "TeamPerson" WHERE id = ${personId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      const person = await tx.teamPerson.findFirst({ where: { id: personId, tenantId }, include: { user: { include: { role: true } } } });
       if (!person?.user) throw new NotFoundException('This person has no login account');
       if (person.archivedAt) throw new UnprocessableEntityException('This person was deleted (archived)');
       const user = person.user;
+      if (user.tenantId !== tenantId || user.deletedAt) throw new ForbiddenException('Invalid linked account');
+      const managed = user.role.tenantId === tenantId && user.role.key === roleKeyOf(personId);
+      if (!managed && (dto.capabilities !== undefined || dto.branchId !== undefined)) throw new ForbiddenException('Existing user permissions and branch are managed through Users');
+      if (dto.loginEnabled === true && !person.isActive) throw new UnprocessableEntityException('Activate this person first');
       if (dto.branchId) {
-        const branch = await tx.branch.findFirst({ where: { id: dto.branchId, tenantId }, select: { id: true } });
+        const branch = await tx.branch.findFirst({ where: { id: dto.branchId, tenantId, isActive: true }, select: { id: true } });
         if (!branch) throw new NotFoundException('Branch not found');
         await tx.user.update({ where: { id: user.id }, data: { branchId: branch.id } });
       }
-      if (dto.loginEnabled === false) return disableLogin(tx, user.id);
+      if (dto.loginEnabled === false) return disableLogin(tx, tenantId, user.id);
       const enabling = dto.loginEnabled === true && user.status !== 'ACTIVE';
       if (enabling) await tx.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } });
-      if (dto.capabilities !== undefined || enabling) {
+      if (managed && (dto.capabilities !== undefined || enabling)) {
         const current = dto.capabilities ?? (await this.capabilitiesOf(tx, user.roleId));
         if (user.status === 'ACTIVE' || enabling) {
           await setRolePermissions(tx, user.roleId, [PERMISSIONS.CASH_READ, ...sanitizeCapabilities(current)]);
@@ -134,6 +172,7 @@ export class TeamPersonAccountService {
     await assertRealStoreAdmin(this.prisma, tenantId, adminId);
     const person = await this.prisma.teamPerson.findFirst({ where: { id: personId, tenantId, archivedAt: null }, include: { user: true } });
     if (!person?.user) throw new NotFoundException('This person has no login account');
+    if (!person.isActive || person.user.tenantId !== tenantId || person.user.deletedAt) throw new ForbiddenException('Invalid linked account');
     if (person.user.status !== 'ACTIVE') throw new UnprocessableEntityException('Turn the login on first');
     return { inviteSent: await this.invite(person.user) };
   }

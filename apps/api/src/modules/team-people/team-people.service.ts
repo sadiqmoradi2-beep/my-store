@@ -32,7 +32,7 @@ export class TeamPeopleService {
           select: {
             id: true, email: true, status: true, branchId: true,
             branch: { select: { name: true } },
-            role: { select: { rolePermissions: { select: { permission: { select: { key: true } } } } } },
+            role: { select: { key: true, rolePermissions: { select: { permission: { select: { key: true } } } } } },
           },
         },
       },
@@ -50,12 +50,14 @@ export class TeamPeopleService {
               branchId: user.branchId,
               branchName: user.branch?.name ?? null,
               capabilities: user.role.rolePermissions.map((rp) => rp.permission.key).filter((k) => k !== 'cash.read'),
+              managed: user.role.key === `${FINANCIAL_PERSONNEL_ROLE_PREFIX}${p.id}`,
             }
           : null,
     }));
   }
 
   async create(tenantId: string, dto: CreateTeamPersonDto, userId?: string) {
+    await assertRealStoreAdmin(this.prisma, tenantId, userId ?? '');
     const displayName = clean(dto.displayName);
     await this.assertNameFree(tenantId, displayName);
     if (!dto.account) {
@@ -75,7 +77,8 @@ export class TeamPeopleService {
     return { ...safe, hasAccount: true, inviteSent: await this.accounts.invite(user) };
   }
 
-  async update(tenantId: string, id: string, dto: UpdateTeamPersonDto) {
+  async update(tenantId: string, id: string, dto: UpdateTeamPersonDto, userId?: string) {
+    await assertRealStoreAdmin(this.prisma, tenantId, userId ?? '');
     const person = await this.prisma.teamPerson.findFirst({ where: { id, tenantId } });
     if (!person) throw new NotFoundException('Person not found');
     if (person.archivedAt) throw new UnprocessableEntityException('This person was deleted (archived) and can no longer be changed');
@@ -85,6 +88,10 @@ export class TeamPeopleService {
     }
     const updated = await this.save(() =>
       this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "TeamPerson" WHERE id = ${id} AND "tenantId" = ${tenantId} FOR UPDATE`;
+        const current = await tx.teamPerson.findFirst({ where: { id, tenantId } });
+        if (!current) throw new NotFoundException('Person not found');
+        if (current.archivedAt) throw new UnprocessableEntityException('This person was deleted (archived)');
         const row = await tx.teamPerson.update({
           where: { id },
           data: {
@@ -93,9 +100,9 @@ export class TeamPeopleService {
             ...(dto.isActive !== undefined && { isActive: dto.isActive }),
           },
         });
-        if (person.userId && displayName) await tx.user.update({ where: { id: person.userId }, data: { fullName: displayName } });
+        // A linked existing User keeps its own name and role; this edits only the TeamPerson.
         // deactivating the person also turns the login off at once (turning it back on is a separate step)
-        const roleId = person.userId && dto.isActive === false ? await disableLogin(tx, person.userId) : null;
+        const roleId = current.userId && dto.isActive === false ? await disableLogin(tx, tenantId, current.userId) : null;
         return { row, roleId };
       }),
     );
@@ -112,12 +119,13 @@ export class TeamPeopleService {
     const [employees, partners, people] = await Promise.all([
       this.prisma.employee.findMany({ where: { tenantId, deletedAt: null, isActive: true }, select: { id: true, fullName: true, position: true }, orderBy: { fullName: 'asc' } }),
       this.prisma.partner.findMany({ where: { tenantId, deletedAt: null, isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      this.prisma.teamPerson.findMany({ where: { tenantId, isActive: true, archivedAt: null }, select: { id: true, displayName: true }, orderBy: { displayName: 'asc' } }),
+      this.prisma.teamPerson.findMany({ where: { tenantId, isActive: true, archivedAt: null }, select: { id: true, displayName: true, user: { select: { tenantId: true, status: true, deletedAt: true, branchId: true, branch: { select: { isActive: true } } } } }, orderBy: { displayName: 'asc' } }),
     ]);
     return [
       ...employees.map((e) => ({ kind: 'EMPLOYEE' as const, id: e.id, name: e.fullName, detail: e.position })),
       ...partners.map((p) => ({ kind: 'PARTNER' as const, id: p.id, name: p.name, detail: null })),
-      ...people.map((p) => ({ kind: 'PERSON' as const, id: p.id, name: p.displayName, detail: null })),
+      ...people.map((p) => ({ kind: 'PERSON' as const, id: p.id, name: p.displayName, detail: null, branchId: p.user?.branchId ?? null,
+        actorEligible: !p.user || (p.user.tenantId === tenantId && p.user.status === 'ACTIVE' && !p.user.deletedAt && !!p.user.branch?.isActive) })),
     ];
   }
 
@@ -132,10 +140,13 @@ export class TeamPeopleService {
       await tx.$queryRaw`SELECT id FROM "TeamPerson" WHERE id = ${id} AND "tenantId" = ${tenantId} FOR UPDATE`;
       const person = await tx.teamPerson.findFirst({ where: { id, tenantId } });
       if (!person) throw new NotFoundException('Person not found');
-      if (person.archivedAt) return { result: 'ARCHIVED' as const, references: null };
+      if (person.archivedAt) {
+        if (person.userId) roleIds.push(await disableLogin(tx, tenantId, person.userId));
+        return { result: 'ARCHIVED' as const, references: null };
+      }
       const [transactions, transfers, recorded] = await Promise.all([
         tx.cashTransaction.count({
-          where: { tenantId, OR: [{ paidByPersonId: id }, { receivedByPersonId: id }, { transferredByPersonId: id }] },
+          where: { tenantId, OR: [{ paidByPersonId: id }, { receivedByPersonId: id }, { transferredByPersonId: id }, { staffActorPersonId: id }] },
         }),
         tx.cashTransfer.count({ where: { tenantId, transferredByPersonId: id } }),
         // money movements recorded by this person's login: that user row is part of the history too
@@ -147,21 +158,12 @@ export class TeamPeopleService {
           : Promise.resolve(0),
       ]);
       const login = person.userId ? await tx.user.findUnique({ where: { id: person.userId }, include: { role: true } }) : null;
-      // only this person's own hidden-role login is ever removed — never a shared or admin account
-      const ownLogin = !!login && login.role.key.startsWith(FINANCIAL_PERSONNEL_ROLE_PREFIX) && login.role.tenantId === tenantId;
-      if (transactions + transfers + recorded > 0) {
+      if (transactions + transfers + recorded > 0 || person.userId) {
         await tx.teamPerson.update({ where: { id }, data: { archivedAt: new Date(), isActive: false } });
-        if (login) roleIds.push(await disableLogin(tx, login.id));
+        if (login) roleIds.push(await disableLogin(tx, tenantId, login.id));
         return { result: 'ARCHIVED' as const, references: { transactions, transfers, recorded } };
       }
       await tx.teamPerson.delete({ where: { id } });
-      if (login && ownLogin) {
-        await tx.user.delete({ where: { id: login.id } });
-        await tx.role.delete({ where: { id: login.roleId } });
-        roleIds.push(login.roleId);
-      } else if (login) {
-        roleIds.push(await disableLogin(tx, login.id));
-      }
       return { result: 'DELETED' as const, references: { transactions: 0, transfers: 0, recorded: 0 } };
     });
     for (const roleId of roleIds) this.permissionsCache.invalidate(roleId);

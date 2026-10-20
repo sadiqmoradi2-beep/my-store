@@ -229,6 +229,12 @@ export interface CashTransactionDto {
   sessionCode?: string | null;
   sessionPerson?: string | null;
   performedByName?: string;
+  performedById?: string;
+  /** Alias of the existing authenticated operator FK, not a second identity. */
+  createdByUserId?: string;
+  staffActorPersonId?: string | null;
+  staffActorName?: string | null;
+  destination?: string | null;
   /** Paid By / Who Is Paid — name snapshots stay readable after renames or deactivation */
   paidByKind?: PersonKind | null;
   paidByName?: string | null;
@@ -307,6 +313,8 @@ export type PersonKind = 'EMPLOYEE' | 'PARTNER' | 'PERSON';
 
 /** One selectable person for Paid By / Who Is Paid — kind says which table the id belongs to */
 export interface DirectoryPersonDto {
+  actorEligible?: boolean;
+  branchId?: string | null;
   kind: PersonKind;
   id: string;
   name: string;
@@ -330,6 +338,7 @@ export interface TeamPersonDto {
     branchId: string | null;
     branchName: string | null;
     capabilities: string[];
+    managed?: boolean;
   } | null;
 }
 

@@ -370,9 +370,11 @@ function RegisterTransactions({
                   <td className="p-3 text-ink-muted">{formatMoney(tx.balanceAfter, locale)}</td>
                   <td className="p-3 text-ink-muted">
                     {tx.referenceType === 'transfer' ? tx.note : (tx.category ?? tx.note ?? '—')}
+                    {tx.staffActorName && <span className="block text-xs text-ink-faint">{t('financialPersonnel')}: <span className="text-ink">{tx.staffActorName}</span></span>}
+                    {tx.destination && <span className="block text-xs text-ink-faint">{t('destination')}: <span className="text-ink">{tx.destination}</span></span>}
                     {(tx.paidByName || tx.receivedByName) && (
                       <span className="block text-xs text-ink-faint">
-                        {t('paidByPerson')}: <span className="text-ink">{tx.paidByName ?? '—'}</span> → {t('whoIsPaid')}:{' '}
+                        {t(tx.type === 'INCOME' ? 'externalPayer' : 'paidByPerson')}: <span className="text-ink">{tx.paidByName ?? '—'}</span> → {t(tx.type === 'INCOME' ? 'collectedBy' : 'whoIsPaid')}:{' '}
                         <span className="text-ink">{tx.receivedByName ?? '—'}</span>
                       </span>
                     )}

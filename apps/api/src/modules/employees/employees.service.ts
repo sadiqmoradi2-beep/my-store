@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { createSalaryPayment } from './salary-payment';
+import { resolveFinancialActor } from '../../common/financial-actor';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
 import { SellersService } from '../sellers/sellers.service';
@@ -302,6 +303,8 @@ export class EmployeesService {
         note: dto.note,
         receiptImageUrl: dto.receiptImageUrl,
         sessionId: dto.sessionId,
+        paidByPersonId: dto.paidByPersonId,
+        destination: dto.destination,
         at,
       }),
     );
@@ -328,6 +331,7 @@ export class EmployeesService {
         },
       });
       if (effectiveRegisterId) {
+        const { actor } = await resolveFinancialActor(tx, tenantId, userId, 'EMPLOYEE_PAYMENT', [effectiveRegisterId]);
         await recordCashTransaction(tx, {
           tenantId,
           userId,
@@ -339,6 +343,8 @@ export class EmployeesService {
           referenceType: 'salary',
           referenceId: payment.id,
           receivedBy: { kind: 'EMPLOYEE', id: employee.id, name: employee.fullName },
+          paidBy: actor,
+          staffActor: actor,
         });
       }
       return updated;

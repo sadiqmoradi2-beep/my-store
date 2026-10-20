@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PartnerEntryType } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
+import { resolveFinancialActor } from '../../common/financial-actor';
 import {
   CreateLedgerEntryDto,
   CreatePartnerDto,
@@ -120,6 +121,7 @@ export class PartnersService {
 
   /** Record a ledger entry — a WITHDRAWAL with a registerId also deducts the actual cash payout from that register */
   async addLedgerEntry(tenantId: string, userId: string, partnerId: string, dto: CreateLedgerEntryDto) {
+    if ((dto.paidByPersonId || dto.destination) && (dto.type !== 'WITHDRAWAL' || !dto.registerId)) throw new BadRequestException('Staff attribution requires a register withdrawal');
     const partner = await this.get(tenantId, partnerId);
     const amount = new Prisma.Decimal(dto.amount);
     const at = transactionDate(dto.date);
@@ -139,6 +141,7 @@ export class PartnersService {
         },
       });
       if (dto.type === 'WITHDRAWAL' && dto.registerId) {
+        const { actor } = await resolveFinancialActor(tx, tenantId, userId, 'PARTNER_PAYMENT', [dto.registerId], dto.paidByPersonId);
         await recordCashTransaction(tx, {
           tenantId,
           userId,
@@ -153,6 +156,9 @@ export class PartnersService {
           createdAt: at,
           // the partner is the recipient — Paid By is not recorded by this workflow
           receivedBy: { kind: 'PARTNER', id: partner.id, name: partner.name },
+          paidBy: actor,
+          staffActor: actor,
+          destination: dto.destination?.trim() || undefined,
         });
       }
       return entry;

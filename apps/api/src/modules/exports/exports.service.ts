@@ -160,6 +160,8 @@ export class ExportsService {
         { key: 'receivedBy', header: 'Who is paid', width: 20 },
         { key: 'transferredBy', header: 'Transferred by', width: 20 },
         { key: 'performedBy', header: 'User', width: 20 },
+        { key: 'staffActor', header: 'Financial Personnel actor', width: 24 },
+        { key: 'destination', header: 'Where paid', width: 24 },
       ],
       rows: transactions.map((t) => ({
         createdAt: t.createdAt,
@@ -173,6 +175,8 @@ export class ExportsService {
         receivedBy: t.receivedByName,
         transferredBy: t.transferredByName,
         performedBy: t.performedBy.fullName,
+        staffActor: t.staffActorName,
+        destination: t.destination,
       })),
     };
   }

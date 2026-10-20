@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
-import { PERMISSIONS, ROLES, type TeamPersonDto } from '@my-store/shared';
+import { PERMISSIONS, type TeamPersonDto } from '@my-store/shared';
+import { useFinancialActor } from '@/components/income/financial-actor-field';
 import { api } from '@/lib/api-client';
 import { Badge, Button, Card, ErrorText, Field, Input, Modal, Spinner } from '@/components/ui';
 import { useRequirePermission } from '@/hooks/use-require-permission';
@@ -16,11 +17,12 @@ export default function TeamPeoplePage() {
   const t = useTranslations('teamPeople');
   const tc = useTranslations('common');
   const allowed = useRequirePermission(PERMISSIONS.EMPLOYEES_READ);
-  const canManage = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.EMPLOYEES_MANAGE));
+  const isAdmin = useFinancialActor().data?.canSelectActor === true;
+  const hasManagePermission = !!useAuthStore((s) => s.user?.permissions?.includes(PERMISSIONS.EMPLOYEES_MANAGE));
+  const canManage = isAdmin && hasManagePermission;
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<TeamPersonDto | 'new' | null>(null);
   // Delete is shown to the Store Admin only; the server re-checks the real built-in Admin role
-  const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
   const [deleting, setDeleting] = useState<TeamPersonDto | null>(null);
   const [access, setAccess] = useState<TeamPersonDto | null>(null);
 
@@ -85,7 +87,7 @@ export default function TeamPeoplePage() {
                           </span>
                           <Badge tone={p.account.loginEnabled ? 'DELIVERED' : 'neutral'}>{p.account.loginEnabled ? t('loginOn') : t('loginOff')}</Badge>{' '}
                           {p.account.branchName && <span>{p.account.branchName} · </span>}
-                          {p.account.capabilities.length
+                          {p.account.managed === false ? t('existingRolePermissions') : p.account.capabilities.length
                             ? p.account.capabilities.map((c) => t(`caps.${c.split('.')[1]}`)).join(', ')
                             : t('noCapabilities')}
                         </>
@@ -201,7 +203,7 @@ function PersonModal({ person, onClose }: { person: TeamPersonDto | null; onClos
   const [displayName, setDisplayName] = useState(person?.displayName ?? '');
   const [notes, setNotes] = useState(person?.notes ?? '');
   // "Create Account" (Store Admin only): a login through the existing email invite, no password shown to anyone
-  const isAdmin = useAuthStore((s) => s.user?.roleKey === ROLES.ADMIN);
+  const isAdmin = useFinancialActor().data?.canSelectActor === true;
   const [createAccount, setCreateAccount] = useState(false);
   const [account, setAccount] = useState<AccountForm>({ email: '', branchId: '', capabilities: [] });
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);

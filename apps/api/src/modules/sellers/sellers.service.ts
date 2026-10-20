@@ -14,6 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta, PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { recordCashTransaction, transactionDate } from '../cash/cash.service';
 import { resolveSessionId } from '../work-sessions/session-link';
+import { resolveFinancialActor } from '../../common/financial-actor';
 import { assertPlanLimit } from '../subscriptions/subscriptions.service';
 import { AuthService } from '../auth/auth.service';
 import { CreateSellerDto, PaySellerSalaryDto, UpdateSellerDto } from './dto/seller.dto';
@@ -157,6 +158,7 @@ export class SellersService {
 
   /** Pay a seller — a fixed salary, or a commission payout for a commission seller */
   async paySalary(tenantId: string, userId: string, id: string, dto: PaySellerSalaryDto) {
+    if ((dto.paidByPersonId || dto.destination) && !dto.registerId) throw new BadRequestException('Staff attribution requires a register payment');
     const profile = await this.get(tenantId, id);
     // An hourly seller has no salary or commission to pay here — and an hourly employee may only be
     // paid here for commission actually earned (a commission profile), never a typed-in salary
@@ -185,6 +187,7 @@ export class SellersService {
         },
       });
       if (dto.registerId) {
+        const { actor } = await resolveFinancialActor(tx, tenantId, userId, 'SELLER_PAYMENT', [dto.registerId], dto.paidByPersonId);
         await recordCashTransaction(tx, {
           tenantId,
           userId,
@@ -192,6 +195,9 @@ export class SellersService {
           type: 'EXPENSE',
           amount,
           category: 'Seller salary',
+          paidBy: actor,
+          staffActor: actor,
+          destination: dto.destination?.trim() || undefined,
           note: `Seller salary — ${dto.period}`,
           referenceType: 'seller_salary',
           referenceId: payment.id,

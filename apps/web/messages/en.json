@@ -227,6 +227,9 @@
     "warehouseOwner": "Warehouse owner name (optional)"
   },
   "cash": {
+    "externalPayer": "External payer (optional)",
+    "collectedBy": "Collected by",
+    "destination": "Destination / Where paid (optional)",
     "title": "Income",
     "transactionsOf": "Transactions of {name}",
     "newTransaction": "New transaction",
@@ -1386,6 +1389,10 @@
     "paidDone": "Paid {amount} USDT. The hours are now locked."
   },
   "teamPeople": {
+    "linkExisting": "Link existing user",
+    "linkExistingHint": "Enter the existing user's email. Their role, branch and permissions will stay the same. This link cannot be reassigned here.",
+    "linkedExistingHint": "Existing user linked. Manage their role and branch in Users; this link grants no permissions.",
+    "existingRolePermissions": "Existing role permissions preserved",
     "title": "Financial Personnel",
     "hint": "People responsible for paying, receiving or transferring money who are neither employees nor partners. They can be chosen on Income transactions. They get no payroll; a login is optional and only the Store Admin can create it.",
     "add": "Add person",

@@ -2,6 +2,12 @@ import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { FINANCIAL_PERSONNEL_CAPABILITIES } from '@my-store/shared';
 
+export class LinkPersonUserDto {
+  @IsEmail()
+  @MaxLength(200)
+  email: string;
+}
+
 /** Optional login for a Financial Personnel member — Store Admin only; the person sets a password via the emailed invite */
 export class CreatePersonAccountDto {
   @IsEmail()

@@ -616,6 +616,11 @@ model CashTransaction {
   // Transfer: the Financial Personnel member who sent / moved the money (attribution only, never moves money)
   transferredByPersonId String?
   transferredByName     String?
+  // Staff actor is separate from external payer/recipient; performedById remains the authenticated operator.
+  staffActorPersonId    String?
+  staffActorName        String?
+  destination           String?
+  staffActorPerson      TeamPerson? @relation("CashTxStaffActor", fields: [staffActorPersonId], references: [id], onDelete: SetNull)
 
   register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
   performedBy User         @relation(fields: [performedById], references: [id])
@@ -642,6 +647,7 @@ model CashTransaction {
   @@index([receivedByPartnerId])
   @@index([receivedByPersonId])
   @@index([transferredByPersonId])
+  @@index([staffActorPersonId])
 }
 
 /// A registered person who is neither an employee nor a partner (Team → People). No payroll, no login.
@@ -763,6 +769,7 @@ model TeamPerson {
   receivedTransactions CashTransaction[] @relation("CashTxReceivedByPerson")
   transferredTransactions CashTransaction[] @relation("CashTxTransferredByPerson")
   cashTransfers           CashTransfer[]    @relation("CashTransferBy")
+  actorTransactions       CashTransaction[] @relation("CashTxStaffActor")
 
   @@index([tenantId, isActive])
 }

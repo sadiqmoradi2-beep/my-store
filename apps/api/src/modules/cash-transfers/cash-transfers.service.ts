@@ -4,8 +4,10 @@ import { TRANSFER_REFERENCE_TYPE } from '@my-store/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginationMeta } from '../../common/dto/pagination-query.dto';
 import { lockRegisters, recordCashTransaction, transactionDate } from '../cash/cash.service';
-import { PersonRef, resolvePerson } from '../cash/person-ref';
+import { PersonRef } from '../cash/person-ref';
 import { CreateTransferDto, ReverseTransferDto, TransferListQueryDto } from './dto/transfer.dto';
+import { resolveFinancialActor } from '../../common/financial-actor';
+import { assertRealStoreAdmin } from '../../common/store-admin';
 
 type Tx = Prisma.TransactionClient;
 
@@ -50,17 +52,21 @@ export class CashTransfersService {
   async create(tenantId: string, userId: string, dto: CreateTransferDto) {
     if (dto.fromRegisterId === dto.toRegisterId) throw new BadRequestException('Source and destination accounts must be different');
     const when = transactionDate(dto.date);
-    return this.idempotent(tenantId, dto.requestId, () =>
+    return this.idempotent(tenantId, userId, dto.requestId, () =>
       this.prisma.$transaction(async (tx) => {
+        const { actor: person, user } = await resolveFinancialActor(tx, tenantId, userId, 'TRANSFER', [dto.fromRegisterId, dto.toRegisterId], dto.transferredById);
         const replay = await tx.cashTransfer.findUnique({ where: { tenantId_requestId: { tenantId, requestId: dto.requestId } } });
-        if (replay) return { replayed: true, transfer: replay };
-        const person = await resolvePerson(tx, tenantId, { kind: 'PERSON', id: dto.transferredById }, 'Transferred By');
+        if (replay) {
+          if (replay.performedById !== userId) throw new ConflictException('Request key belongs to another operator');
+          return { replayed: true, transfer: replay };
+        }
         const transfer = await this.move(tx, tenantId, userId, {
           requestId: dto.requestId,
           fromRegisterId: dto.fromRegisterId,
           toRegisterId: dto.toRegisterId,
           amount: new Prisma.Decimal(dto.amount),
           person,
+          personName: person?.name ?? user.fullName,
           note: dto.note?.trim() || null,
           createdAt: when,
         });
@@ -71,7 +77,8 @@ export class CashTransfersService {
 
   /** The controlled correction: one reversal per transfer (destination → source, same amount), never an edit */
   async reverse(tenantId: string, userId: string, id: string, dto: ReverseTransferDto) {
-    return this.idempotent(tenantId, dto.requestId, () =>
+    await assertRealStoreAdmin(this.prisma, tenantId, userId);
+    return this.idempotent(tenantId, userId, dto.requestId, () =>
       this.prisma.$transaction(async (tx) => {
         const replay = await tx.cashTransfer.findUnique({ where: { tenantId_requestId: { tenantId, requestId: dto.requestId } } });
         if (replay) return { replayed: true, transfer: replay };
@@ -156,6 +163,7 @@ export class CashTransfersService {
         sessionId: null, // the main box of each account — no work session's cash changes
         createdAt: transfer.createdAt,
         transferredBy: input.person,
+        staffActor: input.person,
       });
     const tail = input.note ? ` — ${input.note}` : '';
     await leg(from.id, 'TRANSFER_OUT', `Transfer to ${to.name}${tail}`);
@@ -164,13 +172,13 @@ export class CashTransfersService {
   }
 
   /** Same request key twice at the same moment: the second hits the unique key and returns the first result */
-  private async idempotent<T>(tenantId: string, requestId: string, op: () => Promise<T>) {
+  private async idempotent<T>(tenantId: string, userId: string, requestId: string, op: () => Promise<T>) {
     try {
       return await op();
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         const done = await this.prisma.cashTransfer.findUnique({ where: { tenantId_requestId: { tenantId, requestId } } });
-        if (done) return { replayed: true, transfer: done };
+        if (done?.performedById === userId) return { replayed: true, transfer: done };
         throw new ConflictException('Duplicate request');
       }
       throw e;
