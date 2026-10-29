@@ -69,7 +69,8 @@ function todayDate() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function TransactionModal({ register, onClose }: { register: CashRegisterDto; onClose: () => void }) {
+/** The New Transaction form for one main box (chosen in MainBoxTransactionModal); all postings go to `register` only */
+export function TransactionForm({ register, mainBoxField, onClose }: { register: CashRegisterDto; mainBoxField: React.ReactNode; onClose: () => void }) {
   const t = useTranslations('cash');
   const tc = useTranslations('common');
   const te = useTranslations('employees');
@@ -269,14 +270,16 @@ export function TransactionModal({ register, onClose }: { register: CashRegister
 
   if (isTransfer) {
     return (
-      <Modal open title={`${t('transfer.title')}: ${t(`parts.${register.part}`)}`} onClose={onClose}>
+      <Modal open title={t('transfer.title')} onClose={onClose}>
+        {mainBoxField}
         <TransferForm register={register} typeField={typeField} onClose={onClose} />
       </Modal>
     );
   }
 
   return (
-    <Modal open title={`${t('newTransaction')}: ${t(`parts.${register.part}`)}`} onClose={onClose}>
+    <Modal open title={t('newTransaction')} onClose={onClose}>
+      {mainBoxField}
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           {typeField}

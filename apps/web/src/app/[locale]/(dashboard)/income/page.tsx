@@ -24,7 +24,7 @@ import { ExportButtons } from '@/components/export-buttons';
 import { useAuthStore } from '@/stores/auth-store';
 import { SalesList } from '@/components/income/sales-list';
 import { SessionReport } from '@/components/sessions/session-report';
-import { TransactionModal } from '@/components/income/transaction-modal';
+import { TransactionModal } from '@/components/income/main-box-modal';
 import { TransactionEditModal, TransactionHistoryModal } from '@/components/income/transaction-edit-modal';
 import { useRequirePermission } from '@/hooks/use-require-permission';
 
@@ -246,7 +246,7 @@ export default function IncomePage() {
 
       {user?.permissions?.includes(PERMISSIONS.SALES_READ) && <SalesList from={from} to={to} />}
 
-      {newTx && selected && <TransactionModal register={selected} onClose={() => setNewTx(false)} />}
+      {newTx && <TransactionModal onClose={() => setNewTx(false)} />}
     </div>
   );
 }

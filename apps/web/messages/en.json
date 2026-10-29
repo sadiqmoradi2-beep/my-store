@@ -312,7 +312,7 @@
     "paidBy": "Paid by",
     "receivedBy": "Received by",
     "paidByHint": "The main cash box, or the cash box of a person with an open work session — a session's expenses reduce its cash box",
-    "mainBox": "Main cash box",
+    "mainBox": "Main Box",
     "paidByColumn": "Paid by",
     "sessionsTitle": "Work sessions (seller / employee / partner cash boxes)",
     "pastDateHint": "Recorded on this past date — it shows in reports for that day",
@@ -399,7 +399,9 @@
       "reversePrompt": "Reverse this whole transfer (both accounts). Reason:"
     },
     "retired": "Retired",
-    "retiredHint": "Card and EBT are retired: this balance and its history stay as they are. Nothing new can be recorded here — move a remaining balance with an internal transfer if needed."
+    "retiredHint": "Card and EBT are retired: this balance and its history stay as they are. Nothing new can be recorded here — move a remaining balance with an internal transfer if needed.",
+    "selectMainBox": "Select main box",
+    "mainBoxRequired": "Choose the main box this transaction is recorded on: Cash, System or Zelle."
   },
   "pos": {
     "title": "My Store",
