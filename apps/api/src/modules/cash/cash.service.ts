@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { CashTransactionType, IncomePart, PaymentMethod, Prisma } from '@prisma/client';
 import {
+  ACTIVE_INCOME_PARTS,
   CASH_TRANSACTION_DIRECTION,
+  isRetiredPart,
   INCOME_PARTS,
   INCOME_PART_NAMES,
   storeMonthStartUtc,
@@ -33,7 +35,8 @@ export class CashService {
       include: { branch: { select: { name: true } } },
       orderBy: [{ branchId: 'asc' }, { part: 'asc' }, { isDefault: 'desc' }, { createdAt: 'asc' }],
     });
-    return rows.map(({ branch, ...register }) => ({ ...register, branchName: branch.name }));
+    // retired Card / EBT accounts stay listed (history, balances) but are flagged so no selector offers them
+    return rows.map(({ branch, ...register }) => ({ ...register, branchName: branch.name, retired: isRetiredPart(register.part) }));
   }
 
   private async ensureRegisters(tenantId: string) {
@@ -42,7 +45,8 @@ export class CashService {
       select: { id: true },
     });
     for (const branch of branches) {
-      for (const part of INCOME_PARTS) {
+      // only the main boxes in use — no new Card / EBT accounts for existing or new branches
+      for (const part of ACTIVE_INCOME_PARTS) {
         await findIncomeRegister(this.prisma, tenantId, branch.id, part);
       }
     }
@@ -202,6 +206,7 @@ export class CashService {
     const parts = INCOME_PARTS.map((part) => ({
       part,
       name: INCOME_PART_NAMES[part],
+      retired: isRetiredPart(part),
       balance: zero(),
       income: zero(),
       expenses: zero(),
@@ -307,10 +312,15 @@ export async function recordCashTransaction(
   await lockRegisters(tx, input.tenantId, [input.registerId]);
   const register = await tx.cashRegister.findFirst({
     where: { id: input.registerId, tenantId: input.tenantId },
-    select: { balance: true, isActive: true },
+    select: { balance: true, isActive: true, part: true },
   });
   if (!register) throw new NotFoundException('Register not found');
   if (!register.isActive) throw new UnprocessableEntityException('Register is inactive');
+  // Card and EBT are retired: nothing new lands on them. Only money leaving them through an internal transfer is
+  // allowed, so a remaining balance can be moved out deliberately (and audited) — never automatically.
+  if (isRetiredPart(register.part) && input.type !== 'TRANSFER_OUT') {
+    throw new UnprocessableEntityException('Card and EBT accounts are retired — use Cash, System or Zelle');
+  }
 
   const direction = CASH_TRANSACTION_DIRECTION[input.type];
   const balanceAfter = register.balance.add(input.amount.mul(direction));
@@ -363,6 +373,7 @@ export async function findIncomeRegister(
   branchId: string,
   part: IncomePart,
 ) {
+  if (isRetiredPart(part)) throw new UnprocessableEntityException('Card and EBT accounts are retired — use Cash, System or Zelle');
   const find = () =>
     db.cashRegister.findFirst({
       where: { tenantId, branchId, part, isActive: true },

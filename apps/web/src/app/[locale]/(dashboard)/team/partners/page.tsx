@@ -322,7 +322,7 @@ function LedgerEntryModal({ partner, onClose }: { partner: PartnerDto; onClose: 
           <Field label={t('register')} hint={t('registerHint')}>
             <Select value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
               <option value="">{t('noRegister')}</option>
-              {registers?.map((register) => (
+              {registers?.filter((x) => !x.retired).map((register) => (
                 <option key={register.id} value={register.id}>
                   {register.name} — {register.branchName}
                 </option>

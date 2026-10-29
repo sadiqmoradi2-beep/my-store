@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useState } from 'react';
 import {
-  INCOME_PARTS,
+  ACTIVE_INCOME_PARTS,
   sessionResult,
   type IncomePart,
   type Locale,
@@ -93,7 +93,7 @@ export function HarvestModal({
           </Field>
           <Field label={t('method')} hint={t('methodHint')}>
             <Select value={method} onChange={(e) => setMethod(e.target.value as IncomePart)}>
-              {INCOME_PARTS.map((p) => (
+              {ACTIVE_INCOME_PARTS.map((p) => (
                 <option key={p} value={p}>
                   {t(`parts.${p}`)}
                 </option>

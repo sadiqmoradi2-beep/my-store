@@ -12,7 +12,7 @@ import {
   MinLength,
 } from 'class-validator';
 import {
-  INCOME_PARTS,
+  ACTIVE_INCOME_PARTS,
   IncomePart,
   SESSION_ROLES,
   SESSION_STATUSES,
@@ -83,9 +83,9 @@ export class CreateHarvestDto {
   @Max(MAX_AMOUNT)
   amount: number;
 
-  /** How the money was handed over: cash from the box, or a Zelle / EBT transfer */
+  /** How the money was handed over: cash from the box, or a System / Zelle transfer (Card / EBT are retired) */
   @IsOptional()
-  @IsEnum(INCOME_PARTS)
+  @IsEnum(ACTIVE_INCOME_PARTS)
   method?: IncomePart;
 
   @IsOptional()

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { CashTransactionType, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { isRetiredPart } from '@my-store/shared';
 import {
   CASH_TRANSACTION_DIRECTION,
   CORRECTABLE_TRANSACTION_TYPES,
@@ -81,7 +82,7 @@ export class CashCorrectionsService {
       where: { tenantId, branchId: t.register.branchId, isActive: true },
       select: { id: true, name: true, part: true },
       orderBy: [{ part: 'asc' }, { isDefault: 'desc' }, { createdAt: 'asc' }],
-    });
+    }).then((rows) => rows.filter((a) => !isRetiredPart(a.part) || a.id === current.registerId));
     return {
       editable: !blockedReason,
       mode: blockedReason ? null : deadline && deadline.getTime() > Date.now() ? 'WINDOW' : 'EXCEPTION',
@@ -209,6 +210,10 @@ export class CashCorrectionsService {
     const target = accountOf(wantRegisterId);
     if (target.branchId !== t.register.branchId) throw new UnprocessableEntityException('The account must belong to the same branch');
     if (!target.isActive) throw new UnprocessableEntityException('That account is inactive');
+    // a correction may fix history on a retired Card / EBT account, but never move money onto one
+    if (wantRegisterId !== before.registerId && isRetiredPart(target.part)) {
+      throw new UnprocessableEntityException('Card and EBT accounts are retired — choose Cash, System or Zelle');
+    }
     if (moneyChanged) for (const a of accounts) await assertReconciles(tx, a);
 
     // 5. session: only an active one; the date must stay inside it

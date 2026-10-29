@@ -33,7 +33,7 @@ export function TransferForm({ register, typeField, onClose }: { register: CashR
   const [note, setNote] = useState('');
   const { data: registers } = useQuery({ queryKey: ['cash-registers'], queryFn: () => api.get<CashRegisterDto[]>('/cash-registers') });
   const { data: directory } = useQuery({ queryKey: ['people-directory'], queryFn: () => api.get<DirectoryPersonDto[]>('/team-people/directory') });
-  const destinations = (registers ?? []).filter((r) => r.id !== register.id && r.isActive && (!actorContext.data?.actor || r.branchId === actorContext.data.branchId));
+  const destinations = (registers ?? []).filter((r) => r.id !== register.id && r.isActive && !r.retired && (!actorContext.data?.actor || r.branchId === actorContext.data.branchId));
   const isToday = date === todayDate();
 
   const save = useMutation({

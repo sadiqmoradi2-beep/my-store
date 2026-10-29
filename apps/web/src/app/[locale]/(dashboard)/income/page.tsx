@@ -5,6 +5,7 @@ import { CreditCard, HandCoins, History, Landmark, Pencil, Plus, ReceiptText, Un
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
+  ACTIVE_INCOME_PARTS,
   CORRECTABLE_TRANSACTION_TYPES,
   FINANCIAL_PERSONNEL_CAPABILITIES,
   PERMISSIONS,
@@ -47,6 +48,12 @@ const PART_ICONS: Record<IncomePart, typeof Wallet> = {
 };
 
 const RANGES = ['today', 'week', 'month', 'all'] as const;
+
+/** Display order: Cash, System, Zelle, then any retired account */
+const partOrder = (part: IncomePart) => {
+  const i = (ACTIVE_INCOME_PARTS as readonly string[]).indexOf(part);
+  return i === -1 ? 99 : i;
+};
 type RangeKey = (typeof RANGES)[number];
 
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -157,7 +164,11 @@ export default function IncomePage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-              {summary.parts.map((part) => {
+              {summary.parts
+                // Cash, System, Zelle first; a retired Card / EBT only while it still has a balance or activity
+                .filter((part) => !part.retired || [part.balance, part.income, part.expenses, part.transfersIn ?? 0, part.transfersOut ?? 0].some((v) => Number(v) !== 0))
+                .sort((a, b) => partOrder(a.part) - partOrder(b.part))
+                .map((part) => {
                 const Icon = PART_ICONS[part.part];
                 const active = selectedPart === part.part;
                 return (
@@ -180,6 +191,7 @@ export default function IncomePage() {
                     <div className="flex items-center gap-2">
                       <Icon className="h-4 w-4 text-primary-600" aria-hidden />
                       <span className="font-bold text-ink">{t(`parts.${part.part}`)}</span>
+                      {part.retired && <Badge tone="neutral">{t('retired')}</Badge>}
                     </div>
                     <p className="mt-2 text-xs text-ink-muted">{t('balance')}</p>
                     <p className="text-lg font-black text-ink">{money(part.balance)}</p>
@@ -307,7 +319,8 @@ function RegisterTransactions({
               </option>
             ))}
           </Select>
-          {canCreate && (
+          {register.retired && <span className="text-xs text-ink-faint">{t('retiredHint')}</span>}
+          {canCreate && !register.retired && (
           <Button variant="outline" onClick={onNewTx}>
             <Plus className="h-4 w-4" aria-hidden />
             {t('newTransaction')}

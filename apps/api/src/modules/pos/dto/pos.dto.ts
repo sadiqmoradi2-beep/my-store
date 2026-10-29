@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
-import { PAYMENT_METHODS, PaymentMethod } from '@my-store/shared';
+import { ACTIVE_PAYMENT_METHODS, PaymentMethod } from '@my-store/shared';
 
 /** Sanity cap on a register transaction — guards against a typo (extra digit) */
 const MAX_CASH_AMOUNT = 10_000_000_000;
@@ -10,7 +10,8 @@ export class PosSaleDto {
   cartId: string;
 
   /** Cash / Card / EBT / Zelle / Debit Card — all recorded as immediate income */
-  @IsEnum(PAYMENT_METHODS)
+  /** Card and EBT are retired — new sales use Cash, System or Zelle */
+  @IsEnum(ACTIVE_PAYMENT_METHODS)
   paymentMethod: PaymentMethod;
 
   /** CASH only: money handed over by the customer; empty = exactly the sale amount */

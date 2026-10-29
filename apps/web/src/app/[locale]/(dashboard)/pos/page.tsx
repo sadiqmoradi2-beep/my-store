@@ -5,7 +5,7 @@ import { Banknote, CreditCard, HandCoins, Landmark, Minus, Pencil, Plus, Receipt
 import { useLocale, useTranslations } from 'next-intl';
 import { FormEvent, useRef, useState } from 'react';
 import {
-  PAYMENT_METHODS,
+  ACTIVE_PAYMENT_METHODS,
   type BranchDto,
   type CartDto,
   type Locale,
@@ -163,7 +163,7 @@ export default function PosPage() {
               <div className="mt-4 space-y-3 border-t border-line pt-4">
                 <Field label={t('paymentMethod')}>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                    {PAYMENT_METHODS.map((m) => {
+                    {ACTIVE_PAYMENT_METHODS.map((m) => {
                       const Icon = METHOD_ICONS[m];
                       return (
                         <button

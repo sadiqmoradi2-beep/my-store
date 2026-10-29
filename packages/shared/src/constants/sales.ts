@@ -9,15 +9,21 @@ export const PAYMENT_METHOD_NAMES: Record<PaymentMethod, string> = {
   CARD: 'Card',
   EBT: 'EBT',
   ZELLE: 'Zelle',
-  DEBIT_CARD: 'Debit Card',
+  // shown as "System" — the internal code stays DEBIT_CARD so every existing account, sale and link is unchanged
+  DEBIT_CARD: 'System',
 };
+
+/** Card and EBT are retired: kept for history, never offered for or accepted on new activity */
+export const RETIRED_PAYMENT_METHODS = ['CARD', 'EBT'] as const;
+/** What a new sale can be paid with */
+export const ACTIVE_PAYMENT_METHODS = ['CASH', 'DEBIT_CARD', 'ZELLE'] as const;
 
 export const PAYMENT_METHOD_HINTS: Record<PaymentMethod, string> = {
   CASH: 'Cash payment',
   CARD: 'Card payment — the money goes to Income → Card',
   EBT: 'Government assistance (Electronic Benefit Transfer)',
   ZELLE: 'Bank transfer payment',
-  DEBIT_CARD: 'Card payment — the money goes to Income → Debit Card',
+  DEBIT_CARD: 'System payment — the money goes to Income → System',
 };
 
 /** The parts of Income — every payment received lands in one of them */
@@ -29,8 +35,14 @@ export const INCOME_PART_NAMES: Record<IncomePart, string> = {
   CARD: 'Card',
   EBT: 'EBT',
   ZELLE: 'Zelle',
-  DEBIT_CARD: 'Debit Card',
+  DEBIT_CARD: 'System',
 };
+
+/** Retired accounts: their balances and history stay intact and visible, but nothing new is posted to them */
+export const RETIRED_INCOME_PARTS = ['CARD', 'EBT'] as const;
+/** The main boxes in use, in display order: Cash, System (formerly Debit Card), Zelle */
+export const ACTIVE_INCOME_PARTS = ['CASH', 'DEBIT_CARD', 'ZELLE'] as const;
+export const isRetiredPart = (part: string) => (RETIRED_INCOME_PARTS as readonly string[]).includes(part);
 
 /** Which Income part receives the money of each payment method — each has its own bucket. */
 export const PAYMENT_METHOD_PART: Record<PaymentMethod, IncomePart> = {

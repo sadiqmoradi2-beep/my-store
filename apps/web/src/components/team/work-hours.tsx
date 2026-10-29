@@ -288,7 +288,7 @@ function HourlyPay({ employeeId, range, onPaid }: { employeeId: string; range: {
             <Field label={t('payFrom')} hint={t('payFromHint')}>
               <Select value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
                 <option value="">{t('noCashEffect')}</option>
-                {registers?.map((r) => (
+                {registers?.filter((x) => !x.retired).map((r) => (
                   <option key={r.id} value={r.id}>
                     {INCOME_PART_NAMES[r.part]} — {r.branchName}
                   </option>

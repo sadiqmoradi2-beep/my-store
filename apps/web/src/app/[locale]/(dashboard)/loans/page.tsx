@@ -414,7 +414,7 @@ function DebtModal({ onClose }: { onClose: () => void }) {
           <Field label={t('receivedInto')} hint={t('receivedIntoHint')}>
             <Select value={form.receivedRegisterId} onChange={(e) => set({ receivedRegisterId: e.target.value })}>
               <option value="">{t('notReceivedYet')}</option>
-              {registers?.map((register) => (
+              {registers?.filter((x) => !x.retired).map((register) => (
                 <option key={register.id} value={register.id}>
                   {INCOME_PART_NAMES[register.part]} — {register.branchName}
                 </option>
@@ -615,7 +615,7 @@ function PayDebtModal({ debt, onClose }: { debt: DebtDto; onClose: () => void })
           hint={debt.direction === 'RECEIVABLE' ? t('registerHintIn') : t('registerHintOut')}
         >
           <Select required value={registerId} onChange={(e) => setRegisterChoice(e.target.value)}>
-            {registers?.map((register) => (
+            {registers?.filter((x) => !x.retired).map((register) => (
               <option key={register.id} value={register.id}>
                 {INCOME_PART_NAMES[register.part]} — {register.branchName}
               </option>

@@ -208,12 +208,21 @@ describe('CashService', () => {
 describe('findIncomeRegister', () => {
   it('returns the existing register of the part', async () => {
     const db = { cashRegister: { findFirst: jest.fn().mockResolvedValue({ id: 'r1' }), create: jest.fn() } };
-    const result = await findIncomeRegister(db as never, 't1', 'b1', 'EBT');
+    const result = await findIncomeRegister(db as never, 't1', 'b1', 'ZELLE');
     expect(result.id).toBe('r1');
     expect(db.cashRegister.create).not.toHaveBeenCalled();
     expect(db.cashRegister.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { tenantId: 't1', branchId: 'b1', part: 'EBT', isActive: true } }),
+      expect.objectContaining({ where: { tenantId: 't1', branchId: 'b1', part: 'ZELLE', isActive: true } }),
     );
+  });
+
+  it('Card and EBT are retired: never opened or created again', async () => {
+    const db = { cashRegister: { findFirst: jest.fn(), create: jest.fn() }, $executeRaw: jest.fn() };
+    for (const part of ['CARD', 'EBT'] as const) {
+      await expect(findIncomeRegister(db as never, 't1', 'b1', part)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    }
+    expect(db.cashRegister.findFirst).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('creates the register on first use with an insert that cannot duplicate it (ON CONFLICT … DO NOTHING)', async () => {
@@ -242,6 +251,18 @@ describe('recordCashTransaction', () => {
       },
     };
   }
+
+  it('retired Card / EBT account: nothing new is posted, only money leaving it through a transfer', async () => {
+    for (const type of ['INCOME', 'SALE', 'EXPENSE', 'WITHDRAWAL', 'TRANSFER_IN'] as const) {
+      const tx = buildTx({ balance: D(4500), isActive: true, part: 'CARD' } as never);
+      await expect(recordCashTransaction(tx as never, { tenantId: 't1', userId: 'u1', registerId: 'r-card', type, amount: D(1) })).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(tx.cashRegister.update).not.toHaveBeenCalled();
+      expect(tx.cashTransaction.create).not.toHaveBeenCalled();
+    }
+    const out = buildTx({ balance: D(4500), isActive: true, part: 'EBT' } as never);
+    await recordCashTransaction(out as never, { tenantId: 't1', userId: 'u1', registerId: 'r-ebt', type: 'TRANSFER_OUT', amount: D(100) });
+    expect(out.cashRegister.update).toHaveBeenCalledWith(expect.objectContaining({ data: { balance: D(4400) } }));
+  });
 
   it('register belonging to another tenant (or nonexistent) → 404 with no balance change — findFirst must filter by tenantId', async () => {
     const tx = buildTx(null);

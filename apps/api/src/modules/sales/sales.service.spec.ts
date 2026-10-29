@@ -205,7 +205,7 @@ describe('SalesService.createFromCart', () => {
     expect(findIncomeRegister).toHaveBeenCalledWith(tx, 't1', 'b1', 'DEBIT_CARD');
     expect(recordCashTransaction).toHaveBeenCalledWith(
       tx,
-      expect.objectContaining({ registerId: 'reg-auto', type: 'SALE', category: 'Debit Card' }),
+      expect.objectContaining({ registerId: 'reg-auto', type: 'SALE', category: 'System' }),
     );
     expect((recordCashTransaction as jest.Mock).mock.calls[0][1].amount.toString()).toBe('450');
   });

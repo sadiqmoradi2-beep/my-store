@@ -211,6 +211,8 @@ export interface CashRegisterDto {
   isActive: boolean;
   openingBalance: string;
   balance: string;
+  /** Card / EBT: kept for history and balances, never offered for new activity */
+  retired?: boolean;
 }
 
 export interface CashTransactionDto {
@@ -359,6 +361,8 @@ export interface IncomePartSummaryDto {
   income: string;
   /** Money that went out of this part during the range (expenses, salaries, withdrawals, debts paid) */
   expenses: string;
+  /** Card / EBT: shown only while it still has a balance or activity, never for new transactions */
+  retired?: boolean;
   /** Internal transfers into / out of this part — never income or expense */
   transfersIn?: string;
   transfersOut?: string;
@@ -372,7 +376,7 @@ export interface IncomeSummaryDto {
   to: string;
   parts: IncomePartSummaryDto[];
   totals: {
-    /** Sum of the income of every Income part (Cash, EBT, Zelle, Debit Card) */
+    /** Sum of the income of every Income part (Cash, System, Zelle; retired Card / EBT history included) */
     totalIncome: string;
     totalBalance: string;
     /** Every sale of the range, paid or not */

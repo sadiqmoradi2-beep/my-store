@@ -634,7 +634,7 @@ function PurchaseModal({
           <Field label={t('register')}>
             <Select value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
               <option value="">{t('noRegister')}</option>
-              {registers?.map((register) => (
+              {registers?.filter((x) => !x.retired).map((register) => (
                 <option key={register.id} value={register.id}>
                   {register.name}
                 </option>
