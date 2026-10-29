@@ -25,8 +25,9 @@ export function FinancialActorField({ context, error, label, value, onChange, di
   const t = useTranslations('cash');
   const options = (directory ?? []).filter((p) => p.kind === 'PERSON' && p.actorEligible !== false && (!p.branchId || p.branchId === branchId));
   return <Field label={label}>
-    {context?.canSelectActor ? <Select required value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="" disabled>{t('selectPerson')}</option>
+    {/* Optional for the Store Admin (the server treats it as optional): a store without Financial Personnel can still record */}
+    {context?.canSelectActor ? <Select value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{t('noOperation')}</option>
       {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
     </Select> : <Input readOnly value={context?.actor?.name ?? context?.operatorName ?? ''} />}
     <ErrorText error={error} />

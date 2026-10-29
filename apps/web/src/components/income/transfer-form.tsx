@@ -43,7 +43,7 @@ export function TransferForm({ register, typeField, onClose }: { register: CashR
         fromRegisterId: register.id,
         toRegisterId,
         amount: Number(amount),
-        transferredById: actorContext.data?.canSelectActor ? personId : undefined,
+        transferredById: actorContext.data?.canSelectActor && personId ? personId : undefined,
         date: isToday ? undefined : new Date(`${date}T12:00:00`).toISOString(),
         note: note || undefined,
       }),
