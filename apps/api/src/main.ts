@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { apiDocsEnabled } from './config/security';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -29,18 +30,23 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('MY STORE API')
-    .setDescription('MY STORE — Sales Management Platform')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  // API docs (UI at /api/docs and the raw spec at /api/docs-json) are for development only: in production they
+  // would hand anyone a map of every endpoint. ENABLE_API_DOCS=true turns them on deliberately.
+  const docsEnabled = apiDocsEnabled(process.env);
+  if (docsEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('MY STORE API')
+      .setDescription('MY STORE — Sales Management Platform')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
-  console.log(`MY STORE API → http://localhost:${port}/api/v1 (docs: /api/docs)`);
+  console.log(`MY STORE API → http://localhost:${port}/api/v1${docsEnabled ? ' (docs: /api/docs)' : ''}`);
 }
 
 bootstrap();
