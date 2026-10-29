@@ -6,6 +6,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { requireSignedUpload } from './common/uploads/signed-upload-url';
 import { apiDocsEnabled } from './config/security';
 
 async function bootstrap() {
@@ -15,7 +17,9 @@ async function bootstrap() {
   // scripts/styles that a locked-down CSP would break. Every other header helmet sets
   // (nosniff, frameguard, HSTS, etc.) stays on.
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.useStaticAssets(resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
+  // Receipts / invoices / payment proofs: only with a valid short-lived signature (issued inside authorized responses)
+  app.use('/uploads', requireSignedUpload(app.get(ConfigService).get<string>('jwt.secret')!));
+  app.useStaticAssets(resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads', index: false, dotfiles: 'deny' });
   // Behind a hosting proxy: trust only the configured number of proxy hops (default 1), never every hop —
   // `true` makes Express believe a client-supplied X-Forwarded-For, which defeats IP rate limits.
   const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);

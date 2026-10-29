@@ -1,6 +1,8 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { map, Observable } from 'rxjs';
+import { ConfigService } from '@nestjs/config';
+import { signUploadRefs, stripUploadSignatures } from '../uploads/signed-upload-url';
 
 /** Decimal → string and Date → ISO; applied recursively over the whole response body */
 export function serialize(value: unknown): unknown {
@@ -33,13 +35,21 @@ function isPaginated(data: unknown): data is PaginatedPayload {
 
 @Injectable()
 export class ResponseEnvelopeInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  constructor(private readonly config: ConfigService) {}
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const req = context.switchToHttp().getRequest<{ body?: unknown; user?: { tenantId?: string | null } }>();
+    // a signed upload link sent back by the browser is stored as its plain path (never with a signature)
+    if (req?.body && typeof req.body === 'object') req.body = stripUploadSignatures(req.body);
+    const secret = this.config.get<string>('jwt.secret')!;
+    // upload paths of the caller's own store become short-lived signed links (no user → nothing is signed)
+    const sign = (value: unknown) => (req?.user ? signUploadRefs(value, req.user.tenantId ?? null, secret) : value);
     return next.handle().pipe(
       map((data) => {
         if (isPaginated(data)) {
-          return { success: true, data: serialize(data.items), meta: data.meta };
+          return { success: true, data: sign(serialize(data.items)), meta: data.meta };
         }
-        return { success: true, data: serialize(data) };
+        return { success: true, data: sign(serialize(data)) };
       }),
     );
   }
