@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
@@ -10,6 +11,7 @@ import { AuthUser, JwtPayload, LoginResponse, ROLES, RoleKey, TwoFactorRequired,
 import { generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { LoginAttemptsService } from './login-attempts.service';
 import { randomBytes } from 'node:crypto';
 import { MailService } from '../../common/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -21,6 +23,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
+/** A valid bcrypt hash of a random value: unknown accounts still cost one comparison (no timing leak) */
+const DUMMY_HASH = bcrypt.hashSync(randomBytes(16).toString('hex'), 10);
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -33,12 +37,14 @@ export interface AuthResult extends LoginResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly repo: AuthRepository,
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
+    private readonly attempts: LoginAttemptsService,
   ) {}
 
   async registerTenant(dto: RegisterTenantDto): Promise<AuthResult> {
@@ -123,13 +129,14 @@ export class AuthService {
     return this.issueTokens(user!);
   }
 
-  async login(dto: LoginDto): Promise<AuthResult | TwoFactorRequired> {
+  async login(dto: LoginDto, ip = 'unknown'): Promise<AuthResult | TwoFactorRequired> {
+    // temporary lock after repeated failures (per account + source, and per account overall)
+    await this.attempts.assertCanTry(dto.email, ip);
     const user = await this.repo.findUserByEmail(dto.email);
-    if (!user || user.deletedAt || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Incorrect email or password');
-    }
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
+    // the same bcrypt work for unknown / inactive accounts, so timing does not reveal which e-mails exist
+    const valid = await bcrypt.compare(dto.password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || user.deletedAt || user.status !== 'ACTIVE' || !valid) {
+      await this.attempts.recordFailure(dto.email, ip);
       throw new UnauthorizedException('Incorrect email or password');
     }
     if (user.tenant && !user.tenant.isActive) {
@@ -138,9 +145,11 @@ export class AuthService {
     if (user.totpEnabledAt && user.totpSecret) {
       if (!dto.totpCode) return { requires2fa: true };
       if (!verifyTotp(user.totpSecret, dto.totpCode)) {
+        await this.attempts.recordFailure(dto.email, ip);
         throw new UnauthorizedException('Incorrect two-factor code');
       }
     }
+    await this.attempts.recordSuccess(dto.email, ip);
     await this.repo.markLogin(user.id);
     return this.issueTokens(user);
   }
@@ -306,17 +315,23 @@ export class AuthService {
 
   /** Password recovery request — always returns the same public response (does not reveal whether the email exists) */
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const response = { message: 'If this email is registered, a reset link has been sent to it' };
+    // at most a few reset e-mails per account per hour (no inbox flooding); same answer either way
+    if (!(await this.attempts.allowResetEmail(dto.email))) return response;
     const user = await this.repo.findUserByEmail(dto.email);
     if (user && !user.deletedAt) {
       const rawToken = await this.issueResetToken(user.id, RESET_TOKEN_TTL_MS);
       const resetUrl = this.setPasswordUrl(user.email, user.locale, rawToken);
-      await this.mail.send({
-        to: user.email,
-        subject: 'Reset your MY STORE password',
-        html: `<p>Click the link below to set a new password (valid for 30 minutes):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
-      });
+      // sent in the background, so the response time does not reveal whether the account exists
+      this.mail
+        .send({
+          to: user.email,
+          subject: 'Reset your MY STORE password',
+          html: `<p>Click the link below to set a new password (valid for 30 minutes):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+        })
+        .catch((err) => this.logger.error('Failed to send a password-reset email', err));
     }
-    return { message: 'If this email is registered, a reset link has been sent to it' };
+    return response;
   }
 
   /** New employee/seller login: email a "set up your account" link instead of handing the owner a temp password */
@@ -343,13 +358,18 @@ export class AuthService {
   }
 
   /** Set a new password with the reset token — the reason it's invalid (missing user/expired/mismatch) is not revealed */
-  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    const invalidLink = () => new BadRequestException('The reset link is invalid or has expired');
+  async resetPassword(dto: ResetPasswordDto, ip = 'unknown'): Promise<{ message: string }> {
+    await this.attempts.assertCanReset(dto.email, ip);
+    const invalidLink = async () => {
+      await this.attempts.recordFailure(dto.email, ip);
+      return new BadRequestException('The reset link is invalid or has expired');
+    };
     const user = await this.repo.findUserByEmail(dto.email);
-    if (!user || !user.resetTokenHash || !user.resetTokenExpiresAt) throw invalidLink();
-    if (user.resetTokenExpiresAt.getTime() < Date.now()) throw invalidLink();
+    if (!user || !user.resetTokenHash || !user.resetTokenExpiresAt) throw await invalidLink();
+    if (user.resetTokenExpiresAt.getTime() < Date.now()) throw await invalidLink();
     const matches = await bcrypt.compare(dto.token, user.resetTokenHash);
-    if (!matches) throw invalidLink();
+    if (!matches) throw await invalidLink();
+    await this.attempts.recordSuccess(dto.email, ip);
 
     const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
     await this.prisma.user.update({

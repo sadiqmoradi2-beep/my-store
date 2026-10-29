@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -7,6 +7,7 @@ import { MailService } from '../../common/mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
+import { LoginAttemptsService } from './login-attempts.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -53,6 +54,13 @@ describe('AuthService', () => {
     role: { key: 'ADMIN', rolePermissions: [] },
   };
 
+  const attempts = {
+    assertCanTry: jest.fn(),
+    recordFailure: jest.fn(),
+    recordSuccess: jest.fn(),
+    assertCanReset: jest.fn(),
+    allowResetEmail: jest.fn().mockResolvedValue(true),
+  };
   beforeEach(async () => {
     repo = {
       findUserByEmail: jest.fn(),
@@ -94,6 +102,7 @@ describe('AuthService', () => {
         },
         { provide: ConfigService, useValue: { get: jest.fn((_k: string, d?: string) => d ?? 'secret') } },
         { provide: MailService, useValue: mail },
+        { provide: LoginAttemptsService, useValue: attempts },
       ],
     }).compile();
     service = moduleRef.get(AuthService);
@@ -130,6 +139,20 @@ describe('AuthService', () => {
     await expect(service.login({ email: 'a@b.af', password: 'x' })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it('brute-force protection: a locked account is refused before any lookup; failures are counted, success clears them', async () => {
+    attempts.assertCanTry.mockRejectedValueOnce(new HttpException('locked', 429));
+    await expect(service.login({ email: 'a@b.af', password: 'Correct@123' }, '1.2.3.4')).rejects.toMatchObject({ status: 429 });
+    expect(repo.findUserByEmail).not.toHaveBeenCalled();
+
+    repo.findUserByEmail.mockResolvedValue(null); // unknown e-mail: same 401, still counted
+    await expect(service.login({ email: 'ghost@b.af', password: 'x' }, '1.2.3.4')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(attempts.recordFailure).toHaveBeenCalledWith('ghost@b.af', '1.2.3.4');
+
+    repo.findUserByEmail.mockResolvedValue({ ...baseUser, passwordHash: await bcrypt.hash('Correct@123', 4) });
+    await service.login({ email: 'a@b.af', password: 'Correct@123' }, '1.2.3.4');
+    expect(attempts.recordSuccess).toHaveBeenCalledWith('a@b.af', '1.2.3.4');
   });
 
   it('reuse of a rotated refresh token → revoke all sessions', async () => {

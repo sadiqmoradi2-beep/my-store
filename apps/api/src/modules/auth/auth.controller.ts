@@ -50,7 +50,7 @@ export class AuthController {
   @HttpCode(200)
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.login(dto);
+    const result = await this.authService.login(dto, req.ip ?? 'unknown');
     if ('requires2fa' in result) return result;
     return this.withRefreshCookie(res, result, isMobile(req));
   }
@@ -83,8 +83,8 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    return this.authService.resetPassword(dto, req.ip ?? 'unknown');
   }
 
   @HttpCode(200)

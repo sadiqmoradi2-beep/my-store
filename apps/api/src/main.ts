@@ -15,8 +15,10 @@ async function bootstrap() {
   // (nosniff, frameguard, HSTS, etc.) stays on.
   app.use(helmet({ contentSecurityPolicy: false }));
   app.useStaticAssets(resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
-  // Behind a hosting proxy (Render/Vercel): use the real client IP for rate limiting
-  app.set('trust proxy', true);
+  // Behind a hosting proxy: trust only the configured number of proxy hops (default 1), never every hop —
+  // `true` makes Express believe a client-supplied X-Forwarded-For, which defeats IP rate limits.
+  const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 1);
+  app.set('trust proxy', Number.isInteger(proxyHops) && proxyHops >= 0 ? proxyHops : 1);
   app.setGlobalPrefix('api/v1');
   app.use(cookieParser());
   app.enableCors({
